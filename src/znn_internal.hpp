@@ -9,6 +9,7 @@
 #pragma once
 #include "znn.hpp"
 #include <atomic>
+#include "backends/cuda/cuda_backend.hpp"
 #include <stdexcept>
 #include <string>
 

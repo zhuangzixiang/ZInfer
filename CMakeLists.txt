@@ -15,6 +15,7 @@ endif()
 
 option(ZNN_BUILD_TESTS    "Build tests"     ON)
 option(ZNN_BUILD_EXAMPLES "Build examples"  ON)
+option(ZNN_CUDA "Build CUDA backend (requires nvcc)" OFF)
 # 里程碑 2+ 启用的后端开关: ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / ZNN_ONEDNN
 # 唯一默认三方依赖 Eigen 于实现阶段引入 third_party/eigen
 
@@ -84,6 +85,13 @@ set(ZNN_OPTIM
     src/optim/adamw.cpp
 )
 
+if(ZNN_CUDA)
+    enable_language(CUDA)
+    set(ZNN_CUDA_SRC src/backends/cuda/cuda_device.cu)
+else()
+    set(ZNN_CUDA_SRC src/backends/cuda/cuda_stub.cpp)
+endif()
+
 add_library(znn
     src/znn_internal.cpp
     src/autograd.cpp
@@ -91,6 +99,7 @@ add_library(znn
     ${ZNN_OPERATORS}
     ${ZNN_LAYERS}
     ${ZNN_OPTIM}
+    ${ZNN_CUDA_SRC}
 )
 target_include_directories(znn PUBLIC include PRIVATE src third_party/eigen)
 

@@ -331,3 +331,22 @@ causal 行 0 只看位置 0 / Dropout 保留率+缩放+梯度 0-or-2+eval 直通
 
 **反思**: 架构 9/10(全部经注册算子与选项副本机制, 零机制新增) |
 选项副本机制(块 F 偿的债)在本包中连续支撑 5 处, 证明设计正确。
+
+---
+
+## [14] CUDA 后端骨架(里程碑 2 起点)
+
+**内容**
+- src/backends/cuda/: cuda_backend.hpp(内部接口: available/alloc/
+  free/h2d/d2h) + cuda_stub.cpp(非CUDA 构建的明确报错实现) +
+  cuda_device.cu(cudaMalloc/cudaMemcpy + 示范 add 内核展示扩展模式)
+- Storage::create/~Storage 按设备分发分配/释放; Tensor::to_device
+  实现 CPU↔CUDA 同步拷贝(非连续视图先紧凑化)
+- CMake: option ZNN_CUDA(默认 OFF), stub ↔ .cu 二选一;
+  默认构建完全不受影响
+
+**扩展模式**(与 DESIGN §5.2 一致): 新算子 = operators/foo.cu 填
+kernels[CUDA] 槽位, 派发器按输入设备自动选择——无需改机制。
+
+**验证**: 默认构建全绿(测试/基准), stub 路径行为明确。
+教训: CMake 变量必须先 set 后引用, 条件块要放 add_library 之前。

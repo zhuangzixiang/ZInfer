@@ -131,6 +131,16 @@ bool Shape::operator==(const Shape& other) const {
 // ============================================================ Storage
 
 Storage* Storage::create(size_t bytes, Device device) {
+    if (device == Device::CUDA) {
+        if (!cuda_backend::available()) {
+            throw std::runtime_error("znn: CUDA device not available");
+        }
+        Storage* s = new Storage(bytes, device);
+        if (bytes > 0) {
+            s->data_ = cuda_backend::alloc(bytes);
+        }
+        return s;
+    }
     check_cpu(device);
     Storage* s = new Storage(bytes, device);
     if (bytes > 0) {
@@ -144,7 +154,12 @@ Storage::Storage(size_t bytes, Device device)
 }
 
 Storage::~Storage() {
-    if (data_) {
+    if (!data_) {
+        return;
+    }
+    if (device_ == Device::CUDA) {
+        cuda_backend::free(data_);
+    } else {
         ::operator delete(data_);
     }
 }
