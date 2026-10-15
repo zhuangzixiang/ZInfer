@@ -24,20 +24,23 @@ static void conv2d_eigen(KernelContext&, Span<const Tensor*> in,
     const int64_t N = x.size(0), C = x.size(1), H = x.size(2), W = x.size(3);
     const int64_t O = w.size(0), KH = w.size(2), KW = w.size(3);
     const int64_t HO = y.size(2), WO = y.size(3);
+    const int64_t G = o->groups;
+    const int64_t Cg = C / G;                             // 每组输入通道
+    const int64_t Og = O / G;                             // 每组输出通道
     using Mat = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
     const float* xp = x.data<float>();
     const float* wp = w.data<float>();
     float* yp = y.data<float>();
-    // W_row: [O, C*KH*KW] —— 权重本身行主序连续
-    Eigen::Map<const Mat> w_row(wp, O, C * KH * KW);
-    std::vector<float> col_buf(static_cast<size_t>(C * KH * KW * HO * WO));
+    std::vector<float> col_buf(static_cast<size_t>(Cg * KH * KW * HO * WO));
+    for (int64_t g = 0; g < G; ++g) {
+    Eigen::Map<const Mat> w_row(wp + g * Og * Cg * KH * KW, Og, Cg * KH * KW);
     for (int64_t n = 0; n < N; ++n) {
-        Eigen::Map<Mat> x_col(col_buf.data(), C * KH * KW, HO * WO);
+        Eigen::Map<Mat> x_col(col_buf.data(), Cg * KH * KW, HO * WO);
         x_col.setZero();
-        for (int64_t c = 0; c < C; ++c) {
+        for (int64_t c = g * Cg; c < (g + 1) * Cg; ++c) {
             for (int64_t ki = 0; ki < KH; ++ki) {
                 for (int64_t kj = 0; kj < KW; ++kj) {
-                    const int64_t row = (c * KH + ki) * KW + kj;
+                    const int64_t row = ((c - g * Cg) * KH + ki) * KW + kj;
                     for (int64_t ho = 0; ho < HO; ++ho) {
                         const int64_t i = ho * o->stride[0] + ki * o->dilation[0] - o->pad[0];
                         if (i < 0 || i >= H) continue;
@@ -50,8 +53,9 @@ static void conv2d_eigen(KernelContext&, Span<const Tensor*> in,
                 }
             }
         }
-        Eigen::Map<Mat> y_out(yp + n * O * HO * WO, O, HO * WO);
+        Eigen::Map<Mat> y_out(yp + n * O * HO * WO + g * Og * HO * WO, Og, HO * WO);
         y_out.noalias() = w_row * x_col;
+    }
     }
 }
 

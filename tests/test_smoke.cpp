@@ -374,6 +374,99 @@ static void test_eigen_vs_ref() {
     check(md2 < 1e-3f, "conv2d eigen vs ref allclose");
 }
 
+
+static void test_restriction_lifts() {
+    // 任意维 sum/mean + 梯度
+    const float a[6] = {1, 2, 3, 4, 5, 6};
+    Tensor A = Tensor::from_host(a, {2, 3});
+    Tensor s0 = Tensor::sum(A, 0);
+    check(s0.dim_count() == 1 && s0.data<float>()[0] == 5.f && s0.data<float>()[2] == 9.f,
+          "sum dim0 values");
+    Tensor m1 = Tensor::mean(A, 1, true);
+    check(m1.shape()[1] == 1 && fabsf(m1.data<float>()[0] - 2.f) < 1e-5f, "mean dim1 keepdim");
+    Tensor R = Tensor::from_host(a, {2, 3});
+    R.requires_grad(true);
+    Tensor l0 = Tensor::sum(Tensor::sum(R, 0), -1);       // {1}
+    l0.backward();
+    check(R.grad().data<float>()[0] == 1.f && R.grad().data<float>()[5] == 1.f,
+          "sum dim0 grad broadcast");
+
+    // softmax 沿 dim 0: 每列和为 1
+    Tensor sm0 = Activator::softmax(A, 0);
+    const float col0 = sm0.data<float>()[0] + sm0.data<float>()[3];
+    check(col0 > 0.999f && col0 < 1.001f, "softmax dim0 col sums 1");
+
+    // permute 训练态: y = sum(permute(x, {1,0})) → dx 全 1
+    Tensor P = Tensor::from_host(a, {2, 3});
+    P.requires_grad(true);
+    Tensor lp = Tensor::sum(P.permute({1, 0}).flatten(), -1);
+    lp.backward();
+    bool all1 = true;
+    for (int64_t i = 0; i < 6; ++i) all1 = all1 && P.grad().data<float>()[i] == 1.f;
+    check(all1, "permute training grad");
+
+    // slice 训练态: 取行 1, loss=sum → 只有该行有梯度
+    Tensor S = Tensor::zeros({3, 2});
+    S.requires_grad(true);
+    Tensor sv = S.slice(0, 1, 2);
+    Tensor ls = Tensor::sum(sv.flatten(), -1);
+    ls.backward();
+    check(S.grad().data<float>()[0] == 0.f && S.grad().data<float>()[2] == 1.f
+          && S.grad().data<float>()[3] == 1.f, "slice training grad scatters");
+}
+
+static void test_grouped_conv_and_causal() {
+    // 分组卷积: groups=2 等价于两个独立半通道卷积拼接
+    const float x[8] = {1, 2, 3, 4, 5, 6, 7, 8};           // 1x4x2x2? 用 1x4x1x2? 用 {1,4,1,1}
+    const float w[8] = {1, 1, 2, 2, 3, 3, 4, 4};           // 4x1x1x1, groups=2
+    Tensor tx = Tensor::from_host(x, {1, 4, 1, 1});
+    Tensor tw = Tensor::from_host(w, {4, 1, 1, 1});
+    Conv2dOptions o;
+    o.groups = 2;
+    Tensor y = Tensor::conv2d(tx, tw, o);
+    // 每通道 = 权重·对应输入: [1,4,6,12]
+    check(y.data<float>()[0] == 1.f && y.data<float>()[1] == 4.f
+          && y.data<float>()[2] == 9.f && y.data<float>()[3] == 12.f, "grouped conv values");
+
+    // causal attention: L=2, 未来位置被屏蔽 → 第 0 行输出只依赖 v[0]
+    const float q[4] = {1, 0, 1, 0};
+    const float v[4] = {10, 20, 30, 40};
+    Tensor tq = Tensor::from_host(q, {1, 1, 2, 2});
+    Tensor tv = Tensor::from_host(v, {1, 1, 2, 2});
+    Tensor att = Tensor::attention(tq, tq, tv, true);
+    check(fabsf(att.data<float>()[0] - 10.f) < 1e-4f
+          && fabsf(att.data<float>()[1] - 20.f) < 1e-4f, "causal row0 attends only pos0");
+}
+
+static void test_dropout_layer() {
+    LayerParam dp;
+    dp.dropout_rate = 0.5;
+    Layer* drop = Layer::create(LayerType::Dropout, dp);
+    Tensor x = Tensor::ones({1000});
+    x.requires_grad(true);
+    Tensor y = drop->forward(x);                            // 训练态
+    float kept = 0.f, scale_of_kept = 0.f;
+    for (int64_t i = 0; i < 1000; ++i) {
+        const float v = y.data<float>()[i];
+        if (v > 0.f) { kept += 1.f; scale_of_kept = v; }
+    }
+    check(kept > 300.f && kept < 700.f, "dropout keeps ~half");
+    check(fabsf(scale_of_kept - 2.f) < 1e-5f, "inverted dropout scale 1/(1-p)");
+    Tensor loss = Tensor::sum(y, -1);
+    loss.backward();
+    // 梯度 = mask/(1-p) ∈ {0, 2}
+    bool grad_ok = true;
+    for (int64_t i = 0; i < 1000; ++i) {
+        const float g = x.grad().data<float>()[i];
+        grad_ok = grad_ok && (g == 0.f || g == 2.f);
+    }
+    check(grad_ok, "dropout grad is 0-or-2");
+    drop->train(false);
+    Tensor y2 = drop->forward(x);                           // eval 直通
+    check(y2.data<float>()[0] == 1.f, "dropout eval passthrough");
+    Layer::destroy(drop);
+}
+
 int main() {
     std::fprintf(stderr, "t1\n"); test_shape();
     std::fprintf(stderr, "t2\n"); test_create_and_read();

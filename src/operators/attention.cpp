@@ -9,6 +9,10 @@ namespace znn {
 
 extern const Operator g_attention_operator;
 
+struct AttentionOptions {
+    bool causal;               // true: 屏蔽未来位置(i < j 的注意力置 -inf)
+};
+
 static void attention_infer(Span<const TensorMeta*> in, const void*,
                             std::vector<Shape>& outs) {
     for (size_t i = 1; i < in.size(); ++i) {
@@ -34,7 +38,8 @@ static void gemm(const float* a, const float* b, float* c,
 }
 
 static void attention_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
-                          const void*) {
+                          const void* options) {
+    const AttentionOptions* oc = static_cast<const AttentionOptions*>(options);
     const Tensor& q = *in[0];
     const Tensor& k = *in[1];
     const Tensor& v = *in[2];
@@ -50,6 +55,11 @@ static void attention_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> 
             const float* vp = v.data<float>() + ((b * H + h) * L) * D;
             float* op = y.data<float>() + ((b * H + h) * L) * D;
             gemm(qp, kp, s.data(), L, D, L, scale, false);       // S = Q @ K^T
+            if (oc->causal) {
+                for (int64_t i = 0; i < L; ++i)
+                    for (int64_t j = i + 1; j < L; ++j)
+                        s[i * L + j] = -3.4e38f;                 // 屏蔽未来位置
+            }
             for (int64_t i = 0; i < L; ++i) {                    // 行 softmax(数值稳定)
                 float m = s[i * L];
                 for (int64_t j = 1; j < L; ++j) m = m < s[i * L + j] ? s[i * L + j] : m;
@@ -66,6 +76,7 @@ static void attention_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> 
 }
 
 static void attention_grad(BackwardContext& c) {
+    const AttentionOptions* oc = static_cast<const AttentionOptions*>(c.options);
     const Tensor& q = *c.saved_inputs[0];
     const Tensor& k = *c.saved_inputs[1];
     const Tensor& v = *c.saved_inputs[2];
@@ -89,6 +100,11 @@ static void attention_grad(BackwardContext& c) {
             float* dkp = dk.data<float>() + ((b * H + h) * L) * D;
             float* dvp = dv.data<float>() + ((b * H + h) * L) * D;
             gemm(qp, kp, s.data(), L, D, L, scale, false);       // 重算前向 S/P
+            if (oc->causal) {
+                for (int64_t i = 0; i < L; ++i)
+                    for (int64_t j = i + 1; j < L; ++j)
+                        s[i * L + j] = -3.4e38f;
+            }
             for (int64_t i = 0; i < L; ++i) {
                 float m = s[i * L];
                 for (int64_t j = 1; j < L; ++j) m = m < s[i * L + j] ? s[i * L + j] : m;
@@ -120,15 +136,14 @@ const Operator g_attention_operator = {
     attention_grad,
     attention_ref,
     {},                          // kernels[CPU/CUDA/Metal/Vulkan]
+    sizeof(AttentionOptions),
 };
 
 Tensor Tensor::attention(const Tensor& q, const Tensor& k, const Tensor& v, bool causal) {
-    if (causal) {
-        throw std::runtime_error("znn: causal attention pending v1.1");
-    }
+    const AttentionOptions o{causal};
     const Tensor* ins[3] = {&q, &k, &v};
     return OpDispatcher::instance().run(&g_attention_operator,
-                                        Span<const Tensor*>(ins, 3), nullptr);
+                                        Span<const Tensor*>(ins, 3), &o);
 }
 
 } // namespace znn

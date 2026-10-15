@@ -10,6 +10,30 @@
 
 namespace znn {
 
+namespace impl {
+
+// 视图(src 任意 strided) → dst(连续)逐元素紧凑拷贝, 只经公共访问器
+void copy_view_to(const Tensor& src, Tensor& dst) {
+    const int64_t rank = dst.dim_count();
+    const float* sp = src.data<float>();
+    float* dp = dst.data<float>();
+    const int64_t* ss = src.strides();
+    int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    for (int64_t i = 0; i < dst.numel(); ++i) {
+        int64_t so = 0;
+        for (int64_t d = 0; d < rank; ++d) {
+            so += idx[d] * ss[d];
+        }
+        dp[i] = sp[so];
+        for (int64_t d = rank - 1; d >= 0; --d) {
+            if (++idx[d] < dst.size(d)) break;
+            idx[d] = 0;
+        }
+    }
+}
+
+} // namespace impl
+
 // ============================================================ 内部小工具
 
 size_t dtype_size(DType dtype) {
@@ -424,6 +448,9 @@ Tensor Tensor::unsqueeze(int64_t dim) const {
 
 Tensor Tensor::slice(int64_t dim, int64_t begin, int64_t end) const {
     require(impl_, "empty tensor");
+    if (Runtime::grad_enabled() && impl_->requires_grad) {
+        return slice_for_autograd(*this, dim, begin, end);   // 训练态: 材料化+散射梯度
+    }
     const Shape& sp = impl_->shape;
     const int64_t d = normalize_index(dim, sp.rank);
     require(begin >= 0 && end <= sp.dims[d] && begin < end, "slice: range invalid");
@@ -460,6 +487,9 @@ Tensor Tensor::transpose(int64_t d0, int64_t d1) const {
 
 Tensor Tensor::permute(std::initializer_list<int64_t> dims) const {
     require(impl_, "empty tensor");
+    if (Runtime::grad_enabled() && impl_->requires_grad) {
+        return permute_for_autograd(*this, dims);       // 训练态: 材料化+逆排列梯度
+    }
     const Shape& sp = impl_->shape;
     require(static_cast<int64_t>(dims.size()) == sp.rank, "permute: rank mismatch");
     Shape shape;

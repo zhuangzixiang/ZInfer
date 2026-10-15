@@ -307,3 +307,27 @@ MLP 训练步 2.5×(14.2s/epoch) / MNIST 5epoch ~12min → 152s, acc 97.09%
 
 **反思**: 架构不变(槽位换内核, 派发/前端零改动, 验证了
 "提速=往 kernels[] 换实现"的承诺); 完成度: 里程碑1 性能项达标。
+
+---
+
+## [13] 限制解除包: 全部 v1 限制清零
+
+**内容**
+1. sum/mean/softmax 任意维: 选项经节点副本传入梯度规则,
+   softmax 重写为"outer 遍历 + 行内 stride 步进"通用实现
+2. permute/slice 训练态: 新增两算子(材料化前向 + 逆排列/散射梯度),
+   视图族(reshape/transpose/permute/slice)全部接入训练图
+3. 分组卷积: infer/朴素/Eigen im2col 三处按组循环
+   (oc→组映射, 权重下标 oc*Cg; Eigen 每组独立 GEMM)
+4. Dropout 层: 逆置失活 x·mask/(1-p), mask 为常量张量经 mul 算子
+   ——梯度自动回传, 无需专用算子; eval 直通
+5. causal attention: AttentionOptions{causal} 经选项副本,
+   前向/梯度重算均施加未来位置 -inf 掩码
+
+**测试**: sum dim0 值+梯度广播 / mean keepdim / softmax 列归一 /
+permute 恒等梯度 / slice 散射梯度 / 分组卷积值(手算) /
+causal 行 0 只看位置 0 / Dropout 保留率+缩放+梯度 0-or-2+eval 直通
+—— 全部通过。
+
+**反思**: 架构 9/10(全部经注册算子与选项副本机制, 零机制新增) |
+选项副本机制(块 F 偿的债)在本包中连续支撑 5 处, 证明设计正确。

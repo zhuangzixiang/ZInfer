@@ -12,8 +12,8 @@ static void conv2d_infer(Span<const TensorMeta*> in, const void* options,
     const Conv2dOptions* o = static_cast<const Conv2dOptions*>(options);
     const Shape& x = *in[0]->shape;                       // {N,C,H,W}
     const Shape& w = *in[1]->shape;                       // {O,C,KH,KW}
-    if (x.rank != 4 || w.rank != 4 || x[1] != w[1] || o->groups != 1) {
-        throw std::runtime_error("znn: conv2d expects NCHW x [O,C,KH,KW], groups=1");
+    if (x.rank != 4 || w.rank != 4 || x[1] != w[1] * o->groups || w[0] % o->groups != 0) {
+        throw std::runtime_error("znn: conv2d expects NCHW x [O, C/groups, KH, KW]");
     }
     const int64_t ho = (x[2] + 2 * o->pad[0] - o->dilation[0] * (w[2] - 1) - 1) / o->stride[0] + 1;
     const int64_t wo = (x[3] + 2 * o->pad[1] - o->dilation[1] * (w[3] - 1) - 1) / o->stride[1] + 1;
@@ -38,12 +38,16 @@ void conv2d_naive(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const float* wp = w.data<float>();
     float* yp = y.data<float>();
     const int64_t* xs = x.strides();
+    const int64_t G = o->groups;
+    const int64_t Cg = C / G;
+    const int64_t Og = O / G;
     for (int64_t n = 0; n < N; ++n) {
         for (int64_t oc = 0; oc < O; ++oc) {
+            const int64_t g = oc / Og;                      // 输出通道所属组
             for (int64_t ho = 0; ho < HO; ++ho) {
                 for (int64_t wo = 0; wo < WO; ++wo) {
                     float acc = 0.f;
-                    for (int64_t c = 0; c < C; ++c) {
+                    for (int64_t c = g * Cg; c < (g + 1) * Cg; ++c) {
                         for (int64_t ki = 0; ki < KH; ++ki) {
                             const int64_t i = ho * o->stride[0] + ki * o->dilation[0] - o->pad[0];
                             if (i < 0 || i >= H) continue;
@@ -51,7 +55,7 @@ void conv2d_naive(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                                 const int64_t j = wo * o->stride[1] + kj * o->dilation[1] - o->pad[1];
                                 if (j < 0 || j >= W) continue;
                                 acc += xp[n * xs[0] + c * xs[1] + i * xs[2] + j * xs[3]]
-                                     * wp[((oc * C + c) * KH + ki) * KW + kj];
+                                     * wp[((oc * Cg + c) * KH + ki) * KW + kj];
                             }
                         }
                     }
@@ -78,12 +82,16 @@ static void conv2d_grad(BackwardContext& c) {
     float* dxp = dx.data<float>();
     float* dwp = dw.data<float>();
     const int64_t* xs = x.strides();
+    const int64_t G2 = o->groups;
+    const int64_t Cg2 = C / G2;
+    const int64_t Og2 = O / G2;
     for (int64_t n = 0; n < N; ++n) {
         for (int64_t oc = 0; oc < O; ++oc) {
+            const int64_t g = oc / Og2;
             for (int64_t ho = 0; ho < HO; ++ho) {
                 for (int64_t wo = 0; wo < WO; ++wo) {
                     const float dy = gp[((n * O + oc) * HO + ho) * WO + wo];
-                    for (int64_t c = 0; c < C; ++c) {
+                    for (int64_t c = g * Cg2; c < (g + 1) * Cg2; ++c) {
                         for (int64_t ki = 0; ki < KH; ++ki) {
                             const int64_t i = ho * o->stride[0] + ki * o->dilation[0] - o->pad[0];
                             if (i < 0 || i >= H) continue;
@@ -91,8 +99,8 @@ static void conv2d_grad(BackwardContext& c) {
                                 const int64_t j = wo * o->stride[1] + kj * o->dilation[1] - o->pad[1];
                                 if (j < 0 || j >= W) continue;
                                 const float xv = xp[n * xs[0] + c * xs[1] + i * xs[2] + j * xs[3]];
-                                dwp[((oc * C + c) * KH + ki) * KW + kj] += dy * xv;
-                                dxp[((n * C + c) * H + i) * W + j] += dy * wp[((oc * C + c) * KH + ki) * KW + kj];
+                                dwp[((oc * Cg2 + c) * KH + ki) * KW + kj] += dy * xv;
+                                dxp[((n * C + c) * H + i) * W + j] += dy * wp[((oc * Cg2 + c) * KH + ki) * KW + kj];
                             }
                         }
                     }

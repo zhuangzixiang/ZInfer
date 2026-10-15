@@ -56,6 +56,9 @@ Tensor batch_norm2d_apply(const Tensor& x, const Tensor& w, const Tensor& b,
 
 // 训练态形状变换(材料化+逆梯度); 纯推理态各视图方法直接返回零拷贝视图
 Tensor reshape_for_autograd(const Tensor& x, Shape target);
+// 训练态维度重排/切片(材料化+逆变换梯度); 纯推理态为零拷贝视图
+Tensor permute_for_autograd(const Tensor& x, std::initializer_list<int64_t> dims);
+Tensor slice_for_autograd(const Tensor& x, int64_t dim, int64_t begin, int64_t end);
 // 训练态转置(材料化+逆梯度); 纯推理态 Tensor::transpose 直接返回零拷贝视图
 Tensor transpose_for_autograd(const Tensor& x, int64_t d0, int64_t d1);
 

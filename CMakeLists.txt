@@ -57,6 +57,8 @@ set(ZNN_OPERATORS
     src/operators/mse.cpp
     src/operators/transpose.cpp
     src/operators/reshape.cpp
+    src/operators/permute.cpp
+    src/operators/slice.cpp
     src/operators/operator_list.cpp
 )
 

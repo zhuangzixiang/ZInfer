@@ -6,6 +6,7 @@
 // ============================================================================
 #pragma once
 #include "znn.hpp"
+#include <random>
 #include <vector>
 
 namespace znn {
@@ -111,6 +112,7 @@ public:
 private:
     double rate_;
     unsigned seed_;
+    std::mt19937 rng_;                                      // 前向掩码随机源
     bool training_ = true;
 };
 
