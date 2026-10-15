@@ -1,6 +1,7 @@
 // matmul: 2D 矩阵乘(v1 仅 rank-2); 梯度 dA=dY@Bᵀ, dB=dYᵀ@A 经算子组合
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -57,7 +58,7 @@ const Operator g_matmul_operator = {
     matmul_infer,
     matmul_grad,
     matmul_ref,
-    {matmul_cpu_kernel()},    // kernels[CPU] = Eigen GEMM(非连续输入内部回退)
+    {matmul_cpu_kernel(), cuda_backend::matmul_cuda, nullptr, nullptr},  // CPU=Eigen, CUDA=朴素GEMM
 };
 
 Tensor Tensor::matmul(const Tensor& a, const Tensor& b) {

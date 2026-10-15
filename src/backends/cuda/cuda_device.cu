@@ -54,5 +54,13 @@ void copy_device_to_host(void* dst, const void* src, size_t bytes) {
     check(cudaMemcpy(dst, src, bytes, cudaMemcpyDeviceToHost), "d2h copy");
 }
 
+void copy_device_to_device(void* dst, const void* src, size_t bytes) {
+    check(cudaMemcpy(dst, src, bytes, cudaMemcpyDeviceToDevice), "d2d copy");
+}
+
+void memset0(void* p, size_t bytes) {
+    check(cudaMemset(p, 0, bytes), "memset0");
+}
+
 } // namespace cuda_backend
 } // namespace znn

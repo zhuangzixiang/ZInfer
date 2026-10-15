@@ -1,6 +1,7 @@
 // neg: 逐元素一元运算()
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -19,7 +20,7 @@ const Operator g_neg_operator = {
     infer_same,
     neg_grad,
     neg_ref,
-    {},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::neg_cuda, nullptr, nullptr},
 };
 
 Tensor Tensor::neg(const Tensor& x) {

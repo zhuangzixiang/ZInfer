@@ -56,6 +56,14 @@ void check_cpu(Device device) {
 
 // 见头文件声明: dst 连续, src 任意 strided 视图
 void Tensor::Impl::copy_elements(const Tensor::Impl* src, Tensor::Impl* dst) {
+    if (src->device == Device::CUDA || dst->device == Device::CUDA) {
+        if (src->device != dst->device) {
+            throw std::runtime_error("znn: cross-device copy must go through to_device");
+        }
+        cuda_backend::copy_device_to_device(dst->storage->data(), src->storage->data(),
+                                            dst->nbytes());
+        return;
+    }
     const int64_t total = static_cast<int64_t>(dst->nbytes() / dtype_size(dst->dtype));
     const size_t esz = dtype_size(dst->dtype);
     char* out = static_cast<char*>(dst->storage->data());
@@ -289,7 +297,11 @@ Tensor Tensor::empty(Shape shape, DType dtype, Device device) {
 
 Tensor Tensor::zeros(Shape shape, DType dtype, Device device) {
     Tensor t = Tensor::empty(shape, dtype, device);
-    std::memset(t.impl_->storage->data(), 0, t.impl_->nbytes());
+    if (device == Device::CUDA) {
+        cuda_backend::memset0(t.impl_->storage->data(), t.impl_->nbytes());
+    } else {
+        std::memset(t.impl_->storage->data(), 0, t.impl_->nbytes());
+    }
     return t;
 }
 
@@ -320,7 +332,12 @@ Tensor Tensor::full(Shape shape, double value, DType dtype, Device device) {
 Tensor Tensor::from_host(const void* data, Shape shape, DType dtype, Device device) {
     Tensor t = Tensor::empty(shape, dtype, device);
     if (t.numel() > 0) {
-        std::memcpy(t.impl_->storage->data(), data, t.impl_->nbytes());
+        if (device == Device::CUDA) {
+            cuda_backend::copy_host_to_device(t.impl_->storage->data(), data,
+                                              t.impl_->nbytes());
+        } else {
+            std::memcpy(t.impl_->storage->data(), data, t.impl_->nbytes());
+        }
     }
     return t;
 }

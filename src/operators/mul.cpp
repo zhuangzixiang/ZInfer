@@ -1,6 +1,7 @@
 // mul: 逐元素二元运算(输入间自动广播)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -23,7 +24,7 @@ const Operator g_mul_operator = {
     infer_broadcast,
     mul_grad,
     mul_ref,
-    {},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::mul_cuda, nullptr, nullptr},
 };
 
 Tensor Tensor::mul(const Tensor& a, const Tensor& b) {

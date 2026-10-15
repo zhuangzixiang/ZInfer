@@ -1,6 +1,7 @@
 // sigmoid: 激活函数()
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -19,7 +20,7 @@ const Operator g_sigmoid_operator = {
     infer_same,
     sigmoid_grad,
     sigmoid_ref,
-    {},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::sigmoid_cuda, nullptr, nullptr},
 };
 
 Tensor Activator::sigmoid(const Tensor& x) {

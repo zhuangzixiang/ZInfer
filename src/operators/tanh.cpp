@@ -1,6 +1,7 @@
 // tanh: 激活函数()
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -19,7 +20,7 @@ const Operator g_tanh_operator = {
     infer_same,
     tanh_grad,
     tanh_ref,
-    {},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::tanh_cuda, nullptr, nullptr},
 };
 
 Tensor Activator::tanh(const Tensor& x) {

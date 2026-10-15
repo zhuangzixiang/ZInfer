@@ -1,12 +1,22 @@
 // op_dispatcher.cpp — 派发器实现(索引构建为结构性实现, 派发链为占位)
 #include "op_dispatcher.hpp"
 #include "autograd.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 #include "znn_internal.hpp"
+#include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
 #include <vector>
 
 namespace znn {
+
+namespace {
+// CPU 中间结果拷回原设备输出(经 Storage 直写, 保持输出张量身份)
+void Impl_copy_back(const Tensor& cpu_src, Tensor& dst) {
+    cuda_backend::copy_host_to_device(dst.data<float>(), cpu_src.data<float>(),
+                                      static_cast<size_t>(cpu_src.numel()) * sizeof(float));
+}
+} // namespace
 
 OpDispatcher& OpDispatcher::instance() {
     static OpDispatcher dispatcher;
@@ -55,7 +65,30 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
         throw std::runtime_error(std::string("znn: no kernel for operator ") + op->name);
     }
     KernelContext ctx{dev, nullptr};
-    kernel(ctx, inputs, Span<Tensor*>(outs, 1), options);
+    const bool fallback = dev != Device::CPU && kernel == op->ref;
+    if (!fallback) {
+        kernel(ctx, inputs, Span<Tensor*>(outs, 1), options);
+    } else {
+        // 透明降级: 拷回 CPU 执行 ref, 结果拷回原设备(带一次性告警)
+        static bool warned = false;
+        if (!warned) {
+            std::fprintf(stderr, "znn: op '%s' has no native kernel, falling back to CPU",
+                         op->name);
+            warned = true;
+        }
+        std::vector<Tensor> cpu_ins(inputs.size());
+        std::vector<const Tensor*> cpu_ptrs(inputs.size());
+        for (size_t i = 0; i < inputs.size(); ++i) {
+            cpu_ins[i] = inputs[i]->to_device(Device::CPU);
+            cpu_ptrs[i] = &cpu_ins[i];
+        }
+        Tensor cpu_out = Tensor::empty(out.shape(), out.dtype(), Device::CPU);
+        Tensor* cpu_outs[1] = {&cpu_out};
+        KernelContext cpu_ctx{Device::CPU, nullptr};
+        kernel(cpu_ctx, Span<const Tensor*>(cpu_ptrs.data(), cpu_ptrs.size()),
+               Span<Tensor*>(cpu_outs, 1), options);
+        Impl_copy_back(cpu_out, out);
+    }
     // 4. 训练时建图: 任一输入 requires_grad 则输出也标记
     if (Runtime::grad_enabled() && op->grad) {
         bool any = false;

@@ -467,6 +467,53 @@ static void test_dropout_layer() {
     Layer::destroy(drop);
 }
 
+
+static void test_cuda_parity() {
+    if (!Runtime::device_available(Device::CUDA)) {
+        std::printf("CUDA not available, skipping GPU parity tests\n");
+        return;
+    }
+    // 逐元素: GPU 与 CPU 结果一致
+    Tensor a = Tensor::randn({64, 64}, 11);
+    Tensor b = Tensor::randn({64, 64}, 12);
+    Tensor cpu_add = Tensor::add(a, b);
+    Tensor gpu_add = Tensor::add(a.to_device(Device::CUDA), b.to_device(Device::CUDA))
+                         .to_device(Device::CPU);
+    float max_d = 0.f;
+    for (int64_t i = 0; i < cpu_add.numel(); ++i) {
+        const float d = fabsf(cpu_add.data<float>()[i] - gpu_add.data<float>()[i]);
+        max_d = max_d < d ? d : max_d;
+    }
+    check(max_d == 0.f, "cuda add parity");
+
+    Tensor gpu_relu = Activator::relu(a.to_device(Device::CUDA)).to_device(Device::CPU);
+    float rd = 0.f;
+    for (int64_t i = 0; i < gpu_relu.numel(); ++i) {
+        const float d = fabsf(Activator::relu(a).data<float>()[i] - gpu_relu.data<float>()[i]);
+        rd = rd < d ? d : rd;
+    }
+    check(rd == 0.f, "cuda relu parity");
+
+    // matmul: 朴素 GPU GEMM vs Eigen CPU
+    Tensor m1 = Tensor::randn({32, 48}, 13);
+    Tensor m2 = Tensor::randn({48, 24}, 14);
+    Tensor cpu_mm = Tensor::matmul(m1, m2);
+    Tensor gpu_mm = Tensor::matmul(m1.to_device(Device::CUDA), m2.to_device(Device::CUDA))
+                        .to_device(Device::CPU);
+    float md = 0.f;
+    for (int64_t i = 0; i < cpu_mm.numel(); ++i) {
+        const float d = fabsf(cpu_mm.data<float>()[i] - gpu_mm.data<float>()[i]);
+        md = md < d ? d : md;
+    }
+    check(md < 1e-4f, "cuda matmul parity");
+
+    // 兜底链: softmax 无 CUDA 内核 → GPU 输入自动落 CPU 计算再拷回
+    Tensor sm = Activator::softmax(a.to_device(Device::CUDA));
+    Tensor sm_cpu = sm.to_device(Device::CPU);
+    check(sm_cpu.numel() == a.numel(), "cuda fallback softmax shape");
+    std::printf("CUDA parity tests passed\n");
+}
+
 int main() {
     std::fprintf(stderr, "t1\n"); test_shape();
     std::fprintf(stderr, "t2\n"); test_create_and_read();

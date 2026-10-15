@@ -1,6 +1,7 @@
 // sub: 逐元素二元运算(输入间自动广播)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -15,7 +16,7 @@ const Operator g_sub_operator = {
     infer_broadcast,
     binary_grad,
     sub_ref,
-    {},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::sub_cuda, nullptr, nullptr},
 };
 
 Tensor Tensor::sub(const Tensor& a, const Tensor& b) {

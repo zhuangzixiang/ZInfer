@@ -1,6 +1,7 @@
 // sqrt: 逐元素一元运算()
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -19,7 +20,7 @@ const Operator g_sqrt_operator = {
     infer_same,
     sqrt_grad,
     sqrt_ref,
-    {},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::sqrt_cuda, nullptr, nullptr},
 };
 
 Tensor Tensor::sqrt(const Tensor& x) {

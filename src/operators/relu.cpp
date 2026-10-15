@@ -1,6 +1,7 @@
 // relu: 激活函数()
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -19,7 +20,7 @@ const Operator g_relu_operator = {
     infer_same,
     relu_grad,
     relu_ref,
-    {},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::relu_cuda, nullptr, nullptr},
 };
 
 Tensor Activator::relu(const Tensor& x) {

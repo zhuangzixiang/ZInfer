@@ -1,6 +1,7 @@
 // gelu: GELU 激活(tanh 近似)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 #include <cmath>
 
 namespace znn {
@@ -32,7 +33,7 @@ const Operator g_gelu_operator = {
     infer_same,
     gelu_grad,
     gelu_ref,
-    {},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::gelu_cuda, nullptr, nullptr},
 };
 
 Tensor Activator::gelu(const Tensor& x) {
