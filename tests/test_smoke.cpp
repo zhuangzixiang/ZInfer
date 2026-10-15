@@ -1,5 +1,6 @@
 // 基础测试: 创建/元信息/视图/拷贝/数据读取/引用计数语义
 #include "znn.hpp"
+#include <cmath>
 #include <cstdio>
 
 using namespace znn;
@@ -115,6 +116,60 @@ static void test_autograd_chain() {
     check(x.grad().item<float>() == 32.f, "chain rule dz/dx = 4x³");
 }
 
+static void test_matmul_reduce_loss() {
+    const float a[4] = {1, 2, 3, 4};
+    const float b[4] = {5, 6, 7, 8};
+    Tensor A = Tensor::from_host(a, {2, 2});
+    Tensor B = Tensor::from_host(b, {2, 2});
+    Tensor M = Tensor::matmul(A, B);
+    check(M.data<float>()[0] == 19.f && M.data<float>()[3] == 50.f, "matmul values");
+    Tensor s = Tensor::sum(A, -1);
+    check(s.shape().rank == 1 && s.data<float>()[0] == 3.f && s.data<float>()[1] == 7.f, "sum last dim");
+    Tensor m = Tensor::mean(A, -1);
+    check(m.data<float>()[0] == 1.5f, "mean");
+    const float lg[4] = {2, 0, 0, 2};
+    const int64_t tg[2] = {0, 1};
+    Tensor loss = Loss::cross_entropy(Tensor::from_host(lg, {2, 2}),
+                                      Tensor::from_host(tg, {2}, DType::I64));
+    check(loss.item<float>() > 0.126f && loss.item<float>() < 0.128f, "cross entropy value");
+    Tensor ms = Loss::mse(A, B);
+    check(ms.item<float>() == 16.f, "mse value");   // 差恒为 -4, 均方 = 16
+}
+
+static void test_gradient_checks() {
+    // 广播梯度: dl/dw = x
+    const float xa[2] = {3, 4};
+    Tensor x = Tensor::from_host(xa, {1, 2});
+    Tensor w = Tensor::full({1, 2}, 2.0);
+    w.requires_grad(true);
+    Tensor y = Tensor::mul(x, w);
+    Tensor l = Tensor::sum(y, -1);                     // {1}
+    l.backward();
+    check(w.grad().data<float>()[0] == 3.f && w.grad().data<float>()[1] == 4.f, "broadcast grad dw = x");
+
+    // 有限差分校验: f(W) = ce(x @ W.T, y)
+    const float xr[2] = {1, 2};
+    const int64_t yr[1] = {0};
+    Tensor X = Tensor::from_host(xr, {1, 2});
+    Tensor Y = Tensor::from_host(yr, {1}, DType::I64);
+    auto f = [&X, &Y](float w00, float w01) {
+        const float w[2] = {w00, w01};
+        return Loss::cross_entropy(Tensor::matmul(X, Tensor::from_host(w, {1, 2}).transpose(0, 1)), Y).item<float>();
+    };
+    const float w0[2] = {0.5f, -0.25f};
+    Tensor W = Tensor::from_host(w0, {1, 2});
+    W.requires_grad(true);
+    Tensor logits = Tensor::matmul(X, W.transpose(0, 1));
+    Tensor loss2 = Loss::cross_entropy(logits, Y);
+    loss2.backward();
+    const float e = 1e-3f;
+    const float g0n = (f(w0[0] + e, w0[1]) - f(w0[0] - e, w0[1])) / (2 * e);
+    const float g1n = (f(w0[0], w0[1] + e) - f(w0[0], w0[1] - e)) / (2 * e);
+    const float g0a = W.grad().data<float>()[0];
+    const float g1a = W.grad().data<float>()[1];
+    check(fabsf(g0n - g0a) < 1e-2f && fabsf(g1n - g1a) < 1e-2f, "finite-diff grad check");
+}
+
 int main() {
     test_shape();
     test_create_and_read();
@@ -123,6 +178,8 @@ int main() {
     test_grad_meta();
     test_elementwise();
     test_autograd_chain();
+    test_matmul_reduce_loss();
+    test_gradient_checks();
     if (failures == 0) {
         std::printf("ALL BASIC TESTS PASSED\n");
         return 0;

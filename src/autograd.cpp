@@ -1,5 +1,6 @@
 // autograd.cpp — 自动求导引擎实现
 #include "autograd.hpp"
+#include "operators/shared.hpp"
 #include "znn_internal.hpp"
 #include <stdexcept>
 #include <vector>
@@ -86,37 +87,6 @@ void AutogradEngine::backward(const Tensor& loss) {
 }
 
 namespace {
-
-// 沿 dim 求和(keepdim 控制保留长度 1 的维), CPU 直写
-Tensor sum_along(const Tensor& x, int64_t dim, bool keepdim) {
-    Shape out;
-    for (int64_t d = 0; d < x.dim_count(); ++d) {
-        if (d != dim) {
-            out.dims[out.rank++] = x.size(d);
-        }
-    }
-    Tensor r = Tensor::zeros(out, x.dtype(), x.device());
-    const float* xp = x.data<float>();
-    float* rp = r.data<float>();
-    const int64_t* xs = x.strides();
-    const int64_t* rs = r.strides();
-    int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-    for (int64_t i = 0; i < x.numel(); ++i) {
-        int64_t ro = 0;
-        for (int64_t d = 0; d < x.dim_count(); ++d) {
-            if (d != dim) {
-                const int64_t rd = d > dim ? d - 1 : d;
-                ro += idx[d] * rs[rd];
-            }
-        }
-        rp[ro] += xp[i];
-        for (int64_t d = x.dim_count() - 1; d >= 0; --d) {
-            if (++idx[d] < x.size(d)) break;
-            idx[d] = 0;
-        }
-    }
-    return keepdim ? r.unsqueeze(dim) : r;
-}
 
 } // namespace
 

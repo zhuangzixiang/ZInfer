@@ -1,20 +1,52 @@
-// mse: 均方误差(回归标准损失), 返回标量
-#include "operator.hpp"
-#include "znn_internal.hpp"
+// mse: 均方误差(同形) → 标量; 梯度 = 2(pred-target)/N
+#include "shared.hpp"
+#include "op_dispatcher.hpp"
 
 namespace znn {
 
 extern const Operator g_mse_operator;
+
+static void mse_infer(Span<const TensorMeta*>, const void*, std::vector<Shape>& outs) {
+    outs.push_back(Shape{});
+}
+
+static void mse_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
+    const Tensor& p = *in[0];
+    const Tensor& t = *in[1];
+    const float* pp = p.data<float>();
+    const float* tp = t.data<float>();
+    float acc = 0.f;
+    for (int64_t i = 0; i < p.numel(); ++i) {
+        const float d = pp[i] - tp[i];
+        acc += d * d;
+    }
+    out[0]->data<float>()[0] = acc / static_cast<float>(p.numel());
+}
+
+static void mse_grad(BackwardContext& c) {
+    const Tensor& p = *c.saved_inputs[0];
+    const Tensor& t = *c.saved_inputs[1];
+    Tensor& gi = *c.grad_inputs[0];
+    const float scale = 2.f * *c.grad_outputs[0]->data<float>() / static_cast<float>(p.numel());
+    const float* pp = p.data<float>();
+    const float* tp = t.data<float>();
+    float* ip = gi.data<float>();
+    for (int64_t i = 0; i < p.numel(); ++i) {
+        ip[i] = (pp[i] - tp[i]) * scale;
+    }
+}
+
 const Operator g_mse_operator = {
     "mse",
-    nullptr,   // infer: 实现阶段补
-    nullptr,   // grad: 实现阶段补
-    nullptr,   // ref(对拍基准)
+    mse_infer,
+    mse_grad,
+    mse_ref,
     {},        // kernels[CPU/CUDA/Metal/Vulkan]
 };
 
 Tensor Loss::mse(const Tensor& pred, const Tensor& target) {
-    ZNN_TODO();
+    const Tensor* ins[2] = {&pred, &target};
+    return OpDispatcher::instance().run(&g_mse_operator, Span<const Tensor*>(ins, 2), nullptr);
 }
 
 } // namespace znn

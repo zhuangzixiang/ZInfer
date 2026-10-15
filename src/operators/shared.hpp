@@ -27,4 +27,21 @@ void binary_grad(BackwardContext& context);
 // 一元逐元素: 梯度 = grad_out * d(前向输入 x, 前向输出 y)
 void unary_grad(BackwardContext& context, float (*d)(float x, float y));
 
+// ---- 规约共用(sum/mean/autograd 复用) ----
+struct ReduceAttrs {                 // sum/mean 的调用选项
+    int64_t dim    = -1;             // 规约维(负索引)
+    bool    keepdim = false;         // 保留长度 1 的维
+};
+
+// 沿 dim 求和写入 out(out 形状已按 keepdim 约定分配)
+void sum_into(const Tensor& x, int64_t dim, bool keepdim, Tensor& out);
+// 便利封装: 自行分配输出
+Tensor sum_along(const Tensor& x, int64_t dim, bool keepdim);
+// sum 的梯度: 把 g 沿 dim 广播回 in_shape 写入 out(mean 梯度再除以 n)
+void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
+                   const Shape& in_shape, Tensor& out);
+
+// 规约类(sum/mean)共用形状推导: ReduceAttrs 选项
+void infer_reduce(Span<const TensorMeta*> inputs, const void* options, std::vector<Shape>& outs);
+
 } // namespace znn

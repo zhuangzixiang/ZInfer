@@ -115,4 +115,79 @@ void unary_grad(BackwardContext& context, float (*d)(float, float)) {
     }
 }
 
+
+void sum_into(const Tensor& x, int64_t dim, bool keepdim, Tensor& out) {
+    const float* xp = x.data<float>();
+    float* op = out.data<float>();
+    const int64_t* xs = x.strides();
+    const int64_t* os = out.strides();
+    int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    for (int64_t i = 0; i < x.numel(); ++i) {
+        int64_t ro = 0;
+        for (int64_t d = 0; d < x.dim_count(); ++d) {
+            if (d != dim) {
+                const int64_t rd = d > dim ? d - 1 : d;
+                ro += idx[d] * os[rd];
+            }
+        }
+        op[ro] += xp[i];
+        for (int64_t d = x.dim_count() - 1; d >= 0; --d) {
+            if (++idx[d] < x.size(d)) break;
+            idx[d] = 0;
+        }
+    }
+}
+
+Tensor sum_along(const Tensor& x, int64_t dim, bool keepdim) {
+    Shape out;
+    for (int64_t d = 0; d < x.dim_count(); ++d) {
+        if (d != dim) out.dims[out.rank++] = x.size(d);
+    }
+    Tensor r = Tensor::zeros(keepdim ? Shape{} : out, x.dtype(), x.device());
+    if (keepdim) {
+        Shape k;
+        for (int64_t d = 0; d < x.dim_count(); ++d) {
+            k.dims[k.rank++] = d == dim ? 1 : x.size(d);
+        }
+        r = Tensor::zeros(k, x.dtype(), x.device());
+    }
+    sum_into(x, dim, keepdim, r);
+    return r;
+}
+
+void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
+                   const Shape& in_shape, Tensor& out) {
+    const float* gp = g.data<float>();
+    float* op = out.data<float>();
+    const int64_t* gs = g.strides();
+    int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    for (int64_t i = 0; i < out.numel(); ++i) {
+        int64_t go = 0;
+        for (int64_t d = 0; d < in_shape.rank; ++d) {
+            const int64_t gd = keepdim ? d : (d > dim ? d - 1 : d);
+            go += idx[d] * gs[gd];
+        }
+        op[i] = gp[go];
+        for (int64_t d = in_shape.rank - 1; d >= 0; --d) {
+            if (++idx[d] < in_shape.dims[d]) break;
+            idx[d] = 0;
+        }
+    }
+}
+
+void infer_reduce(Span<const TensorMeta*> inputs, const void* options, std::vector<Shape>& outs) {
+    const ReduceAttrs* a = static_cast<const ReduceAttrs*>(options);
+    const Shape& s = *inputs[0]->shape;
+    const int64_t dim = a->dim < 0 ? a->dim + s.rank : a->dim;
+    Shape out;
+    for (int64_t d = 0; d < s.rank; ++d) {
+        if (a->keepdim) {
+            out.dims[out.rank++] = d == dim ? 1 : s[d];
+        } else if (d != dim) {
+            out.dims[out.rank++] = s[d];
+        }
+    }
+    outs.push_back(out);
+}
+
 } // namespace znn
