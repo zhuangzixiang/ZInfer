@@ -1,6 +1,7 @@
 // Linear: y = x @ w.T + b
 #include "layers/layers.hpp"
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {

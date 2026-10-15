@@ -1,6 +1,7 @@
 // Pool2d: MaxPool2d/AvgPool2d 共用层(NCHW)
 #include "layers/layers.hpp"
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {

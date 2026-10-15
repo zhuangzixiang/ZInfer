@@ -1,5 +1,6 @@
 // cat: 沿 dim 拼接(其余维必须同形)
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

@@ -5,7 +5,7 @@
 // 新增算子三步: operators/<name>.cpp 定义 OpDef → 此处 extern 与 ZNN_OP
 // 各加一行 → CMake 源清单加一行。
 // ============================================================================
-#include "znn_ext.hpp"
+#include "op_def.hpp"
 
 namespace znn {
 

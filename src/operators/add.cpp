@@ -1,5 +1,6 @@
 // add: 逐元素二元运算(输入间自动广播)
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

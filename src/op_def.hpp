@@ -1,25 +1,27 @@
 // ============================================================================
-// znn_ext.hpp — ZInfer 扩展接口 (v0.7)
+// op_def.hpp — 算子契约 (算子作者唯一需要阅读的内部头)
 //
-// 受众: 算子/后端作者(库内开发), 不随库发布, 不在 include/ 中。
-// 库的使用者只需要 include/znn.hpp。
+// 本文件定义"一个算子是什么"与"如何注册":
+//   OpDef                  算子注册项: 名字/形状推导/反向规则/各后端内核槽位
+//   KernelFn InferFn GradFn 三类函数指针(后端无关的算子作者接口)
+//   KernelCtx BackwardCtx TensorMeta 内核与反向规则的调用上下文
+//   ZNN_OP_* 宏           注册到 operator_list 的方式
 //
-// 新增算子三步 (零改内核, 详见 docs/DESIGN.md §5.1):
-//   1. operators/<name>.cpp: 定义 OpDef(infer 必填/grad 可空/ref 必填/
-//      kernels 按后端填, 空槽走兜底链) + 前端函数
-//   2. operators/operator_list.cpp: extern 声明 + ZNN_OP 列表各加一行
-//   3. CMake 源清单加一行
+// 算子在调用链路中的位置:
+//   Tensor::add(a,b) → OpRegistry::run → 按 OpDef.kernels[设备] 执行内核
+//   loss.backward()  → AutogradEngine  → 按 OpDef.grad 执行反向规则
+//
+// 新增算子三步(详见 docs/DESIGN.md §5.1):
+//   1. operators/<name>.cpp 实现 OpDef 与前端
+//   2. operators/operator_list.cpp: extern 与 ZNN_OP 各加一行
+//   3. CMake 的 ZNN_OPERATORS 清单加一行
 // ============================================================================
 #pragma once
 #include "znn.hpp"
 #include <cstddef>
-#include <stdexcept>
-#include <string>
+#include <vector>
 
 namespace znn {
-
-// 未实现占位: 骨架阶段统一抛出, 待逐项填充真实逻辑
-#define ZNN_TODO() throw std::runtime_error(std::string("znn: TODO ") + __func__)
 
 // ---------------------------------------------------------------- 轻量视图
 // 算子接口专用, 不进入用户 API。
@@ -34,7 +36,7 @@ struct Span {
     size_t size() const { return n; }
 };
 
-// ---------------------------------------------------------------- 算子上下文
+// ---------------------------------------------------------------- 调用上下文
 
 // 调用内核时各输入的元信息(不含数据指针)
 struct TensorMeta {
@@ -60,7 +62,7 @@ struct BackwardCtx {
     static Tensor reduce_to(const Tensor& g, const Shape& target_shape);
 };
 
-// ---------------------------------------------------------------- 函数指针
+// ---------------------------------------------------------------- 算子接口
 
 // attrs 指向该算子的强类型选项 struct(如 Conv2dOptions), 无选项算子为 nullptr
 using KernelFn = void (*)(KernelCtx& ctx,
@@ -96,7 +98,7 @@ struct OpDef {
 #define ZNN_OP_LIST_END \
     nullptr };
 
-// 注册表(OpRegistry, 见 znn_internal.hpp)启动时读取; 以 nullptr 结尾
+// 注册表(OpRegistry)启动时读取; 以 nullptr 结尾
 extern const OpDef* g_znn_op_list[];
 
 } // namespace znn

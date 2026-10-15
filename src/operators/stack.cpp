@@ -1,5 +1,6 @@
 // stack: 沿新维度 dim 堆叠(所有输入同形)
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

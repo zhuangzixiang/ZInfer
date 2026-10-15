@@ -1,5 +1,6 @@
 // max_pool2d: 池化(NCHW)
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

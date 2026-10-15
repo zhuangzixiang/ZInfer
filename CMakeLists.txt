@@ -72,6 +72,8 @@ set(ZNN_OPTIM
 
 add_library(znn
     src/znn_internal.cpp
+    src/autograd.cpp
+    src/op_registry.cpp
     ${ZNN_OPERATORS}
     ${ZNN_LAYERS}
     ${ZNN_OPTIM}

@@ -86,3 +86,29 @@
 - 完成度: 里程碑 1 约 20%(结构与初版骨架等价, 组织方式落定)
 - 下一步不变: Storage/Impl 引用计数 → OpRegistry.run 派发链 →
   逐算子 ref 实现 → Eigen 内核 → AutogradEngine → 优化器 → MNIST
+
+---
+
+## [4] 命名与职责语义整改: 按角色命名的文件 + 链路文档化
+
+> 评审三点: znn_ext 名不对/意义不明; znn_internal 是 registry+autograd
+> 的大杂货铺, 链路读不懂。
+
+**变化**
+- znn_ext.hpp → **op_def.hpp**(算子契约: 算子作者唯一要读的头),
+  文件头写明本文件定义什么 + 算子在调用链路中的位置 + 新增算子三步
+- **znn_internal.hpp/.cpp 瘦身为"znn.hpp 的实现支撑"**:
+  Storage / Tensor::Impl / Shape 方法 / Runtime / ZNN_TODO;
+  文件头明确"本文件不含任何引擎"
+- 引擎独立成文件(与 layers/optim 平级的单文件子系统):
+  **autograd.hpp/.cpp**(求导引擎: GraphNode/record/backward/reduce_to)
+  **op_registry.hpp/.cpp**(注册机制: 查找/派发/兜底, 数据在 operator_list)
+- 每个文件头 = "我是什么 + 职责 + 链路位置"三段式
+- DESIGN.md §3 增补"一次算子调用的完整链路"图(前端→机制→内核→建图→反向)
+
+**反思**
+- 命名语义: op_def(契约)/op_registry(机制)/autograd(引擎)/
+  znn_internal(实现支撑)——每个名字即职责, 大杂货铺问题消除
+- 架构合理性 9/10; 可理解 10/10(链路图 + 文件头三段式);
+  可维护 10/10; 可扩展 9/10; 精简 9/10
+- 完成度: 里程碑 1 约 20%(结构第四轮收敛, 实现未动)

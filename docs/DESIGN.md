@@ -81,10 +81,10 @@ ZInfer/
 │   ├── znn_defines.hpp     # ① 结构定义: 枚举/Shape/Options/Param
 │   └── znn.hpp             # ② 接口定义: Tensor/Activator/Loss/Layer/Optimizer
 ├── src/                    # 内部, 对用户不可见
-│   ├── znn_ext.hpp         # 扩展接口: OpDef/KernelFn/BackwardCtx/注册宏(算子·后端作者用)
-│   ├── znn_internal.hpp    # 通用内部定义(仅跨子系统共用基础): Storage/
-│   │                       #   Tensor::Impl/GraphNode/AutogradEngine/OpRegistry
-│   ├── znn_internal.cpp    # 通用基础实现 + Tensor 公共方法 + Runtime
+│   ├── op_def.hpp          # 算子契约(算子作者唯一要读): OpDef/内核签名/注册宏
+│   ├── znn_internal.hpp/.cpp  # znn.hpp 的实现支撑: Storage/Tensor::Impl/Shape/Runtime
+│   ├── autograd.hpp/.cpp   # 自动求导引擎: GraphNode/建图(record)/反向(backward)
+│   ├── op_registry.hpp/.cpp  # 算子注册表与派发: 机制(数据在 operator_list, 机制在此)
 │   ├── operators/          # 一算子一文件, 文件名=算子名; 异构后端=同名异后缀
 │   │   ├── operator_list.cpp   # ← 注册数据(extern + 列表, ≈ ffmpeg codec_list.c)
 │   │   └── add.cpp  conv2d.cpp  (conv2d.cu/.mm/.comp 里程碑 2+)
@@ -100,7 +100,22 @@ ZInfer/
 └── docs/
 ```
 
-**文件划分判定规则：按编译器分文件、按逻辑聚目录。** 同编译器的实现（CPU ref 版与 Eigen 版）留在同一文件的不同内核槽位；异构后端（.cu/.mm/.comp）为同目录同名异后缀文件，注册项 extern 引用。层与优化器没有后端维度——它们是"参数 + 调用算子"的组合，设备选择发生在算子派发。职责边界：注册**数据**在 `operators/operator_list.cpp`，注册**机制**在 `OpRegistry`（znn_internal）；通用基础新增进 znn_internal，层/优化器新增进各自目录。include 一律不带相对路径（CMake 以 `src/` 为私有包含目录）。用户接入方式：`#include "znn.hpp"` + 链接 `libznn`。
+**一次算子调用的完整链路**（各文件在链路中的位置）：
+
+```
+Tensor::add(a, b)                          operators/add.cpp(前端)
+  └─ OpRegistry::run(&g_add_def, ...)       op_registry.cpp(机制)
+       ├─ g_add_def.infer(...)             → 输出形状
+       ├─ 分配输出 Tensor                   znn_internal(Tensor::Impl/Storage)
+       ├─ g_add_def.kernels[设备](...)      operators/add.cpp(内核; 空槽→兜底链)
+       └─ AutogradEngine::record(...)       autograd.cpp(训练时建 tape 节点)
+
+loss.backward()
+  └─ AutogradEngine::backward(loss)         autograd.cpp: 逆拓扑执行各 g_*_def.grad
+       └─ 广播梯度规约 BackwardCtx::reduce_to
+```
+
+**文件划分判定规则：按编译器分文件、按逻辑聚目录。** 同编译器的实现（CPU ref 版与 Eigen 版）留在同一文件的不同内核槽位；异构后端（.cu/.mm/.comp）为同目录同名异后缀文件，注册项 extern 引用。层与优化器没有后端维度——它们是"参数 + 调用算子"的组合，设备选择发生在算子派发。职责边界：注册**数据**在 `operators/operator_list.cpp`，注册**机制**在 `op_registry`；算子契约在 `op_def`；求导引擎在 `autograd`；`znn_internal` 只是公共 API 的实现支撑，不含任何引擎。include 一律不带相对路径（CMake 以 `src/` 为私有包含目录）。用户接入方式：`#include "znn.hpp"` + 链接 `libznn`。
 
 CMake 按平台/开关条件启用后端：`ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / ZNN_ONEDNN`，`ZNN_MINIMAL` 可裁掉 Eigen 只留参考实现。可选项：CMake 扫描 `src/ops/` 自动生成 `operator_list.cpp`（对应 ffmpeg configure 生成 codec_list.c 的做法），实现"丢文件即扩展"。
 
@@ -262,7 +277,7 @@ zllm 作为平行包新增：
 
 ## 12. 接口草案 v0.4（讨论稿）
 
-**权威版本已落为真实头文件，以文件为准**：`include/znn_defines.hpp`（结构定义）+ `include/znn.hpp`（接口定义）。v0.4 接口语言："一切操作挂在类名下"（Tensor/Activator/Loss/Runtime 静态方法 + Layer/Optimizer 虚接口与 create/destroy 工厂，无全局自由函数）；公共头零实现体（data/item 模板由库内显式实例化）。扩展接口在 `src/znn_ext.hpp`（库内开发接口，不随库发布）。
+**权威版本已落为真实头文件，以文件为准**：`include/znn_defines.hpp`（结构定义）+ `include/znn.hpp`（接口定义）。v0.4 接口语言："一切操作挂在类名下"（Tensor/Activator/Loss/Runtime 静态方法 + Layer/Optimizer 虚接口与 create/destroy 工厂，无全局自由函数）；公共头零实现体（data/item 模板由库内显式实例化）。算子契约在 `src/op_def.hpp`（库内开发接口，不随库发布）。
 
 典型用法（MNIST 训练循环）：
 

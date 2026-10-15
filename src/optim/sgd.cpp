@@ -1,6 +1,7 @@
 // SGD: p -= lr * (grad + momentum 项 + weight_decay 项)
 #include "optim/optim.hpp"
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

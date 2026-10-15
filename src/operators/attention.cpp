@@ -1,5 +1,6 @@
 // attention: scaled_dot_product_attention(q/k/v: [B,H,L,D]; causal 屏蔽未来位)
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

@@ -1,5 +1,6 @@
 // sum: 沿 dim 规约(keepdim 控制保留维度)
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

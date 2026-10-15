@@ -1,5 +1,6 @@
 // arange: 等差序列 [0, n)
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

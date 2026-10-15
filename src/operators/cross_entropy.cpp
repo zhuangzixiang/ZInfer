@@ -1,5 +1,6 @@
 // cross_entropy: softmax + 负对数似然(分类标准损失), 返回标量
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

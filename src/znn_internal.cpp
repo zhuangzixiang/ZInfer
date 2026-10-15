@@ -1,6 +1,6 @@
 // ============================================================================
-// znn_internal.cpp — 通用基础实现 + Tensor 公共方法 + Runtime
-// (骨架阶段: 逻辑体为 ZNN_TODO 占位; 层/优化器实现在各自目录)
+// znn_internal.cpp — znn.hpp 的实现支撑
+// (骨架阶段: 逻辑体为 ZNN_TODO 占位; 引擎在 autograd/op_registry, 层/优化器在各自目录)
 // ============================================================================
 #include "znn_internal.hpp"
 
@@ -256,53 +256,6 @@ void Tensor::backward() const {
 }
 
 Tensor Tensor::detach() const {
-    ZNN_TODO();
-}
-
-// ============================================================ AutogradEngine
-
-AutogradEngine& AutogradEngine::instance() {
-    static AutogradEngine engine;
-    return engine;
-}
-
-GraphNode* AutogradEngine::record(const OpDef* op,
-                                  Span<const Tensor*> inputs,
-                                  Span<const Tensor*> outputs) {
-    // TODO: 节点池分配 → 保存输入输出 → 链接上下游消费计数
-    ZNN_TODO();
-}
-
-void AutogradEngine::backward(const Tensor& loss) {
-    // TODO: 逆拓扑遍历, pending 归零触发, 梯度缓冲合并, 广播规约
-    ZNN_TODO();
-}
-
-Tensor BackwardCtx::reduce_to(const Tensor& g, const Shape& target_shape) {
-    // TODO: 按广播语义对 g 求和规约回 target_shape
-    ZNN_TODO();
-}
-
-// ============================================================ OpRegistry
-
-OpRegistry& OpRegistry::instance() {
-    static OpRegistry registry;
-    return registry;
-}
-
-OpRegistry::OpRegistry() {
-    for (const OpDef* const* it = g_znn_op_list; *it != nullptr; ++it) {
-        table_.emplace((*it)->name, *it);
-    }
-}
-
-const OpDef* OpRegistry::find(const char* name) const {
-    auto it = table_.find(name);
-    return it == table_.end() ? nullptr : it->second;
-}
-
-Tensor OpRegistry::run(const OpDef* op, Span<const Tensor*> inputs, const void* attrs) {
-    // TODO: 形状推理 → 输出分配 → 内核选择(空槽兜底链) → autograd 建图
     ZNN_TODO();
 }
 

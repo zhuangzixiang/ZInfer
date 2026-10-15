@@ -1,5 +1,6 @@
 // relu: 激活函数
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

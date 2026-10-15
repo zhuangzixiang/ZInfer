@@ -1,5 +1,6 @@
 // neg: 逐元素一元运算
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

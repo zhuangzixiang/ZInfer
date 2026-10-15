@@ -1,6 +1,7 @@
 // Adam: 动量更新 + 偏差校正
 #include "optim/optim.hpp"
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

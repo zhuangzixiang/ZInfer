@@ -1,5 +1,6 @@
 // randn: 标准正态随机张量(seed 为 0 时用全局随机源)
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

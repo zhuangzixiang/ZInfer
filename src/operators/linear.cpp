@@ -1,5 +1,6 @@
 // linear: x @ w.T + b(w 形状 [out, in])
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

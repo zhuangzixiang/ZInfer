@@ -1,6 +1,7 @@
 // Optimizer 工厂: 按 OptimType 分发; layers 重载自动收集各层参数
 #include "optim/optim.hpp"
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

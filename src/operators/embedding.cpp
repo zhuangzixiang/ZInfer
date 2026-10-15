@@ -1,5 +1,6 @@
 // embedding: 按索引取行(indices: I64)
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 

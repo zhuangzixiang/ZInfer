@@ -1,6 +1,7 @@
 // BatchNorm2d: 批归一化(train 态更新 running 统计, eval 态使用统计)
 #include "layers/layers.hpp"
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {

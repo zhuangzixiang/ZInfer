@@ -1,5 +1,6 @@
 // matmul: 2D 矩阵乘, 高维按广播批处理
-#include "znn_ext.hpp"
+#include "op_def.hpp"
+#include "znn_internal.hpp"
 
 namespace znn {
 
