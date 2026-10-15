@@ -15,7 +15,13 @@ static void matmul_infer(Span<const TensorMeta*> in, const void*, std::vector<Sh
     outs.push_back(Shape{a[0], b[1]});
 }
 
-static void matmul_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
+void matmul_naive(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*);  // 见下
+
+static void matmul_ref(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out, const void* o) {
+    matmul_naive(c, in, out, o);
+}
+
+void matmul_naive(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
     const Tensor& a = *in[0];
     const Tensor& b = *in[1];
     Tensor& y = *out[0];
@@ -44,12 +50,14 @@ static void matmul_grad(BackwardContext& c) {
     *c.grad_inputs[1] = Tensor::matmul(a.transpose(0, 1), g);
 }
 
+KernelFunction matmul_cpu_kernel();   // matmul_eigen.cpp: Eigen GEMM
+
 const Operator g_matmul_operator = {
     "matmul",
     matmul_infer,
     matmul_grad,
     matmul_ref,
-    {},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {matmul_cpu_kernel()},    // kernels[CPU] = Eigen GEMM(非连续输入内部回退)
 };
 
 Tensor Tensor::matmul(const Tensor& a, const Tensor& b) {

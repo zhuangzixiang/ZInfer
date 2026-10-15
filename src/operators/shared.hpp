@@ -41,6 +41,13 @@ Tensor sum_along(const Tensor& x, int64_t dim, bool keepdim);
 void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
                    const Shape& in_shape, Tensor& out);
 
+// conv2d 朴素参考(对拍与回退共用)
+void conv2d_naive(KernelContext& ctx, Span<const Tensor*> in,
+                  Span<Tensor*> out, const void* options);
+// matmul 朴素参考(对拍与回退共用)
+void matmul_naive(KernelContext& ctx, Span<const Tensor*> in,
+                  Span<Tensor*> out, const void* options);
+
 // 归一化算子入口(层经此调用, 声明集中于此避免头交叉)
 Tensor layer_norm_apply(const Tensor& x, const Tensor& w, const Tensor& b, double eps);
 Tensor batch_norm2d_apply(const Tensor& x, const Tensor& w, const Tensor& b,

@@ -283,3 +283,27 @@ BN 通道均值、attention 单位注意力——全部通过。
 可理解 9/10 | 可维护 9/10 | 可扩展 9/10。
 剩余: Eigen 内核提速 / sum·mean·softmax 任意维 / permute·slice 训练态 /
 causal attention / GPU 里程碑。
+
+---
+
+## [12] Eigen 快速内核: matmul/conv2d 提速与性能档案
+
+**内容**
+- third_party/eigen 3.4.0 vendored(唯一三方依赖, gitignore)
+- matmul/conv2d 的 kernels[CPU] 槽位实装(Eigen GEMM / im2col+GEMM),
+  非连续输入自动回退朴素路径; ZNN_FORCE_REF=1 强制 ref(对拍/调试)
+- 基准工具 znn_bench + docs/BENCH.md 性能档案(前后对比见文件)
+- 对拍测试: matmul/conv2d Eigen vs ref 最大差 < 1e-3
+
+**关键数据**(同一 Release 二进制):
+matmul 1024³ 25.9×(47 GF/s) / conv2d 55.4×(14.5 GF/s) /
+MLP 训练步 2.5×(14.2s/epoch) / MNIST 5epoch ~12min → 152s, acc 97.09%
+
+**工程教训**
+- Eigen 表达式模板在 MSVC Debug 下慢 10×+(必须 Release 或逐文件 O2,
+  且 /O2 与 /RTC1 冲突需剥离); 基准一律 Release
+- 大量 sed/python 多行替换静默失败(换行/空白不匹配), 关键接线一律
+  Edit 工具显式确认(grep 验证)后再构建
+
+**反思**: 架构不变(槽位换内核, 派发/前端零改动, 验证了
+"提速=往 kernels[] 换实现"的承诺); 完成度: 里程碑1 性能项达标。

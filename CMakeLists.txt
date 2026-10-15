@@ -8,6 +8,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # 源码为 UTF-8(含中文注释), MSVC 默认按本地代码页解析会破坏语法
 add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 
+# Debug 默认带 /RTC1, 与 Eigen 内核的 /O2 冲突; 本项目不依赖运行时检查
+if(MSVC)
+    string(REPLACE "/RTC1" "" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
+endif()
+
 option(ZNN_BUILD_TESTS    "Build tests"     ON)
 option(ZNN_BUILD_EXAMPLES "Build examples"  ON)
 # 里程碑 2+ 启用的后端开关: ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / ZNN_ONEDNN
@@ -36,6 +41,8 @@ set(ZNN_OPERATORS
     src/operators/sum.cpp
     src/operators/mean.cpp
     src/operators/matmul.cpp
+    src/operators/matmul_eigen.cpp
+    src/operators/conv2d_eigen.cpp
     src/operators/linear.cpp
     src/operators/cat.cpp
     src/operators/stack.cpp
@@ -46,17 +53,10 @@ set(ZNN_OPERATORS
     src/operators/batch_norm2d.cpp
     src/operators/attention.cpp
     src/operators/embedding.cpp
-    src/operators/attention.cpp
     src/operators/cross_entropy.cpp
     src/operators/mse.cpp
     src/operators/transpose.cpp
     src/operators/reshape.cpp
-    src/operators/conv2d.cpp
-    src/operators/max_pool2d.cpp
-    src/operators/avg_pool2d.cpp
-    src/operators/layer_norm.cpp
-    src/operators/batch_norm2d.cpp
-    src/operators/attention.cpp
     src/operators/operator_list.cpp
 )
 
@@ -90,13 +90,19 @@ add_library(znn
     ${ZNN_LAYERS}
     ${ZNN_OPTIM}
 )
-target_include_directories(znn PUBLIC include PRIVATE src)
+target_include_directories(znn PUBLIC include PRIVATE src third_party/eigen)
+
+# Eigen: 唯一三方依赖(header-only), kernels[CPU] 快速内核使用
 
 if(ZNN_BUILD_TESTS)
     enable_testing()
     add_executable(znn_test tests/test_smoke.cpp)
+    target_include_directories(znn_test PRIVATE src)
     target_link_libraries(znn_test PRIVATE znn)
     add_test(NAME smoke COMMAND znn_test)
+
+    add_executable(znn_bench tests/bench.cpp)
+    target_link_libraries(znn_bench PRIVATE znn)
 endif()
 
 if(ZNN_BUILD_EXAMPLES)

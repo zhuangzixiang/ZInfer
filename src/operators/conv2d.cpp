@@ -20,8 +20,13 @@ static void conv2d_infer(Span<const TensorMeta*> in, const void* options,
     outs.push_back(Shape{x[0], w[0], ho, wo});
 }
 
-static void conv2d_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+static void conv2d_ref(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
                        const void* options) {
+    conv2d_naive(c, in, out, options);
+}
+
+void conv2d_naive(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                  const void* options) {
     const Conv2dOptions* o = static_cast<const Conv2dOptions*>(options);
     const Tensor& x = *in[0];
     const Tensor& w = *in[1];
@@ -97,12 +102,14 @@ static void conv2d_grad(BackwardContext& c) {
     }
 }
 
+KernelFunction conv2d_cpu_kernel();   // conv2d_eigen.cpp: im2col + Eigen GEMM
+
 const Operator g_conv2d_operator = {
     "conv2d",
     conv2d_infer,
     conv2d_grad,
     conv2d_ref,
-    {},                          // kernels[CPU/CUDA/Metal/Vulkan]
+    {conv2d_cpu_kernel()},       // kernels[CPU] = Eigen(非连续输入内部回退)
     sizeof(Conv2dOptions),
 };
 

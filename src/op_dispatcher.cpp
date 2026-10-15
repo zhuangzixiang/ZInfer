@@ -2,6 +2,7 @@
 #include "op_dispatcher.hpp"
 #include "autograd.hpp"
 #include "znn_internal.hpp"
+#include <cstdlib>
 #include <stdexcept>
 #include <vector>
 
@@ -46,7 +47,8 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
     // 3. 内核选择: 后端槽位 → ref 兜底
     const Device dev = inputs[0]->device();
     KernelFunction kernel = op->kernels[static_cast<int>(dev)];
-    if (!kernel) {
+    static const bool force_ref = std::getenv("ZNN_FORCE_REF") != nullptr;   // 对拍/调试
+    if (!kernel || force_ref) {
         kernel = op->ref;
     }
     if (!kernel) {

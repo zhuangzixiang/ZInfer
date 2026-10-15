@@ -1,5 +1,11 @@
 // 基础测试: 创建/元信息/视图/拷贝/数据读取/引用计数语义
 #include "znn.hpp"
+#include "operator.hpp"
+
+namespace znn {
+extern const Operator g_matmul_operator;    // 对拍: 直接调用朴素 ref
+extern const Operator g_conv2d_operator;
+}
 #include <cmath>
 #include <cstdio>
 
@@ -333,6 +339,41 @@ static void test_norms_attention() {
     // S = I → P = I → O = V
     check(att.data<float>()[0] == 1.f && att.data<float>()[3] == 4.f, "attention identity q");
 }
+static void test_eigen_vs_ref() {
+    // matmul: 派发(Eigen) vs 朴素 ref 数值一致
+    Tensor a = Tensor::randn({17, 23}, 7);
+    Tensor b = Tensor::randn({23, 11}, 8);
+    Tensor fast = Tensor::matmul(a, b);
+    Tensor slow = Tensor::empty(fast.shape());
+    const Tensor* ins[2] = {&a, &b};
+    Tensor* outs[1] = {&slow};
+    KernelContext ctx{Device::CPU, nullptr};
+    g_matmul_operator.ref(ctx, Span<const Tensor*>(ins, 2), Span<Tensor*>(outs, 1), nullptr);
+    float max_diff = 0.f;
+    for (int64_t i = 0; i < fast.numel(); ++i) {
+        const float d = fabsf(fast.data<float>()[i] - slow.data<float>()[i]);
+        max_diff = max_diff < d ? d : max_diff;
+    }
+    check(max_diff < 1e-3f, "matmul eigen vs ref allclose");
+
+    // conv2d 同款对拍
+    Tensor x = Tensor::randn({3, 4, 9, 9}, 9);
+    Tensor w = Tensor::randn({6, 4, 3, 3}, 10);
+    Conv2dOptions o;
+    o.pad = {1, 1};
+    Tensor f2 = Tensor::conv2d(x, w, o);
+    Tensor s2 = Tensor::empty(f2.shape());
+    const Tensor* ci[2] = {&x, &w};
+    Tensor* co[1] = {&s2};
+    g_conv2d_operator.ref(ctx, Span<const Tensor*>(ci, 2), Span<Tensor*>(co, 1), &o);
+    float md2 = 0.f;
+    for (int64_t i = 0; i < f2.numel(); ++i) {
+        const float d = fabsf(f2.data<float>()[i] - s2.data<float>()[i]);
+        md2 = md2 < d ? d : md2;
+    }
+    check(md2 < 1e-3f, "conv2d eigen vs ref allclose");
+}
+
 int main() {
     std::fprintf(stderr, "t1\n"); test_shape();
     std::fprintf(stderr, "t2\n"); test_create_and_read();
