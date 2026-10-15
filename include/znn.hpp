@@ -14,12 +14,14 @@
 //        Tensor 为引用计数句柄(含其 grad), 随最后一个引用自动释放。
 // [设备] 创建默认 CPU; 跨设备搬运入口 to_device()。数据读取原语
 //        (模板在库内显式实例化, v1: float/int64_t):
-//          data<T>()  返回当前设备数据指针(含视图偏移), 零拷贝;
-//                     GPU 张量指针仅用于设备侧代码/设备 API, 主机代码
-//                     解引用会崩溃(同 PyTorch data_ptr 约定);
+//          data<T>()  返回本张量所在设备的裸数据指针(含视图偏移),
+//                     不映射不拷贝——CPU 张量=主机内存地址(主机可直读
+//                     直写); GPU 张量=显存地址, 仅供设备侧代码与设备
+//                     API(内核/cuBLAS/互操作)使用, 主机解引用=段错误
+//                     (同 PyTorch data_ptr 与 DLPack 的约定);
 //          item<T>()  任意设备合法, 同步读取单个数值。
-//        批量跨设备取数 = to_device(CPU) + data<T>()(显式搬运;
-//        隐式同步是性能陷阱, 隐式同步仅 item 单值)。
+//        主机批量读 GPU 数据 = to_device(CPU) 后再 data<T>()(显式搬运;
+//        隐式同步是性能陷阱, 全库隐式同步仅 item 单值一处)。
 // [求导] requires_grad(true) 的张量参与建图; 标量损失 backward() 后
 //        各参数 grad() 就绪, 重复 backward() 梯度累加。训练中的验证/
 //        推理段用 Runtime::set_grad_enabled(false) 全局暂停建图。
