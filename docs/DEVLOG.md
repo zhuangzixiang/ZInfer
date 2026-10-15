@@ -225,3 +225,34 @@
 - 封装哲学转变: 从"权限分级靠类型隔离"到"公共接口够全 + 内部零特权",
   更符合评审者口味且删了两块机制(TensorView + friend)
 - 架构合理性 9/10; 精简 +30 行; 可理解 10/10; 完成度 里程碑1 约 20%
+
+---
+
+## [10] 里程碑 1 达成: MNIST 训练跑通(块 G)
+
+**验收结果**(examples/mnist, MLP 784-256-10 + ReLU + Adam lr=1e-3):
+| epoch | 测试集准确率 |
+|---|---|
+| 0 | 95.23% |
+| 1 | 96.01% |
+| 2 | 96.40% |
+| 3 | 96.81% |
+| 4 | **97.19%** ✓ (>97% 标准) |
+
+**内容**: IDX 二进制加载器(大端头解析/批组织) + 推理评估循环
+(NoGrad + argmax); 测试集为标准 t10k 前缀。数据不进仓库(.gitignore)。
+
+**实现阶段总反思(A-G 全块)**
+- 完成度: 里程碑 1 = 100%(CPU 参考实现路线; Eigen 提速未做)
+- 正确性: 链式法则/广播梯度/有限差分/线性回归收敛/MNIST 五重验证
+- 关键债已还: 梯度规则读不到前向选项 → Operator::options_size
+  + 节点选项副本 + BackwardContext::options; 训练态 transpose
+  材料化+逆梯度(视图断流问题在该机制上解决)
+- 已知限制(有意): sum/mean/softmax 仅末维; 视图族仅 transpose
+  接入训练(reshape/flatten 族待同款接入, CNN 前置);
+  conv/pool/cat/stack/embedding/attention 算子未实现(块 D 待做);
+  backward 不支持 retain_graph
+- 调试教训入档: (1)空句柄上 numel() 抛异常在 Debug CRT 下表现为
+  WER 弹窗"挂起", 排查要靠 stderr 分段标记; (2)本环境 bash heredoc
+  会把反斜杠-n 变成真实换行, 多行插入一律改用 python/Edit 工具
+- 架构 9/10 | 精简 8/10 | 可理解 9/10 | 可维护 9/10 | 可扩展 9/10
