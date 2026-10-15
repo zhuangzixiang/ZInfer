@@ -343,3 +343,35 @@ GPU：v1 单默认 stream；多 stream 远期，KernelCtx 已预留字段。
 - CPU 内部：视图直传（内核支持 strided 输入或先紧凑化）。
 - host→device：`from_host` 单次 DMA；v1.5 加 pinned 暂存 + 双缓冲预取。
 - device 内部：同 stream 流水，无 host 往返。
+
+## 14. 内部机制问答（评审问题沉淀）
+
+### 14.1 AutogradEngine::record 的命名与作用
+
+"record" 是动态图领域标准动词（PyTorch RecordFunction / TF GradientTape.record）：把一次运算记录到计算图。步骤：节点池分配 GraphNode → 记 op 入口与 saved 张量(共享存储不拷贝) → 链接上下游(输入的 consumers += 本节点, pending++) → 写各输出 Impl::grad_fn。触发条件：grad_enabled && op->grad && 任一输入 requires_grad；纯推理零开销。
+
+### 14.2 op_def.hpp 逐项职责与数据流位置
+
+| 定义 | 作用 | 数据流位置 |
+|---|---|---|
+| Span | 指针+长度视图, 零拷贝传参 | 所有内核签名 |
+| TensorMeta | 张量名片(shape/dtype/device, 无数据指针) | run 调 infer 前构造 |
+| KernelCtx | 内核上下文(设备 + 预留 stream) | run 构造并传入内核 |
+| BackwardCtx | 反向环境: saved 张量/grad_out 入/grad_in 出/reduce_to 广播规约 | backward 逐节点装配 |
+| KernelFn | 后端无关算体签名(ins 只读/outs 已分配/attrs 强类型 void*) | run 经函数指针调用 |
+| InferFn | 形状推导(分配输出之前) | run 第 2 步 |
+| GradFn | 反向规则(nullptr=仅推理) | backward 逐节点调用 |
+| OpDef | 注册项: name/infer/grad/ref(对拍基准)/kernels[后端槽位] | 前端引用, run 消费 |
+| ZNN_OP* 宏 | 注册数据数组(extern g_znn_op_list) | 首次 instance() 建表后只读 |
+
+### 14.3 op_registry 在数据流中的位置
+
+- instance(): Meyers 单例, 首次调用遍历 g_znn_op_list 建 name→OpDef 哈希表, 此后只读无锁
+- find(): 调试/测试; 正式数据流零字符串查找(前端直接持 &g_*_def)
+- run(): 29 个算子前端的唯一入口, 完整链路八步:
+  构造名片 → infer 形状 → 分配输出(Impl::create→Storage) → 按输入设备选内核(空槽兜底: CPU→ref, GPU→拷回 CPU+warning) → 执行内核 → 满足条件则 record 建图 → 返回输出
+
+### 14.4 mut 与 Storage
+
+- mut(): const 成员函数返回可写参数指针的 const_cast 封装。备选方案(待定): params() 改返回 std::vector<Tensor>(句柄共享 Impl), const_cast 可整体消除。
+- Storage = 引用计数内存块(数据+生命周期); Tensor::Impl = 数据视角(offset+strides)。视图(slice/transpose)共享同一 Storage 实现零拷贝, 最后一个引用释放内存。与 PyTorch Tensor/Storage、numpy ndarray/base 同构。
