@@ -86,12 +86,43 @@ static void test_grad_meta() {
     check(!d.requires_grad() && d.data<float>()[1] == 1.f, "detach shares storage");
 }
 
+static void test_elementwise() {
+    const float a[4] = {1, 2, 3, 4};
+    const float b[4] = {10, 20, 30, 40};
+    Tensor ta = Tensor::from_host(a, {2, 2});
+    Tensor tb = Tensor::from_host(b, {2, 2});
+    check(Tensor::add(ta, tb).data<float>()[3] == 44.f, "add");
+    check(Tensor::sub(tb, ta).data<float>()[0] == 9.f, "sub");
+    check(Tensor::mul(ta, tb).data<float>()[1] == 40.f, "mul");
+    check(Tensor::div(tb, ta).data<float>()[2] == 10.f, "div");
+    const float one[1] = {5};
+    Tensor s = Tensor::add(ta, Tensor::from_host(one, {1}));  // 广播
+    check(s.data<float>()[0] == 6.f && s.data<float>()[3] == 9.f, "broadcast add");
+    const float negv[2] = {-1, 2};
+    check(Activator::relu(Tensor::from_host(negv, {2})).data<float>()[0] == 0.f, "relu");
+    Tensor sm = Activator::softmax(ta);
+    const float s0 = sm.data<float>()[0] + sm.data<float>()[1];
+    check(s0 > 0.999f && s0 < 1.001f, "softmax rows sum to 1");
+}
+
+static void test_autograd_chain() {
+    Tensor x = Tensor::full({1}, 2.0);
+    x.requires_grad(true);
+    Tensor y = Tensor::mul(x, x);                       // y = x²
+    Tensor z = Tensor::mul(y, y);                       // z = x⁴ = 16
+    z.backward();
+    check(z.item<float>() == 16.f, "autograd forward value");
+    check(x.grad().item<float>() == 32.f, "chain rule dz/dx = 4x³");
+}
+
 int main() {
     test_shape();
     test_create_and_read();
     test_views();
     test_lifetime();
     test_grad_meta();
+    test_elementwise();
+    test_autograd_chain();
     if (failures == 0) {
         std::printf("ALL BASIC TESTS PASSED\n");
         return 0;

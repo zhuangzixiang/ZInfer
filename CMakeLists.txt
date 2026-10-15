@@ -16,6 +16,7 @@ option(ZNN_BUILD_EXAMPLES "Build examples"  ON)
 # 算子源清单: 新增算子在此加一行(与 operator_list.cpp 的注册行对应);
 # 异构后端内核为同名异后缀文件(conv2d.cu/.mm/.comp), 里程碑 2+ 按开关加入
 set(ZNN_OPERATORS
+    src/operators/shared.cpp
     src/operators/arange.cpp
     src/operators/randn.cpp
     src/operators/add.cpp

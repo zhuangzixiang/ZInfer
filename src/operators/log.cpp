@@ -1,20 +1,30 @@
-// log: 逐元素一元运算
-#include "operator.hpp"
-#include "znn_internal.hpp"
+// log: 逐元素一元运算()
+#include "shared.hpp"
+#include "op_dispatcher.hpp"
 
 namespace znn {
 
 extern const Operator g_log_operator;
+
+static void log_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
+    unary_kernel(in, out, [](float x) { return logf(x); });
+}
+
+static void log_grad(BackwardContext& c) {
+    unary_grad(c, [](float x, float y) { return 1.0f / x; });
+}
+
 const Operator g_log_operator = {
     "log",
-    nullptr,   // infer: 实现阶段补
-    nullptr,   // grad
-    nullptr,   // ref(对拍基准)
+    infer_same,
+    log_grad,
+    log_ref,
     {},        // kernels[CPU/CUDA/Metal/Vulkan]
 };
 
 Tensor Tensor::log(const Tensor& x) {
-    ZNN_TODO();
+    const Tensor* ins[1] = {&x};
+    return OpDispatcher::instance().run(&g_log_operator, Span<const Tensor*>(ins, 1), nullptr);
 }
 
 } // namespace znn

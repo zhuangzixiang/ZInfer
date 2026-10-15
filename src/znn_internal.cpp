@@ -95,6 +95,14 @@ int64_t Shape::operator[](int64_t index) const {
     return dims[normalize_index(index, rank)];
 }
 
+bool Shape::operator==(const Shape& other) const {
+    if (rank != other.rank) return false;
+    for (int64_t d = 0; d < rank; ++d) {
+        if (dims[d] != other.dims[d]) return false;
+    }
+    return true;
+}
+
 // ============================================================ Storage
 
 Storage* Storage::create(size_t bytes, Device device) {

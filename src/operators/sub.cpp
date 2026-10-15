@@ -1,20 +1,26 @@
 // sub: 逐元素二元运算(输入间自动广播)
-#include "operator.hpp"
-#include "znn_internal.hpp"
+#include "shared.hpp"
+#include "op_dispatcher.hpp"
 
 namespace znn {
 
 extern const Operator g_sub_operator;
+
+static void sub_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
+    binary_kernel(in, out, [](float a, float b) { return a - b; });
+}
+
 const Operator g_sub_operator = {
     "sub",
-    nullptr,   // infer: 实现阶段补
-    nullptr,   // grad
-    nullptr,   // ref(对拍基准)
+    infer_broadcast,
+    binary_grad,
+    sub_ref,
     {},        // kernels[CPU/CUDA/Metal/Vulkan]
 };
 
 Tensor Tensor::sub(const Tensor& a, const Tensor& b) {
-    ZNN_TODO();
+    const Tensor* ins[2] = {&a, &b};
+    return OpDispatcher::instance().run(&g_sub_operator, Span<const Tensor*>(ins, 2), nullptr);
 }
 
 } // namespace znn

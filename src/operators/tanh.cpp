@@ -1,20 +1,30 @@
-// tanh: 激活函数
-#include "operator.hpp"
-#include "znn_internal.hpp"
+// tanh: 激活函数()
+#include "shared.hpp"
+#include "op_dispatcher.hpp"
 
 namespace znn {
 
 extern const Operator g_tanh_operator;
+
+static void tanh_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
+    unary_kernel(in, out, [](float x) { return tanhf(x); });
+}
+
+static void tanh_grad(BackwardContext& c) {
+    unary_grad(c, [](float x, float y) { return 1.0f - y * y; });
+}
+
 const Operator g_tanh_operator = {
     "tanh",
-    nullptr,   // infer: 实现阶段补
-    nullptr,   // grad
-    nullptr,   // ref(对拍基准)
+    infer_same,
+    tanh_grad,
+    tanh_ref,
     {},        // kernels[CPU/CUDA/Metal/Vulkan]
 };
 
 Tensor Activator::tanh(const Tensor& x) {
-    ZNN_TODO();
+    const Tensor* ins[1] = {&x};
+    return OpDispatcher::instance().run(&g_tanh_operator, Span<const Tensor*>(ins, 1), nullptr);
 }
 
 } // namespace znn

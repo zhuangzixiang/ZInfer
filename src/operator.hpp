@@ -28,6 +28,9 @@ template <class T>
 struct Span
 {
 public:
+    Span() = default;
+    Span(T* ptr, size_t count) : p(ptr), n(count) {}
+
     T* begin() const { return p; }
     T* end()   const { return p + n; }
     T& operator[](size_t i) const { return p[i]; }
@@ -55,10 +58,10 @@ struct KernelContext
 // 反向规则的执行上下文: 框架备好一切, 规则只负责填充 grad_inputs
 struct BackwardContext
 {
-    Span<const Tensor* const*> saved_inputs;   // 前向输入(建图时保存, 共享存储不拷贝)
-    Span<const Tensor* const*> saved_outputs;  // 前向输出
-    Span<const Tensor* const*> grad_outputs;   // 上游传来的"对本算子输出的梯度"
-    Span<Tensor* const*>       grad_inputs;    // 待写入:"对各输入的梯度"(框架已分配好)
+    Span<const Tensor*> saved_inputs;   // 前向输入(建图时保存, 共享存储不拷贝)
+    Span<const Tensor*> saved_outputs;  // 前向输出
+    Span<const Tensor*> grad_outputs;   // 上游传来的"对本算子输出的梯度"
+    Span<Tensor*>       grad_inputs;    // 待写入:"对各输入的梯度"(框架已分配好)
 
     // 前向发生过广播时(如 [B,C]+[C]), 把梯度沿广播维求和规约回输入形状
     static Tensor reduce_to(const Tensor& grad, const Shape& target_shape);

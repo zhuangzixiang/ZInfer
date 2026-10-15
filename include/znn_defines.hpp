@@ -52,6 +52,8 @@ struct Shape {
     int64_t c() const { return dims[1]; }
     int64_t h() const { return dims[2]; }
     int64_t w() const { return dims[3]; }
+
+    bool operator==(const Shape& other) const;
 };
 
 // ---------------------------------------------------------------- 运算选项

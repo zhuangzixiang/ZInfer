@@ -1,20 +1,36 @@
-// div: 逐元素二元运算(输入间自动广播)
-#include "operator.hpp"
-#include "znn_internal.hpp"
+// div: 逐元素除法(广播); 梯度 ga=g/b, gb=-g·a/b²(经算子组合表达)
+#include "shared.hpp"
+#include "op_dispatcher.hpp"
 
 namespace znn {
 
 extern const Operator g_div_operator;
+
+static void div_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
+    binary_kernel(in, out, [](float a, float b) { return a / b; });
+}
+
+static void div_grad(BackwardContext& c) {
+    const Tensor& g = *c.grad_outputs[0];
+    const Tensor& a = *c.saved_inputs[0];
+    const Tensor& b = *c.saved_inputs[1];
+    Tensor ga = Tensor::div(g, b);
+    Tensor gb = Tensor::div(Tensor::neg(Tensor::mul(g, a)), Tensor::mul(b, b));
+    *c.grad_inputs[0] = BackwardContext::reduce_to(ga, a.shape());
+    *c.grad_inputs[1] = BackwardContext::reduce_to(gb, b.shape());
+}
+
 const Operator g_div_operator = {
     "div",
-    nullptr,   // infer: 实现阶段补
-    nullptr,   // grad
-    nullptr,   // ref(对拍基准)
+    infer_broadcast,
+    div_grad,
+    div_ref,
     {},        // kernels[CPU/CUDA/Metal/Vulkan]
 };
 
 Tensor Tensor::div(const Tensor& a, const Tensor& b) {
-    ZNN_TODO();
+    const Tensor* ins[2] = {&a, &b};
+    return OpDispatcher::instance().run(&g_div_operator, Span<const Tensor*>(ins, 2), nullptr);
 }
 
 } // namespace znn

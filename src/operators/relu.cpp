@@ -1,20 +1,30 @@
-// relu: 激活函数
-#include "operator.hpp"
-#include "znn_internal.hpp"
+// relu: 激活函数()
+#include "shared.hpp"
+#include "op_dispatcher.hpp"
 
 namespace znn {
 
 extern const Operator g_relu_operator;
+
+static void relu_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
+    unary_kernel(in, out, [](float x) { return x > 0 ? x : 0; });
+}
+
+static void relu_grad(BackwardContext& c) {
+    unary_grad(c, [](float x, float y) { return x > 0 ? 1.0f : 0.0f; });
+}
+
 const Operator g_relu_operator = {
     "relu",
-    nullptr,   // infer: 实现阶段补
-    nullptr,   // grad
-    nullptr,   // ref(对拍基准)
+    infer_same,
+    relu_grad,
+    relu_ref,
     {},        // kernels[CPU/CUDA/Metal/Vulkan]
 };
 
 Tensor Activator::relu(const Tensor& x) {
-    ZNN_TODO();
+    const Tensor* ins[1] = {&x};
+    return OpDispatcher::instance().run(&g_relu_operator, Span<const Tensor*>(ins, 1), nullptr);
 }
 
 } // namespace znn
