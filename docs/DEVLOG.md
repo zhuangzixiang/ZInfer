@@ -112,3 +112,21 @@
 - 架构合理性 9/10; 可理解 10/10(链路图 + 文件头三段式);
   可维护 10/10; 可扩展 9/10; 精简 9/10
 - 完成度: 里程碑 1 约 20%(结构第四轮收敛, 实现未动)
+
+---
+
+## [5] 命名去缩写 + OpDef 字段注释 + 删除注册宏
+
+**变化**
+- 类型全拼: KernelCtx→KernelContext, BackwardCtx→BackwardContext,
+  KernelFn→KernelFunction, InferFn→ShapeInferenceFunction, GradFn→GradientFunction
+- OpDef 每个字段逐条详细注释(作用/时机/示例); 三类函数各自的
+  using 声明上方写明"做什么+何时被调+示例"
+- 注册宏 ZNN_OP_LIST_BEGIN/ZNN_OP/ZNN_OP_LIST_END 删除:
+  operator_list.cpp 直接写普通数组(宏拆三段无实际收益,
+  ffmpeg 用宏因列表是 configure 生成的, 我们手写手维护)
+- 验证: 编译绿, smoke 通过, mnist 退出码 1 + TODO 消息
+
+**反思**
+- 可理解 10/10(契约文件即文档, 零缩写零宏魔法); 精简 +10 行(宏删除)
+- 架构不变; 完成度 里程碑1 约 20%

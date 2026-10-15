@@ -55,10 +55,10 @@
 ```cpp
 struct OpDef {
     const char* name;
-    InferFn     infer;                        // 形状推导
-    GradFn      grad;                         // 反向规则; nullptr = 仅推理
-    KernelFn    kernels[Device::COUNT];       // 后端槽位, 可空 → 兜底链
-    KernelFn    ref;                          // 朴素参考实现(CPU), 兜底+对拍基准
+    ShapeInferenceFunction infer;                        // 形状推导
+    GradientFunction     grad;                         // 反向规则; nullptr = 仅推理
+    KernelFunction    kernels[Device::COUNT];       // 后端槽位, 可空 → 兜底链
+    KernelFunction    ref;                          // 朴素参考实现(CPU), 兜底+对拍基准
 };
 ```
 
@@ -112,7 +112,7 @@ Tensor::add(a, b)                          operators/add.cpp(前端)
 
 loss.backward()
   └─ AutogradEngine::backward(loss)         autograd.cpp: 逆拓扑执行各 g_*_def.grad
-       └─ 广播梯度规约 BackwardCtx::reduce_to
+       └─ 广播梯度规约 BackwardContext::reduce_to
 ```
 
 **文件划分判定规则：按编译器分文件、按逻辑聚目录。** 同编译器的实现（CPU ref 版与 Eigen 版）留在同一文件的不同内核槽位；异构后端（.cu/.mm/.comp）为同目录同名异后缀文件，注册项 extern 引用。层与优化器没有后端维度——它们是"参数 + 调用算子"的组合，设备选择发生在算子派发。职责边界：注册**数据**在 `operators/operator_list.cpp`，注册**机制**在 `op_registry`；算子契约在 `op_def`；求导引擎在 `autograd`；`znn_internal` 只是公共 API 的实现支撑，不含任何引擎。include 一律不带相对路径（CMake 以 `src/` 为私有包含目录）。用户接入方式：`#include "znn.hpp"` + 链接 `libznn`。
@@ -144,9 +144,9 @@ CMake 按平台/开关条件启用后端：`ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / 
 
 ### 4.4 Autograd 引擎（~500 行，算子无关）
 
-- 反向模式：标量 `loss.backward()` 触发，按 tape 拓扑逆序执行各 OpDef 的 `GradFn`。
-- `GradFn(BackwardCtx&)`：ctx 提供 saved inputs/outputs、grad_output，写入 grad_input。广播的梯度自动规约（学 PyTorch unbroadcast）。
-- `NoGrad` RAII 作用域跳过 tape 创建；远期加 `inference_mode`。
+- 反向模式：标量 `loss.backward()` 触发，按 tape 拓扑逆序执行各 OpDef 的 `GradientFunction`。
+- `GradientFunction(BackwardContext&)`：context 提供 saved inputs/outputs、grad_output，写入 grad_input。广播的梯度自动规约（学 PyTorch unbroadcast）。
+- `Runtime::set_grad_enabled(false)` 跳过 tape 创建（旧 NoGrad 的函数形式）。
 - 自定义算子不写 grad → 自动标记仅推理，训练时报清晰错误。
 
 ### 4.5 Optimizer
@@ -167,7 +167,7 @@ CMake 按平台/开关条件启用后端：`ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / 
 1. 声明调用函数：内置算子的调用点是 `include/znn.hpp` 的静态方法（`Tensor::matmul` / `Activator::relu` / `Loss::cross_entropy`）；扩展算子按同一风格在 `znn.hpp` 增加静态声明。
 2. `src/operators/foo.cpp`：定义 `g_foo_def`（extern 前缀保证外部链接）+ 前端函数；实现 `infer/grad/ref/kernels`。
 3. （可选，要性能时再做）`src/operators/foo.cu|.mm|.comp` 填对应槽位。
-4. `operators/operator_list.cpp` 的 extern 块与 `ZNN_OP` 列表各加一行；CMake 的 `ZNN_OPERATORS` 清单加一行。
+4. `operators/operator_list.cpp` 的 extern 块与 `g_znn_op_list` 数组各加一行；CMake 的 `ZNN_OPERATORS` 清单加一行。
 
 ### 5.2 新增第五种后端（如 NPU/oneDNN-direct）
 
@@ -270,7 +270,7 @@ zllm 作为平行包新增：
 - **Vulkan 无 BLAS 可委托**，是唯一必须手写内核的位置（~1,000 行）。
 - **Metal 仅 macOS 可构建**；Windows 开发机上 CUDA/Vulkan/CPU 可验，Metal 需 CI 或手动 mac 验证。
 - Metal shader 需运行时编译或预编译 .metallib（v1 取运行时编译，简单）。
-- 异步执行 v1 不暴露（全同步），但 KernelCtx/接口预留 stream 位，避免日后破坏 API。
+- 异步执行 v1 不暴露（全同步），但 KernelContext/接口预留 stream 位，避免日后破坏 API。
 - 编译时间：转编译库后 Eigen 模板只在 znn 内部 TU 展开，用户工程秒级。
 
 ---
@@ -329,7 +329,7 @@ Optimizer::destroy(opt);
 2. **库内（全局线程池 fork-join）**：复用 Eigen ThreadPool（零额外代码），逐元素/规约按外维并行；委托库（oneDNN 等）共享同一池，避免线程超额。
 3. **线程安全边界**：注册表只读无锁；不同线程各自建模型/推理完全并行；同一 Tensor/Layer/Optimizer 不做内部同步，跨线程共享由调用者串行化；grad 开关为 thread_local。
 
-GPU：v1 单默认 stream；多 stream 远期，KernelCtx 已预留字段。
+GPU：v1 单默认 stream；多 stream 远期，KernelContext 已预留字段。
 
 ### 13.3 自动求导引擎
 
@@ -356,13 +356,13 @@ GPU：v1 单默认 stream；多 stream 远期，KernelCtx 已预留字段。
 |---|---|---|
 | Span | 指针+长度视图, 零拷贝传参 | 所有内核签名 |
 | TensorMeta | 张量名片(shape/dtype/device, 无数据指针) | run 调 infer 前构造 |
-| KernelCtx | 内核上下文(设备 + 预留 stream) | run 构造并传入内核 |
-| BackwardCtx | 反向环境: saved 张量/grad_out 入/grad_in 出/reduce_to 广播规约 | backward 逐节点装配 |
-| KernelFn | 后端无关算体签名(ins 只读/outs 已分配/attrs 强类型 void*) | run 经函数指针调用 |
-| InferFn | 形状推导(分配输出之前) | run 第 2 步 |
-| GradFn | 反向规则(nullptr=仅推理) | backward 逐节点调用 |
+| KernelContext | 内核上下文(设备 + 预留 stream) | run 构造并传入内核 |
+| BackwardContext | 反向环境: saved 张量/grad_out 入/grad_in 出/reduce_to 广播规约 | backward 逐节点装配 |
+| KernelFunction | 后端无关算体签名(ins 只读/outs 已分配/attrs 强类型 void*) | run 经函数指针调用 |
+| ShapeInferenceFunction | 形状推导(分配输出之前) | run 第 2 步 |
+| GradientFunction | 反向规则(nullptr=仅推理) | backward 逐节点调用 |
 | OpDef | 注册项: name/infer/grad/ref(对拍基准)/kernels[后端槽位] | 前端引用, run 消费 |
-| ZNN_OP* 宏 | 注册数据数组(extern g_znn_op_list) | 首次 instance() 建表后只读 |
+| g_znn_op_list | 注册数据数组(直接普通数组, 无宏) | 首次 instance() 建表后只读 |
 
 ### 14.3 op_registry 在数据流中的位置
 

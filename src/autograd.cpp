@@ -21,7 +21,7 @@ void AutogradEngine::backward(const Tensor& loss) {
     ZNN_TODO();
 }
 
-Tensor BackwardCtx::reduce_to(const Tensor& g, const Shape& target_shape) {
+Tensor BackwardContext::reduce_to(const Tensor& g, const Shape& target_shape) {
     // TODO: 按广播语义对 g 求和规约回 target_shape
     ZNN_TODO();
 }
