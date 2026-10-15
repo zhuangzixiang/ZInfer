@@ -51,7 +51,8 @@ public:
     static Tensor empty(Shape shape, DType dt = DType::F32, Device dev = Device::CPU);
     static Tensor full (Shape shape, double value, DType dt = DType::F32, Device dev = Device::CPU);
     // 拷贝 host 内存构造张量(拷贝完成即与源内存无关)
-    static Tensor from_host(const void* data, Shape shape, DType dt, Device dev = Device::CPU);
+    static Tensor from_host(const void* data, Shape shape,
+                            DType dt = DType::F32, Device dev = Device::CPU);
     static Tensor arange(int64_t n, DType dt = DType::F32, Device dev = Device::CPU);
     static Tensor randn(Shape shape, unsigned seed = 0, DType dt = DType::F32, Device dev = Device::CPU);
 
@@ -95,9 +96,17 @@ public:
     const Shape& shape()     const;
     int64_t      size(int64_t dim) const;    // 支持负索引, -1 = 最后一维
     int64_t      numel()     const;          // 元素总数
-    int64_t      dim_count() const;
+    int64_t      dim_count() const;          // = shape().rank
     DType        dtype()     const;
     Device       device()    const;
+
+    // ---- 句柄生命周期(实现于库内; 拷贝=共享存储并递增引用计数) ----
+    Tensor();
+    Tensor(const Tensor& other);
+    Tensor& operator=(const Tensor& other);
+    Tensor(Tensor&& other) noexcept;
+    Tensor& operator=(Tensor&& other) noexcept;
+    ~Tensor();
 
     // ---- 视图(零拷贝, 与原张量共享存储) ----
     Tensor view    (Shape shape)      const;  // 要求存储连续
@@ -127,6 +136,7 @@ public:
 private:
     struct Impl;
     Impl* impl_;               // 引用计数句柄, 生命周期由库内部管理
+    friend struct Impl;        // 内部实现经由 Impl 访问句柄
 };
 
 // ---------------------------------------------------------------- Activator

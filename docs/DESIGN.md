@@ -73,25 +73,28 @@ struct OpDef {
 
 ## 3. 目录结构
 
-**对外只有 2 个头文件**（结构定义 + 接口定义；扩展接口属于库内开发接口，放在 src/；内部实现头一律不暴露，因此内部可自由重构、Eigen 永不进用户编译单元）：
+**对外只有 2 个头文件**（结构定义 + 接口定义；内部实现头一律不暴露，因此内部可自由重构、Eigen 永不进用户编译单元）：
 
 ```
 ZInfer/
-├── include/                # ★ 对外全部: 2 个文件, 固定不动
-│   ├── znn_defines.hpp     # ① 结构定义: 枚举/属性结构/LayerParam/OptimParam
+├── include/                # ★ 对外全部: 2 个文件, 固定不变
+│   ├── znn_defines.hpp     # ① 结构定义: 枚举/Shape/Options/Param
 │   └── znn.hpp             # ② 接口定义: Tensor/Activator/Loss/Layer/Optimizer
-├── src/                    # 内部实现, 对用户不可见
-│   ├── znn_ext.hpp         # 扩展接口: OpDef/KernelFn/BackwardCtx/注册宏 (算子·后端作者用)
-│   ├── core/               # tensor/registry/autograd/optim/device (内部头自由组织)
-│   ├── ops/                # 每算子一个 .cpp (+ .cu/.mm/.comp 随需)
-│   ├── backends/           # cuda/ metal/ vulkan/ (骨架+GEMM委托+拷贝)
-│   └── reg/operator_list.cpp   # ← codec_list.c
+├── src/                    # 内部, 对用户不可见
+│   ├── znn_ext.hpp         # 扩展接口: OpDef/KernelFn/BackwardCtx/注册宏(算子·后端作者用)
+│   ├── znn_internal.hpp    # 内部结构统一定义源: Storage/Tensor::Impl/GraphNode/
+│   │                       #   AutogradEngine/OpRegistry/优化器与层的实现类
+│   ├── znn_internal.cpp    # 内部类实现(集中于一个翻译单元)
+│   ├── operators/          # 每算子一个文件, 文件名 = 算子名(add.cpp 里只有 add)
+│   │   ├── operator_list.cpp   # ← 注册数据(extern + 列表, ≈ ffmpeg codec_list.c)
+│   │   └── (foo.cu/.mm/.comp 随需)
+│   └── backends/           # cuda/ metal/ vulkan/ (里程碑 2+)
 ├── tests/                  # 对拍测试: fast vs ref; GPU vs CPU golden
 ├── examples/mnist/         # 里程碑 1 验收
 └── docs/
 ```
 
-用户接入方式：`#include "znn.hpp"`（自动带入 znn_defines.hpp）+ 链接 `libznn`。算子/后端作者在库内使用 `src/znn_ext.hpp`。
+职责边界：注册**数据**在 `operators/operator_list.cpp`，注册**机制**（查找/派发/兜底）在 `OpRegistry`（znn_internal）；内部新增结构一律进 znn_internal.hpp，不再新建零散 hpp/cpp 对。include 一律不带相对路径（CMake 以 `src/` 为私有包含目录）。用户接入方式：`#include "znn.hpp"` + 链接 `libznn`。
 
 CMake 按平台/开关条件启用后端：`ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / ZNN_ONEDNN`，`ZNN_MINIMAL` 可裁掉 Eigen 只留参考实现。可选项：CMake 扫描 `src/ops/` 自动生成 `operator_list.cpp`（对应 ffmpeg configure 生成 codec_list.c 的做法），实现"丢文件即扩展"。
 
@@ -140,10 +143,10 @@ CMake 按平台/开关条件启用后端：`ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / 
 
 ### 5.1 新增算子（四步，零改 core）
 
-1. 声明调用函数：内置算子的声明集中在 `include/znn.hpp` 的 `znn::ops` 命名空间；扩展算子在自己的头文件中声明 `znn::ops::foo`（如 `Tensor foo(const Tensor&, const FooAttrs& = {})`）。
-2. `src/ops/foo.cpp`：实现 `foo_infer / foo_grad / foo_ref / foo_eigen`，定义 `const OpDef g_foo_def{...}`。
-3. （可选，要性能时再做）`src/ops/foo.cu|.mm|.comp` 填对应槽位。
-4. `reg/operator_list.cpp` 加一行 `ZNN_OP(g_foo_def)`；CMake 加源文件。
+1. 声明调用函数：内置算子的调用点是 `include/znn.hpp` 的静态方法（`Tensor::matmul` / `Activator::relu` / `Loss::cross_entropy`）；扩展算子按同一风格在 `znn.hpp` 增加静态声明。
+2. `src/operators/foo.cpp`：定义 `g_foo_def`（extern 前缀保证外部链接）+ 前端函数；实现 `infer/grad/ref/kernels`。
+3. （可选，要性能时再做）`src/operators/foo.cu|.mm|.comp` 填对应槽位。
+4. `operators/operator_list.cpp` 的 extern 块与 `ZNN_OP` 列表各加一行；CMake 的 `ZNN_OPERATORS` 清单加一行。
 
 ### 5.2 新增第五种后端（如 NPU/oneDNN-direct）
 

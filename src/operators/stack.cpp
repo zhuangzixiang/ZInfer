@@ -1,0 +1,19 @@
+// stack: 沿新维度 dim 堆叠(所有输入同形)
+#include "znn_ext.hpp"
+
+namespace znn {
+
+extern const OpDef g_stack_def;
+const OpDef g_stack_def = {
+    "stack",
+    nullptr,   // infer: 实现阶段补
+    nullptr,   // grad: 实现阶段补
+    nullptr,   // ref(对拍基准)
+    {},        // kernels[CPU/CUDA/Metal/Vulkan]
+};
+
+Tensor Tensor::stack(const std::vector<Tensor>& tensors, int64_t dim) {
+    ZNN_TODO();
+}
+
+} // namespace znn

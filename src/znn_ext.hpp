@@ -1,22 +1,25 @@
 // ============================================================================
-// znn_ext.hpp — ZInfer 扩展接口 (v0.2 讨论稿)
+// znn_ext.hpp — ZInfer 扩展接口 (v0.7)
 //
 // 受众: 算子/后端作者(库内开发), 不随库发布, 不在 include/ 中。
 // 库的使用者只需要 include/znn.hpp。
 //
-// 新增算子四步 (零改 core, 详见 docs/DESIGN.md §5.1):
-//   1. 实现一个 OpDef: infer 必填(形状推导), grad 可空(=仅推理),
-//      ref 必填(CPU 朴素实现, 所有后端的 对拍基准),
-//      kernels[] 按后端填, 空槽走兜底链 [D9: 透明拷回 CPU 执行+warning]
-//   2. 内核物理上可分属 .cpp/.cu/.mm/.comp 翻译单元, 注册项 extern 引用
-//   3. OpDef 加入 operator_list (ZNN_OP 宏, 或 CMake 扫描自动生成)
-//   4. 构建脚本加入源文件
+// 新增算子三步 (零改内核, 详见 docs/DESIGN.md §5.1):
+//   1. operators/<name>.cpp: 定义 OpDef(infer 必填/grad 可空/ref 必填/
+//      kernels 按后端填, 空槽走兜底链) + 前端函数
+//   2. operators/operator_list.cpp: extern 声明 + ZNN_OP 列表各加一行
+//   3. CMake 源清单加一行
 // ============================================================================
 #pragma once
-#include "znn.hpp"          // include/ 在头文件搜索路径上
+#include "znn.hpp"
 #include <cstddef>
+#include <stdexcept>
+#include <string>
 
 namespace znn {
+
+// 未实现占位: 骨架阶段统一抛出, 待逐项填充真实逻辑
+#define ZNN_TODO() throw std::runtime_error(std::string("znn: TODO ") + __func__)
 
 // ---------------------------------------------------------------- 轻量视图
 // 算子接口专用, 不进入用户 API。
@@ -43,7 +46,7 @@ struct TensorMeta {
 // 内核执行上下文
 struct KernelCtx {
     Device device;
-    void*  stream = nullptr;   // [D8] 预留, v1 恒为 nullptr
+    void*  stream = nullptr;   // 预留, v1 恒为 nullptr
 };
 
 // 反向传播上下文: 框架已分配好 grad_in, 规则只负责填充
@@ -80,25 +83,20 @@ struct OpDef {
     const char* name;                       // 全局唯一
     InferFn     infer;
     GradFn      grad;
-    KernelFn    ref;                        // CPU 朴素实现 = 对拍基准
+    KernelFn    ref;                        // CPU 朴素实现 = 所有后端的对拍基准
     KernelFn    kernels[(int)Device::kDeviceCount];
 };
 
 // ---------------------------------------------------------------- 注册
-// src/reg/operator_list.cpp (≈ ffmpeg codec_list.c):
-//
-//   ZNN_OP_LIST_BEGIN
-//       ZNN_OP(g_relu_def)
-//       ZNN_OP(g_matmul_def)
-//   ZNN_OP_LIST_END
+// operators/operator_list.cpp (≈ ffmpeg codec_list.c), 整个宏块置于 namespace znn 内:
 
 #define ZNN_OP_LIST_BEGIN \
-    const znn::OpDef* const g_znn_op_list[] = {
+    const OpDef* g_znn_op_list[] = {
 #define ZNN_OP(def)  &def,
 #define ZNN_OP_LIST_END \
     nullptr };
 
-// 测试/调试用: 按名字查注册项; nullptr = 未注册
-const OpDef* find_op(const char* name);
+// 注册表(OpRegistry, 见 znn_internal.hpp)启动时读取; 以 nullptr 结尾
+extern const OpDef* g_znn_op_list[];
 
 } // namespace znn
