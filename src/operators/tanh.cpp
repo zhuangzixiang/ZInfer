@@ -1,11 +1,11 @@
 // tanh: 激活函数
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_tanh_def;
-const OpDef g_tanh_def = {
+extern const Operator g_tanh_operator;
+const Operator g_tanh_operator = {
     "tanh",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad

@@ -4,7 +4,7 @@
 // 职责: Storage(引用计数设备缓冲) / Tensor::Impl(张量实体, 即 Tensor::Impl)
 // / mut 辅助 / 全库占位宏。Tensor 公共方法与 Runtime 的实现均在
 // znn_internal.cpp。
-// 本文件不含任何"引擎": 算子契约在 op_def.hpp, 派发器在 op_dispatcher,
+// 本文件不含任何"引擎": 算子契约在 operator.hpp, 派发器在 op_dispatcher,
 // 求导引擎在 autograd, 层/优化器在各自目录。
 // ============================================================================
 #pragma once
@@ -66,7 +66,5 @@ struct Tensor::Impl {
     size_t nbytes() const;            // numel × 元素大小
 };
 
-// 层对象逻辑上可变(参数被 Optimizer 更新), const 方法内取可变参数指针
-Tensor* mut(const Tensor& t);
 
 } // namespace znn

@@ -1,11 +1,11 @@
 // mse: 均方误差(回归标准损失), 返回标量
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_mse_def;
-const OpDef g_mse_def = {
+extern const Operator g_mse_operator;
+const Operator g_mse_operator = {
     "mse",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad: 实现阶段补

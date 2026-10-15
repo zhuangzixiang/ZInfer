@@ -134,9 +134,9 @@ public:
     Tensor detach() const;                   // 共享存储但脱离计算图(冻结中间量)
 
 private:
-    struct Impl;
-    Impl* impl_;               // 引用计数句柄, 生命周期由库内部管理
-    friend struct Impl;        // 内部实现经由 Impl 访问句柄
+    struct Impl;               // 内部实体, 定义在 znn_internal.hpp
+    Impl* impl_;               // 引用计数句柄, 生命周期由库管理
+    friend struct Impl;        // 库内部(派发器/求导引擎/内核)经 Impl 访问
 };
 
 // ---------------------------------------------------------------- Activator
@@ -175,8 +175,8 @@ public:
     virtual ~Layer() = default;
 
     virtual Tensor forward(const Tensor& x) = 0;
-    virtual std::vector<Tensor*> params() const = 0;   // 本层可训练权重
-    virtual void   train(bool mode = true) = 0;        // BN 统计更新/Dropout 生效与否
+    virtual std::vector<Tensor> params() const = 0;   // 本层可训练权重(句柄共享, 供 Optimizer 更新)
+    virtual void   train(bool mode = true) = 0;       // BN 统计更新/Dropout 生效与否
 
 protected:
     Layer() = default;                                 // 仅经 create / 继承构造
@@ -189,7 +189,7 @@ public:
     // 从一组 Layer 自动收集参数并构造(常规训练)
     static Optimizer* create(OptimType type, const std::vector<Layer*>& layers, const OptimParam& param);
     // 指定参数张量(自定义层 / 仅微调部分参数)
-    static Optimizer* create(OptimType type, std::vector<Tensor*> params, const OptimParam& param);
+    static Optimizer* create(OptimType type, std::vector<Tensor> params, const OptimParam& param);
     static void destroy(Optimizer* opt);       // 允许传 nullptr
 
     virtual ~Optimizer() = default;

@@ -1,6 +1,6 @@
 // AdamW: 复用 AdamImpl 动量逻辑, 仅 weight_decay 为解耦衰减
 #include "optim/optim.hpp"
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {

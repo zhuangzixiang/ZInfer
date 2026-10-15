@@ -1,11 +1,11 @@
 // matmul: 2D 矩阵乘, 高维按广播批处理
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_matmul_def;
-const OpDef g_matmul_def = {
+extern const Operator g_matmul_operator;
+const Operator g_matmul_operator = {
     "matmul",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad: 实现阶段补

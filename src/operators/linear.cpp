@@ -1,11 +1,11 @@
 // linear: x @ w.T + b(w 形状 [out, in])
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_linear_def;
-const OpDef g_linear_def = {
+extern const Operator g_linear_operator;
+const Operator g_linear_operator = {
     "linear",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad: 实现阶段补

@@ -1,11 +1,11 @@
 // gelu: 激活函数
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_gelu_def;
-const OpDef g_gelu_def = {
+extern const Operator g_gelu_operator;
+const Operator g_gelu_operator = {
     "gelu",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad

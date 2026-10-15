@@ -38,7 +38,7 @@
 │   —— 用户按论文逐层搭网络的 API 层                   │
 ├───────────────────────────────────────────────────┤
 │ znn/core (内核, 稳定不动, ~2,300 行):                │
-│   Tensor │ Device/Allocator │ OpDef+注册表          │
+│   Tensor │ Device/Allocator │ Operator+注册表          │
 │   AutogradEngine(算子无关) │ Optimizer │ NoGrad     │
 ├───────────────────────────────────────────────────┤
 │ 可插拔算子层: ops/*.hpp + *.cpp (+ *.cu/.mm/.comp)  │
@@ -50,10 +50,10 @@
 
 ### 单注册表模型（已商定）
 
-每个算子一条 `OpDef` 注册项，内含各后端内核槽位：
+每个算子一条 `Operator` 注册项，内含各后端内核槽位：
 
 ```cpp
-struct OpDef {
+struct Operator {
     const char* name;
     ShapeInferenceFunction infer;                        // 形状推导
     GradientFunction     grad;                         // 反向规则; nullptr = 仅推理
@@ -81,7 +81,7 @@ ZInfer/
 │   ├── znn_defines.hpp     # ① 结构定义: 枚举/Shape/Options/Param
 │   └── znn.hpp             # ② 接口定义: Tensor/Activator/Loss/Layer/Optimizer
 ├── src/                    # 内部, 对用户不可见
-│   ├── op_def.hpp          # 算子契约(算子作者唯一要读): OpDef/内核签名/注册宏
+│   ├── operator.hpp          # 算子契约(算子作者唯一要读): Operator/内核签名/注册宏
 │   ├── znn_internal.hpp/.cpp  # znn.hpp 的实现支撑: Storage/Tensor::Impl/Shape/Runtime
 │   ├── autograd.hpp/.cpp   # 自动求导引擎: GraphNode/建图(record)/反向(backward)
 │   ├── op_dispatcher.hpp/.cpp # 算子派发器: 执行一次算子调用的完整链路(注册数据在 operator_list)
@@ -104,10 +104,10 @@ ZInfer/
 
 ```
 Tensor::add(a, b)                          operators/add.cpp(前端)
-  └─ OpDispatcher::run(&g_add_def, ...)     op_dispatcher.cpp(派发)
-       ├─ g_add_def.infer(...)             → 输出形状
+  └─ OpDispatcher::run(&g_add_operator, ...)     op_dispatcher.cpp(派发)
+       ├─ g_add_operator.infer(...)             → 输出形状
        ├─ 分配输出 Tensor                   znn_internal(Tensor::Impl/Storage)
-       ├─ g_add_def.kernels[设备](...)      operators/add.cpp(内核; 空槽→兜底链)
+       ├─ g_add_operator.kernels[设备](...)      operators/add.cpp(内核; 空槽→兜底链)
        └─ AutogradEngine::record(...)       autograd.cpp(训练时建 tape 节点)
 
 loss.backward()
@@ -115,7 +115,7 @@ loss.backward()
        └─ 广播梯度规约 BackwardContext::reduce_to
 ```
 
-**文件划分判定规则：按编译器分文件、按逻辑聚目录。** 同编译器的实现（CPU ref 版与 Eigen 版）留在同一文件的不同内核槽位；异构后端（.cu/.mm/.comp）为同目录同名异后缀文件，注册项 extern 引用。层与优化器没有后端维度——它们是"参数 + 调用算子"的组合，设备选择发生在算子派发。职责边界：注册**数据**在 `operators/operator_list.cpp`，派发**机制**在 `op_dispatcher`；算子契约在 `op_def`；求导引擎在 `autograd`；`znn_internal` 只是公共 API 的实现支撑，不含任何引擎。include 一律不带相对路径（CMake 以 `src/` 为私有包含目录）。用户接入方式：`#include "znn.hpp"` + 链接 `libznn`。
+**文件划分判定规则：按编译器分文件、按逻辑聚目录。** 同编译器的实现（CPU ref 版与 Eigen 版）留在同一文件的不同内核槽位；异构后端（.cu/.mm/.comp）为同目录同名异后缀文件，注册项 extern 引用。层与优化器没有后端维度——它们是"参数 + 调用算子"的组合，设备选择发生在算子派发。职责边界：注册**数据**在 `operators/operator_list.cpp`，派发**机制**在 `op_dispatcher`；算子契约在 `operator`；求导引擎在 `autograd`；`znn_internal` 只是公共 API 的实现支撑，不含任何引擎。include 一律不带相对路径（CMake 以 `src/` 为私有包含目录）。用户接入方式：`#include "znn.hpp"` + 链接 `libznn`。
 
 CMake 按平台/开关条件启用后端：`ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / ZNN_ONEDNN`，`ZNN_MINIMAL` 可裁掉 Eigen 只留参考实现。可选项：CMake 扫描 `src/ops/` 自动生成 `operator_list.cpp`（对应 ffmpeg configure 生成 codec_list.c 的做法），实现"丢文件即扩展"。
 
@@ -138,13 +138,13 @@ CMake 按平台/开关条件启用后端：`ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / 
 
 ### 4.3 Dispatch 与兜底链
 
-- 启动期由 `operator_list.cpp` 构建 `name → OpDef*` 表与 id 映射；运行时 `id → 函数指针` 直接调用，零字符串查找。
-- 调用路径：`znn::relu(x)`（自由函数，ops/relu.hpp 声明）→ 取 OpDef → 按 `x.device()` 选槽 → 空槽走兜底链 → autograd 包装（grad 规则存在且 requires_grad 时建 tape 节点）。
+- 启动期由 `operator_list.cpp` 构建 `name → Operator*` 表与 id 映射；运行时 `id → 函数指针` 直接调用，零字符串查找。
+- 调用路径：`znn::relu(x)`（自由函数，ops/relu.hpp 声明）→ 取 Operator → 按 `x.device()` 选槽 → 空槽走兜底链 → autograd 包装（grad 规则存在且 requires_grad 时建 tape 节点）。
 - 默认保存前向输入+输出供 backward（v1 简单起步；后续可按算子声明精简保存列表）。
 
 ### 4.4 Autograd 引擎（~500 行，算子无关）
 
-- 反向模式：标量 `loss.backward()` 触发，按 tape 拓扑逆序执行各 OpDef 的 `GradientFunction`。
+- 反向模式：标量 `loss.backward()` 触发，按 tape 拓扑逆序执行各 Operator 的 `GradientFunction`。
 - `GradientFunction(BackwardContext&)`：context 提供 saved inputs/outputs、grad_output，写入 grad_input。广播的梯度自动规约（学 PyTorch unbroadcast）。
 - `Runtime::set_grad_enabled(false)` 跳过 tape 创建（旧 NoGrad 的函数形式）。
 - 自定义算子不写 grad → 自动标记仅推理，训练时报清晰错误。
@@ -165,9 +165,9 @@ CMake 按平台/开关条件启用后端：`ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / 
 ### 5.1 新增算子（四步，零改 core）
 
 1. 声明调用函数：内置算子的调用点是 `include/znn.hpp` 的静态方法（`Tensor::matmul` / `Activator::relu` / `Loss::cross_entropy`）；扩展算子按同一风格在 `znn.hpp` 增加静态声明。
-2. `src/operators/foo.cpp`：定义 `g_foo_def`（extern 前缀保证外部链接）+ 前端函数；实现 `infer/grad/ref/kernels`。
+2. `src/operators/foo.cpp`：定义 `g_foo_operator`（extern 前缀保证外部链接）+ 前端函数；实现 `infer/grad/ref/kernels`。
 3. （可选，要性能时再做）`src/operators/foo.cu|.mm|.comp` 填对应槽位。
-4. `operators/operator_list.cpp` 的 extern 块与 `g_znn_op_list` 数组各加一行；CMake 的 `ZNN_OPERATORS` 清单加一行。
+4. `operators/operator_list.cpp` 的 extern 块与 `g_operator_list` 数组各加一行；CMake 的 `ZNN_OPERATORS` 清单加一行。
 
 ### 5.2 新增第五种后端（如 NPU/oneDNN-direct）
 
@@ -182,7 +182,7 @@ CMake 按平台/开关条件启用后端：`ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / 
 
 ### 5.4 zllm 扩展包（共用+扩展，不在旧框架长新运行时）
 
-内核已预留的钩子：dtype 含 F16/BF16；分配器预留 arena/可增长块；stream 字段预留；OpDef 零改动。
+内核已预留的钩子：dtype 含 F16/BF16；分配器预留 arena/可增长块；stream 字段预留；Operator 零改动。
 
 zllm 作为平行包新增：
 
@@ -277,7 +277,7 @@ zllm 作为平行包新增：
 
 ## 12. 接口草案 v0.4（讨论稿）
 
-**权威版本已落为真实头文件，以文件为准**：`include/znn_defines.hpp`（结构定义）+ `include/znn.hpp`（接口定义）。v0.4 接口语言："一切操作挂在类名下"（Tensor/Activator/Loss/Runtime 静态方法 + Layer/Optimizer 虚接口与 create/destroy 工厂，无全局自由函数）；公共头零实现体（data/item 模板由库内显式实例化）。算子契约在 `src/op_def.hpp`（库内开发接口，不随库发布）。
+**权威版本已落为真实头文件，以文件为准**：`include/znn_defines.hpp`（结构定义）+ `include/znn.hpp`（接口定义）。v0.4 接口语言："一切操作挂在类名下"（Tensor/Activator/Loss/Runtime 静态方法 + Layer/Optimizer 虚接口与 create/destroy 工厂，无全局自由函数）；公共头零实现体（data/item 模板由库内显式实例化）。算子契约在 `src/operator.hpp`（库内开发接口，不随库发布）。
 
 典型用法（MNIST 训练循环）：
 
@@ -333,7 +333,7 @@ GPU：v1 单默认 stream；多 stream 远期，KernelContext 已预留字段。
 
 ### 13.3 自动求导引擎
 
-- 前向建 tape：每个建图算子从节点池分配 GraphNode（OpDef 指针、保存张量、依赖计数）；**节点创建序即拓扑序，反向无需排序**。
+- 前向建 tape：每个建图算子从节点池分配 GraphNode（Operator 指针、保存张量、依赖计数）；**节点创建序即拓扑序，反向无需排序**。
 - backward：从损失逆序遍历，分支汇合用"输出消费计数归零触发"（等价 PyTorch InputBuffer，约百行），梯度在 grad buffer 累加。
 - 单线程遍历 + 内核内部并行（反向耗时由内核主导，图级并行收益小，远期可选）。
 - 节点与中间量用完即时归还池，见 13.1 峰值内存策略。
@@ -350,7 +350,7 @@ GPU：v1 单默认 stream；多 stream 远期，KernelContext 已预留字段。
 
 "record" 是动态图领域标准动词（PyTorch RecordFunction / TF GradientTape.record）：把一次运算记录到计算图。步骤：节点池分配 GraphNode → 记 op 入口与 saved 张量(共享存储不拷贝) → 链接上下游(输入的 consumers += 本节点, pending++) → 写各输出 Impl::grad_fn。触发条件：grad_enabled && op->grad && 任一输入 requires_grad；纯推理零开销。
 
-### 14.2 op_def.hpp 逐项职责与数据流位置
+### 14.2 operator.hpp 逐项职责与数据流位置
 
 | 定义 | 作用 | 数据流位置 |
 |---|---|---|
@@ -361,12 +361,12 @@ GPU：v1 单默认 stream；多 stream 远期，KernelContext 已预留字段。
 | KernelFunction | 后端无关算体签名(ins 只读/outs 已分配/attrs 强类型 void*) | run 经函数指针调用 |
 | ShapeInferenceFunction | 形状推导(分配输出之前) | run 第 2 步 |
 | GradientFunction | 反向规则(nullptr=仅推理) | backward 逐节点调用 |
-| OpDef | 注册项: name/infer/grad/ref(对拍基准)/kernels[后端槽位] | 前端引用, run 消费 |
-| g_znn_op_list | 注册数据数组(直接普通数组, 无宏) | 首次 instance() 建表后只读 |
+| Operator | 注册项: name/infer/grad/ref(对拍基准)/kernels[后端槽位] | 前端引用, run 消费 |
+| g_operator_list | 注册数据数组(直接普通数组, 无宏) | 首次 instance() 建表后只读 |
 
 ### 14.3 op_dispatcher 在数据流中的位置(注册发生在编译期)
 
-- instance(): Meyers 单例, 首次调用遍历 g_znn_op_list 建 name→OpDef 哈希表, 此后只读无锁
+- instance(): Meyers 单例, 首次调用遍历 g_operator_list 建 name→Operator 哈希表, 此后只读无锁
 - find(): 调试/测试; 正式数据流零字符串查找(前端直接持 &g_*_def)
 - run(): 29 个算子前端的唯一入口, 完整链路八步:
   构造名片 → infer 形状 → 分配输出(Impl::create→Storage) → 按输入设备选内核(空槽兜底: CPU→ref, GPU→拷回 CPU+warning) → 执行内核 → 满足条件则 record 建图 → 返回输出

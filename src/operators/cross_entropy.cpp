@@ -1,11 +1,11 @@
 // cross_entropy: softmax + 负对数似然(分类标准损失), 返回标量
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_cross_entropy_def;
-const OpDef g_cross_entropy_def = {
+extern const Operator g_cross_entropy_operator;
+const Operator g_cross_entropy_operator = {
     "cross_entropy",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad: 实现阶段补

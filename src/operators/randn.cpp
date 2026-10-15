@@ -1,11 +1,11 @@
 // randn: 标准正态随机张量(seed 为 0 时用全局随机源)
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_randn_def;
-const OpDef g_randn_def = {
+extern const Operator g_randn_operator;
+const Operator g_randn_operator = {
     "randn",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad: 无需求导

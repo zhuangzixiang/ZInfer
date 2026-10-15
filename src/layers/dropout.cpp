@@ -1,6 +1,6 @@
 // Dropout: 训练态按 rate 掩码缩放, 推理态直通
 #include "layers/layers.hpp"
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 #include "znn_internal.hpp"
 

@@ -1,11 +1,11 @@
 // SGD: p -= lr * (grad + momentum 项 + weight_decay 项)
 #include "optim/optim.hpp"
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-SgdImpl::SgdImpl(std::vector<Tensor*> params, const OptimParam& param)
+SgdImpl::SgdImpl(std::vector<Tensor> params, const OptimParam& param)
     : params_(std::move(params)), param_(param) {
     // TODO: momentum > 0 时分配速度缓冲
 }

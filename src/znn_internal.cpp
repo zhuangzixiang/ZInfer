@@ -88,10 +88,6 @@ size_t Tensor::Impl::nbytes() const {
     ZNN_TODO();
 }
 
-Tensor* mut(const Tensor& t) {
-    return const_cast<Tensor*>(&t);
-}
-
 // ---- Tensor 公共方法: 句柄生命周期 ----
 
 Tensor::Tensor()

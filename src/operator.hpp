@@ -5,15 +5,15 @@
 //   ShapeInferenceFunction  形状推导: 只看形状不算数据, 在分配输出前运行
 //   KernelFunction          计算内核: 真正做数学的代码, 每个后端一份
 //   GradientFunction        反向规则: 反向传播时怎么求对每个输入的梯度
-//   OpDef                   注册项: 把三者与各后端内核槽位绑在一起
+//   Operator                   注册项: 把三者与各后端内核槽位绑在一起
 //
 // 调用链路(算子在链路中的位置):
 //   Tensor::add(a,b) → OpDispatcher::run → infer → 分配输出 → kernels[设备] → (训练时)record
 //   loss.backward()  → AutogradEngine  → grad 逐节点逆序执行
 //
 // 新增算子三步(详见 docs/DESIGN.md §5.1):
-//   1. operators/<name>.cpp 实现 OpDef 与前端函数
-//   2. operators/operator_list.cpp 的 g_znn_op_list 数组加一行
+//   1. operators/<name>.cpp 实现 Operator 与前端函数
+//   2. operators/operator_list.cpp 的 g_operator_list 数组加一行
 //   3. CMake 的 ZNN_OPERATORS 清单加一行
 // ============================================================================
 #pragma once
@@ -76,7 +76,7 @@ using KernelFunction = void (*)(KernelContext& context, Span<const Tensor*> inpu
 using GradientFunction = void (*)(BackwardContext& context);
 
 // 一个算子的完整注册项: 一个算子 = "1 个形状推导 + N 份内核(每后端一份) + 可选 1 个反向规则"
-struct OpDef
+struct Operator
 {
     const char* name;  // 算子名(全局唯一)
     ShapeInferenceFunction infer;  // 形状推导函数, 必填
@@ -89,6 +89,6 @@ struct OpDef
 // --------------------------------------------- 注册数据
 // operators/operator_list.cpp 直接以普通数组定义(无宏);
 // OpDispatcher 首次使用时读取建索引; 以 nullptr 结尾。
-extern const OpDef* g_znn_op_list[];
+extern const Operator* g_operator_list[];
 
 } // namespace znn

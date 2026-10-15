@@ -9,7 +9,7 @@ AutogradEngine& AutogradEngine::instance() {
     return engine;
 }
 
-GraphNode* AutogradEngine::record(const OpDef* op,
+GraphNode* AutogradEngine::record(const Operator* op,
                                   Span<const Tensor*> inputs,
                                   Span<const Tensor*> outputs) {
     // TODO: 节点池分配 → 保存输入输出 → 链接上下游消费计数

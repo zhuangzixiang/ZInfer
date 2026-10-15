@@ -1,11 +1,11 @@
 // exp: 逐元素一元运算
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_exp_def;
-const OpDef g_exp_def = {
+extern const Operator g_exp_operator;
+const Operator g_exp_operator = {
     "exp",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad

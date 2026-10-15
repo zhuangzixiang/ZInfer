@@ -1,6 +1,6 @@
 // Flatten: 维度展平
 #include "layers/layers.hpp"
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 #include "znn_internal.hpp"
 

@@ -1,11 +1,11 @@
 // sqrt: 逐元素一元运算
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_sqrt_def;
-const OpDef g_sqrt_def = {
+extern const Operator g_sqrt_operator;
+const Operator g_sqrt_operator = {
     "sqrt",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad

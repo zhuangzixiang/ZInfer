@@ -1,11 +1,11 @@
 // relu: 激活函数
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_relu_def;
-const OpDef g_relu_def = {
+extern const Operator g_relu_operator;
+const Operator g_relu_operator = {
     "relu",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad

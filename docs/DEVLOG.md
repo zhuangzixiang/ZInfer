@@ -151,3 +151,25 @@
 **反思**
 - 命名即语义: "派发器"准确描述主职, 消除"注册表为什么会 run"的困惑源
 - 架构合理性 9/10; 可理解 10/10; 完成度 里程碑1 约 20%
+
+---
+
+## [7] 方案B落地 + pimpl 最小化尝试 + OpDef→Operator
+
+**变化**
+1. params() 方案B: Layer::params() 与 Optimizer::create 改返回/接受
+   std::vector<Tensor>(共享句柄), 九个层实现返回句柄拷贝,
+   mut()/const_cast 全库删除
+2. pimpl 三行→两行尝试(struct Impl* impl_; 声明成员合一)被 MSVC 拒绝
+   (不把成员声明中的 elaborated-type-specifier 当嵌套类声明),
+   回退三行可移植形态并逐行注释必要性——"一行"不可行
+3. OpDef → Operator(TFLite/PyTorch-jit 同名先例, 去定义歧义);
+   文件 op_def.hpp → operator.hpp; 实例命名 g_<算子名>_operator;
+   注册数组 g_znn_op_list → g_operator_list; 形参/成员保留惯用名 op
+   并在契约头注明(operator 是 C++ 关键字, 不能作标识符)
+
+**反思**
+- const 正确性: 全库零 const_cast(可维护 10/10)
+- 命名语义: Operator 即"算子"本体, 消除 Def 歧义
+- 跨编译器教训入档: 合一写法 GCC 接受 MSVC 拒绝, 骨架须双编译器验证
+- 完成度: 里程碑1 约 20%; 接口随 B 定稿

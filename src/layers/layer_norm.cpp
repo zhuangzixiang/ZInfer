@@ -1,6 +1,6 @@
 // LayerNorm: 层归一化 + 仿射
 #include "layers/layers.hpp"
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 #include "znn_internal.hpp"
 
@@ -16,8 +16,8 @@ Tensor LayerNormLayer::forward(const Tensor& x) {
     ZNN_TODO();
 }
 
-std::vector<Tensor*> LayerNormLayer::params() const {
-    return {mut(w_), mut(b_)};
+std::vector<Tensor> LayerNormLayer::params() const {
+    return {w_, b_};
 }
 
 } // namespace znn

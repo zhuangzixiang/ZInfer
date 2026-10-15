@@ -10,14 +10,14 @@
 // Tensor::backward() 调用 backward 执行反向。
 // ============================================================================
 #pragma once
-#include "op_def.hpp"
+#include "operator.hpp"
 #include <vector>
 
 namespace znn {
 
 // 前向建图节点: 创建序即拓扑序(动态图天然性质, 反向免排序)
 struct GraphNode {
-    const OpDef* op = nullptr;              // 反向规则入口
+    const Operator* op = nullptr;              // 反向规则入口
     std::vector<Tensor> saved_inputs;       // 前向输入(默认全存)
     std::vector<Tensor> saved_outputs;      // 前向输出(默认全存)
     std::vector<GraphNode*> consumers;      // 消费本节点输出的下游节点
@@ -29,7 +29,7 @@ public:
     static AutogradEngine& instance();
 
     // 前向: 有 grad 规则且任一输入 requires_grad 时由 OpDispatcher 调用
-    GraphNode* record(const OpDef* op, Span<const Tensor*> inputs, Span<const Tensor*> outputs);
+    GraphNode* record(const Operator* op, Span<const Tensor*> inputs, Span<const Tensor*> outputs);
     // 反向: 从标量损失出发, 逆拓扑序填充各参数 .grad()
     void backward(const Tensor& loss);
 

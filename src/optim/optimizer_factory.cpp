@@ -1,6 +1,6 @@
 // Optimizer 工厂: 按 OptimType 分发; layers 重载自动收集各层参数
 #include "optim/optim.hpp"
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
@@ -11,7 +11,7 @@ Optimizer* Optimizer::create(OptimType type, const std::vector<Layer*>& layers,
     ZNN_TODO();
 }
 
-Optimizer* Optimizer::create(OptimType type, std::vector<Tensor*> params,
+Optimizer* Optimizer::create(OptimType type, std::vector<Tensor> params,
                              const OptimParam& param) {
     // TODO: switch(type) 分发到 SgdImpl/AdamImpl/AdamWImpl
     ZNN_TODO();

@@ -1,6 +1,6 @@
 // Linear: y = x @ w.T + b
 #include "layers/layers.hpp"
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 #include "znn_internal.hpp"
 
@@ -16,9 +16,9 @@ Tensor LinearLayer::forward(const Tensor& x) {
     ZNN_TODO();
 }
 
-std::vector<Tensor*> LinearLayer::params() const {
-    return has_bias_ ? std::vector<Tensor*>{mut(w_), mut(b_)}
-                     : std::vector<Tensor*>{mut(w_)};
+std::vector<Tensor> LinearLayer::params() const {
+    return has_bias_ ? std::vector<Tensor>{w_, b_}
+                     : std::vector<Tensor>{w_};
 }
 
 } // namespace znn

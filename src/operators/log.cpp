@@ -1,11 +1,11 @@
 // log: 逐元素一元运算
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_log_def;
-const OpDef g_log_def = {
+extern const Operator g_log_operator;
+const Operator g_log_operator = {
     "log",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad

@@ -1,11 +1,11 @@
 // softmax: 沿 dim 归一化指数
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_softmax_def;
-const OpDef g_softmax_def = {
+extern const Operator g_softmax_operator;
+const Operator g_softmax_operator = {
     "softmax",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad: 实现阶段补

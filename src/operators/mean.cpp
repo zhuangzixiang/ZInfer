@@ -1,11 +1,11 @@
 // mean: 沿 dim 规约(keepdim 控制保留维度)
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_mean_def;
-const OpDef g_mean_def = {
+extern const Operator g_mean_operator;
+const Operator g_mean_operator = {
     "mean",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad

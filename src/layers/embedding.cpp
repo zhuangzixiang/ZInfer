@@ -1,6 +1,6 @@
 // Embedding: 按索引取行
 #include "layers/layers.hpp"
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 #include "znn_internal.hpp"
 
@@ -15,8 +15,8 @@ Tensor EmbeddingLayer::forward(const Tensor& indices) {
     ZNN_TODO();
 }
 
-std::vector<Tensor*> EmbeddingLayer::params() const {
-    return {mut(w_)};
+std::vector<Tensor> EmbeddingLayer::params() const {
+    return {w_};
 }
 
 } // namespace znn

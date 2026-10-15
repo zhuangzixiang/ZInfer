@@ -1,6 +1,6 @@
 // Conv2d: 2D 卷积层(NCHW)
 #include "layers/layers.hpp"
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 #include "znn_internal.hpp"
 
@@ -17,9 +17,9 @@ Tensor Conv2dLayer::forward(const Tensor& x) {
     ZNN_TODO();
 }
 
-std::vector<Tensor*> Conv2dLayer::params() const {
-    return has_bias_ ? std::vector<Tensor*>{mut(w_), mut(b_)}
-                     : std::vector<Tensor*>{mut(w_)};
+std::vector<Tensor> Conv2dLayer::params() const {
+    return has_bias_ ? std::vector<Tensor>{w_, b_}
+                     : std::vector<Tensor>{w_};
 }
 
 } // namespace znn

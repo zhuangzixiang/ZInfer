@@ -10,17 +10,17 @@ namespace znn {
 
 class SgdImpl final : public Optimizer {
 public:
-    SgdImpl(std::vector<Tensor*> params, const OptimParam& param);
+    SgdImpl(std::vector<Tensor> params, const OptimParam& param);
     void step() override;
     void clear() override;
 private:
-    std::vector<Tensor*> params_;
+    std::vector<Tensor> params_;
     OptimParam param_;
 };
 
 class AdamImpl : public Optimizer {
 public:
-    AdamImpl(std::vector<Tensor*> params, const OptimParam& param);
+    AdamImpl(std::vector<Tensor> params, const OptimParam& param);
     void step() override;
     void clear() override;
 protected:
@@ -29,7 +29,7 @@ protected:
         Tensor m;      // 一阶动量
         Tensor v;      // 二阶动量
     };
-    std::vector<Tensor*> params_;
+    std::vector<Tensor> params_;
     std::vector<Moment>  moments_;
     OptimParam param_;
 };

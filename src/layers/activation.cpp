@@ -1,6 +1,6 @@
 // Activation: ReLU/GELU/Sigmoid/Tanh 共用层(无参数)
 #include "layers/layers.hpp"
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 #include "znn_internal.hpp"
 

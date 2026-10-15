@@ -1,6 +1,6 @@
 // BatchNorm2d: 批归一化(train 态更新 running 统计, eval 态使用统计)
 #include "layers/layers.hpp"
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 #include "znn_internal.hpp"
 
@@ -16,8 +16,8 @@ Tensor BatchNorm2dLayer::forward(const Tensor& x) {
     ZNN_TODO();
 }
 
-std::vector<Tensor*> BatchNorm2dLayer::params() const {
-    return {mut(w_), mut(b_)};
+std::vector<Tensor> BatchNorm2dLayer::params() const {
+    return {w_, b_};
 }
 
 } // namespace znn

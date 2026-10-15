@@ -14,7 +14,7 @@ class LinearLayer final : public Layer {
 public:
     LinearLayer(int64_t in, int64_t out, bool bias);
     Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override;
+    std::vector<Tensor> params() const override;
     void train(bool) override {}
 private:
     Tensor w_, b_;
@@ -26,7 +26,7 @@ public:
     Conv2dLayer(int64_t in_ch, int64_t out_ch, Shape kernel,
                 const Conv2dOptions& options, bool bias);
     Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override;
+    std::vector<Tensor> params() const override;
     void train(bool) override {}
 private:
     Tensor w_, b_;
@@ -38,7 +38,7 @@ class BatchNorm2dLayer final : public Layer {
 public:
     BatchNorm2dLayer(int64_t channels, double eps, double momentum);
     Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override;
+    std::vector<Tensor> params() const override;
     void train(bool mode) override { training_ = mode; }
 private:
     Tensor w_, b_;          // 仿射参数 γ/β
@@ -51,7 +51,7 @@ class LayerNormLayer final : public Layer {
 public:
     LayerNormLayer(int64_t normalized_dim, double eps);
     Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override;
+    std::vector<Tensor> params() const override;
     void train(bool) override {}
 private:
     Tensor w_, b_;
@@ -62,7 +62,7 @@ class EmbeddingLayer final : public Layer {
 public:
     EmbeddingLayer(int64_t num_embeddings, int64_t embed_dim);
     Tensor forward(const Tensor& indices) override;
-    std::vector<Tensor*> params() const override;
+    std::vector<Tensor> params() const override;
     void train(bool) override {}
 private:
     Tensor w_;
@@ -73,7 +73,7 @@ class ActivationLayer final : public Layer {
 public:
     explicit ActivationLayer(LayerType type);
     Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override { return {}; }
+    std::vector<Tensor> params() const override { return {}; }
     void train(bool) override {}
 private:
     LayerType type_;
@@ -83,7 +83,7 @@ class FlattenLayer final : public Layer {
 public:
     explicit FlattenLayer(int64_t start_dim);
     Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override { return {}; }
+    std::vector<Tensor> params() const override { return {}; }
     void train(bool) override {}
 private:
     int64_t start_dim_;
@@ -94,7 +94,7 @@ class Pool2dLayer final : public Layer {
 public:
     Pool2dLayer(LayerType type, Shape kernel, const Pool2dOptions& options);
     Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override { return {}; }
+    std::vector<Tensor> params() const override { return {}; }
     void train(bool) override {}
 private:
     LayerType type_;
@@ -106,7 +106,7 @@ class DropoutLayer final : public Layer {
 public:
     DropoutLayer(double rate, unsigned seed);
     Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override { return {}; }
+    std::vector<Tensor> params() const override { return {}; }
     void train(bool mode) override { training_ = mode; }
 private:
     double rate_;

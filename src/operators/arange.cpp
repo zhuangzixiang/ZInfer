@@ -1,11 +1,11 @@
 // arange: 等差序列 [0, n)
-#include "op_def.hpp"
+#include "operator.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-extern const OpDef g_arange_def;
-const OpDef g_arange_def = {
+extern const Operator g_arange_operator;
+const Operator g_arange_operator = {
     "arange",
     nullptr,   // infer: 实现阶段补
     nullptr,   // grad: 无需求导
