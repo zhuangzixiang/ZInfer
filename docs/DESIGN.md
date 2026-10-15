@@ -84,7 +84,7 @@ ZInfer/
 │   ├── op_def.hpp          # 算子契约(算子作者唯一要读): OpDef/内核签名/注册宏
 │   ├── znn_internal.hpp/.cpp  # znn.hpp 的实现支撑: Storage/Tensor::Impl/Shape/Runtime
 │   ├── autograd.hpp/.cpp   # 自动求导引擎: GraphNode/建图(record)/反向(backward)
-│   ├── op_registry.hpp/.cpp  # 算子注册表与派发: 机制(数据在 operator_list, 机制在此)
+│   ├── op_dispatcher.hpp/.cpp # 算子派发器: 执行一次算子调用的完整链路(注册数据在 operator_list)
 │   ├── operators/          # 一算子一文件, 文件名=算子名; 异构后端=同名异后缀
 │   │   ├── operator_list.cpp   # ← 注册数据(extern + 列表, ≈ ffmpeg codec_list.c)
 │   │   └── add.cpp  conv2d.cpp  (conv2d.cu/.mm/.comp 里程碑 2+)
@@ -104,7 +104,7 @@ ZInfer/
 
 ```
 Tensor::add(a, b)                          operators/add.cpp(前端)
-  └─ OpRegistry::run(&g_add_def, ...)       op_registry.cpp(机制)
+  └─ OpDispatcher::run(&g_add_def, ...)     op_dispatcher.cpp(派发)
        ├─ g_add_def.infer(...)             → 输出形状
        ├─ 分配输出 Tensor                   znn_internal(Tensor::Impl/Storage)
        ├─ g_add_def.kernels[设备](...)      operators/add.cpp(内核; 空槽→兜底链)
@@ -115,7 +115,7 @@ loss.backward()
        └─ 广播梯度规约 BackwardContext::reduce_to
 ```
 
-**文件划分判定规则：按编译器分文件、按逻辑聚目录。** 同编译器的实现（CPU ref 版与 Eigen 版）留在同一文件的不同内核槽位；异构后端（.cu/.mm/.comp）为同目录同名异后缀文件，注册项 extern 引用。层与优化器没有后端维度——它们是"参数 + 调用算子"的组合，设备选择发生在算子派发。职责边界：注册**数据**在 `operators/operator_list.cpp`，注册**机制**在 `op_registry`；算子契约在 `op_def`；求导引擎在 `autograd`；`znn_internal` 只是公共 API 的实现支撑，不含任何引擎。include 一律不带相对路径（CMake 以 `src/` 为私有包含目录）。用户接入方式：`#include "znn.hpp"` + 链接 `libznn`。
+**文件划分判定规则：按编译器分文件、按逻辑聚目录。** 同编译器的实现（CPU ref 版与 Eigen 版）留在同一文件的不同内核槽位；异构后端（.cu/.mm/.comp）为同目录同名异后缀文件，注册项 extern 引用。层与优化器没有后端维度——它们是"参数 + 调用算子"的组合，设备选择发生在算子派发。职责边界：注册**数据**在 `operators/operator_list.cpp`，派发**机制**在 `op_dispatcher`；算子契约在 `op_def`；求导引擎在 `autograd`；`znn_internal` 只是公共 API 的实现支撑，不含任何引擎。include 一律不带相对路径（CMake 以 `src/` 为私有包含目录）。用户接入方式：`#include "znn.hpp"` + 链接 `libznn`。
 
 CMake 按平台/开关条件启用后端：`ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / ZNN_ONEDNN`，`ZNN_MINIMAL` 可裁掉 Eigen 只留参考实现。可选项：CMake 扫描 `src/ops/` 自动生成 `operator_list.cpp`（对应 ffmpeg configure 生成 codec_list.c 的做法），实现"丢文件即扩展"。
 
@@ -364,7 +364,7 @@ GPU：v1 单默认 stream；多 stream 远期，KernelContext 已预留字段。
 | OpDef | 注册项: name/infer/grad/ref(对拍基准)/kernels[后端槽位] | 前端引用, run 消费 |
 | g_znn_op_list | 注册数据数组(直接普通数组, 无宏) | 首次 instance() 建表后只读 |
 
-### 14.3 op_registry 在数据流中的位置
+### 14.3 op_dispatcher 在数据流中的位置(注册发生在编译期)
 
 - instance(): Meyers 单例, 首次调用遍历 g_znn_op_list 建 name→OpDef 哈希表, 此后只读无锁
 - find(): 调试/测试; 正式数据流零字符串查找(前端直接持 &g_*_def)

@@ -4,7 +4,7 @@
 // 职责: Storage(引用计数设备缓冲) / Tensor::Impl(张量实体, 即 Tensor::Impl)
 // / mut 辅助 / 全库占位宏。Tensor 公共方法与 Runtime 的实现均在
 // znn_internal.cpp。
-// 本文件不含任何"引擎": 算子契约在 op_def.hpp, 注册机制在 op_registry,
+// 本文件不含任何"引擎": 算子契约在 op_def.hpp, 派发器在 op_dispatcher,
 // 求导引擎在 autograd, 层/优化器在各自目录。
 // ============================================================================
 #pragma once

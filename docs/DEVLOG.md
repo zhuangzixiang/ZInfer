@@ -130,3 +130,24 @@
 **反思**
 - 可理解 10/10(契约文件即文档, 零缩写零宏魔法); 精简 +10 行(宏删除)
 - 架构不变; 完成度 里程碑1 约 20%
+
+---
+
+## [6] OpRegistry → OpDispatcher(命名纠偏: 注册不在运行期)
+
+> 评审: "完全没看出来怎么注册的; 注册和 run 什么关系?"
+
+**澄清(已写入文件头)**
+- 注册 = 编译/链接期静态三步: 算子文件定义 OpDef → operator_list
+  登记地址进数组 → CMake 纳入构建; 运行期零注册动作
+- run 与注册无关: 前端直接持 OpDef 常量指针执行, 不查表;
+  哈希表只服务"按名查找"(调试/未来 ONNX/GGUF 按字符串名找回算子)
+
+**变化**
+- op_registry.hpp/.cpp → op_dispatcher.hpp/.cpp, 类 OpRegistry → OpDispatcher
+- 文件头三段式重写: 注册发生在哪(编译期三步)/职责(run 主职+find 辅助)/链路位置
+- op_def/autograd/znn_internal/operator_list/CMake/DESIGN.md 引用同步
+
+**反思**
+- 命名即语义: "派发器"准确描述主职, 消除"注册表为什么会 run"的困惑源
+- 架构合理性 9/10; 可理解 10/10; 完成度 里程碑1 约 20%

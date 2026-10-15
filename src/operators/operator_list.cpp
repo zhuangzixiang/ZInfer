@@ -1,7 +1,7 @@
 // ============================================================================
 // operator_list.cpp — 算子注册数据(≈ ffmpeg codec_list.c)
 //
-// 注册"数据"集中于此; 注册"机制"(查找/派发/兜底)在 op_registry。
+// 注册"数据"集中于此; 派发器(执行机制)在 op_dispatcher。
 // 新增算子三步: operators/<name>.cpp 定义 OpDef → 此处 extern 与数组
 // 各加一行 → CMake 源清单加一行。
 // ============================================================================
@@ -22,7 +22,7 @@ extern const OpDef g_conv2d_def, g_max_pool2d_def, g_avg_pool2d_def;
 extern const OpDef g_embedding_def, g_attention_def;
 extern const OpDef g_cross_entropy_def, g_mse_def;
 
-// OpRegistry 启动时读取的算子清单, 以 nullptr 结尾
+// OpDispatcher 首次使用时读取的算子清单, 以 nullptr 结尾
 const OpDef* g_znn_op_list[] = {
     &g_arange_def,
     &g_randn_def,
