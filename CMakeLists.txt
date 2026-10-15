@@ -13,7 +13,8 @@ option(ZNN_BUILD_EXAMPLES "Build examples"  ON)
 # 里程碑 2+ 启用的后端开关: ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / ZNN_ONEDNN
 # 唯一默认三方依赖 Eigen 于实现阶段引入 third_party/eigen
 
-# 算子源清单: 新增算子在此加一行(与 operator_list.cpp 的注册行对应)
+# 算子源清单: 新增算子在此加一行(与 operator_list.cpp 的注册行对应);
+# 异构后端内核为同名异后缀文件(conv2d.cu/.mm/.comp), 里程碑 2+ 按开关加入
 set(ZNN_OPERATORS
     src/operators/arange.cpp
     src/operators/randn.cpp
@@ -47,9 +48,33 @@ set(ZNN_OPERATORS
     src/operators/operator_list.cpp
 )
 
+# 层源清单: 一层一文件(ActivationLayer 服务 4 种激活, Pool2dLayer 服务 2 种池化)
+set(ZNN_LAYERS
+    src/layers/layer_factory.cpp
+    src/layers/linear.cpp
+    src/layers/conv2d.cpp
+    src/layers/batch_norm2d.cpp
+    src/layers/layer_norm.cpp
+    src/layers/embedding.cpp
+    src/layers/dropout.cpp
+    src/layers/activation.cpp
+    src/layers/flatten.cpp
+    src/layers/pool2d.cpp
+)
+
+# 优化器源清单: 一个优化器一文件
+set(ZNN_OPTIM
+    src/optim/optimizer_factory.cpp
+    src/optim/sgd.cpp
+    src/optim/adam.cpp
+    src/optim/adamw.cpp
+)
+
 add_library(znn
     src/znn_internal.cpp
     ${ZNN_OPERATORS}
+    ${ZNN_LAYERS}
+    ${ZNN_OPTIM}
 )
 target_include_directories(znn PUBLIC include PRIVATE src)
 

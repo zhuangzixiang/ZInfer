@@ -82,19 +82,25 @@ ZInfer/
 │   └── znn.hpp             # ② 接口定义: Tensor/Activator/Loss/Layer/Optimizer
 ├── src/                    # 内部, 对用户不可见
 │   ├── znn_ext.hpp         # 扩展接口: OpDef/KernelFn/BackwardCtx/注册宏(算子·后端作者用)
-│   ├── znn_internal.hpp    # 内部结构统一定义源: Storage/Tensor::Impl/GraphNode/
-│   │                       #   AutogradEngine/OpRegistry/优化器与层的实现类
-│   ├── znn_internal.cpp    # 内部类实现(集中于一个翻译单元)
-│   ├── operators/          # 每算子一个文件, 文件名 = 算子名(add.cpp 里只有 add)
+│   ├── znn_internal.hpp    # 通用内部定义(仅跨子系统共用基础): Storage/
+│   │                       #   Tensor::Impl/GraphNode/AutogradEngine/OpRegistry
+│   ├── znn_internal.cpp    # 通用基础实现 + Tensor 公共方法 + Runtime
+│   ├── operators/          # 一算子一文件, 文件名=算子名; 异构后端=同名异后缀
 │   │   ├── operator_list.cpp   # ← 注册数据(extern + 列表, ≈ ffmpeg codec_list.c)
-│   │   └── (foo.cu/.mm/.comp 随需)
+│   │   └── add.cpp  conv2d.cpp  (conv2d.cu/.mm/.comp 里程碑 2+)
+│   ├── layers/             # 一层一文件(层无后端维度, 设备选择在算子派发)
+│   │   ├── layers.hpp  layer_factory.cpp
+│   │   └── linear.cpp conv2d.cpp batch_norm2d.cpp ... activation.cpp pool2d.cpp
+│   ├── optim/              # 一个优化器一文件(同样无后端维度)
+│   │   ├── optim.hpp  optimizer_factory.cpp
+│   │   └── sgd.cpp adam.cpp adamw.cpp
 │   └── backends/           # cuda/ metal/ vulkan/ (里程碑 2+)
 ├── tests/                  # 对拍测试: fast vs ref; GPU vs CPU golden
 ├── examples/mnist/         # 里程碑 1 验收
 └── docs/
 ```
 
-职责边界：注册**数据**在 `operators/operator_list.cpp`，注册**机制**（查找/派发/兜底）在 `OpRegistry`（znn_internal）；内部新增结构一律进 znn_internal.hpp，不再新建零散 hpp/cpp 对。include 一律不带相对路径（CMake 以 `src/` 为私有包含目录）。用户接入方式：`#include "znn.hpp"` + 链接 `libznn`。
+**文件划分判定规则：按编译器分文件、按逻辑聚目录。** 同编译器的实现（CPU ref 版与 Eigen 版）留在同一文件的不同内核槽位；异构后端（.cu/.mm/.comp）为同目录同名异后缀文件，注册项 extern 引用。层与优化器没有后端维度——它们是"参数 + 调用算子"的组合，设备选择发生在算子派发。职责边界：注册**数据**在 `operators/operator_list.cpp`，注册**机制**在 `OpRegistry`（znn_internal）；通用基础新增进 znn_internal，层/优化器新增进各自目录。include 一律不带相对路径（CMake 以 `src/` 为私有包含目录）。用户接入方式：`#include "znn.hpp"` + 链接 `libznn`。
 
 CMake 按平台/开关条件启用后端：`ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / ZNN_ONEDNN`，`ZNN_MINIMAL` 可裁掉 Eigen 只留参考实现。可选项：CMake 扫描 `src/ops/` 自动生成 `operator_list.cpp`（对应 ffmpeg configure 生成 codec_list.c 的做法），实现"丢文件即扩展"。
 

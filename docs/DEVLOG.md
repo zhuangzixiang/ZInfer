@@ -54,3 +54,35 @@
   多模型并发训练的边界(远期再评估)
 - 下一步: Storage/Impl 引用计数与分配 → OpRegistry.run 派发链 →
   逐算子 ref 实现 → Eigen 内核 → AutogradEngine → 优化器 → MNIST
+
+---
+
+## [3] 结构再整改: 通用基础单源 + 子系统目录化
+
+> 上一轮把全部内部类型塞进 znn_internal 一个文件矫枉过正, 本轮按
+> "通用进 internal、子系统自成目录一单元一文件" 重排。
+
+**结构变化**
+- znn_internal.hpp/.cpp 瘦身: 只保留跨子系统共用基础
+  (Storage / Tensor::Impl / GraphNode / AutogradEngine / OpRegistry)
+  + Tensor 公共方法 + Runtime; 层/优化器移出
+- 新增 layers/: layers.hpp(9 个层实现类声明) + 一层一文件
+  (linear/conv2d/batch_norm2d/layer_norm/embedding/dropout/
+  activation/flatten/pool2d) + layer_factory.cpp(工厂分发)
+- 新增 optim/: optim.hpp + 一优化器一文件(sgd/adam/adamw)
+  + optimizer_factory.cpp; AdamWImpl::step 重写以承载解耦衰减语义
+- mut() 帮助函数上移 znn_internal(层/未来其他子系统共用)
+
+**文件划分判定规则(已写入 DESIGN.md §3)**
+按编译器分文件、按逻辑聚目录: 同编译器实现同文件不同槽位;
+.cu/.mm/.comp 同目录同名异后缀; 层/优化器无后端维度(设备选择
+在算子派发, 层只是"参数+调用算子"的组合)。
+
+**反思**
+- 架构合理性 9/10: 三类单元(算子/层/优化器)各自目录化, 与
+  扩展路径一一对应; 通用基础单源不再承载子系统
+- 代码精简 9/10: 层文件 17~30 行/个, 无跨文件重复样板
+- 可理解 9/10 / 可维护 10/10(改一层只动一个文件) / 可扩展 9/10
+- 完成度: 里程碑 1 约 20%(结构与初版骨架等价, 组织方式落定)
+- 下一步不变: Storage/Impl 引用计数 → OpRegistry.run 派发链 →
+  逐算子 ref 实现 → Eigen 内核 → AutogradEngine → 优化器 → MNIST

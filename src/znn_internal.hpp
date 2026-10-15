@@ -1,9 +1,9 @@
 // ============================================================================
-// znn_internal.hpp — 内部结构统一定义源 (仅库内使用, 不随库发布)
+// znn_internal.hpp — 通用内部定义源 (仅库内使用, 不随库发布)
 //
-// 全部内部类型集中定义于此, 实现集中于 znn_internal.cpp;
-// 新增内部结构一律加入本文件, 不再新建零散的 hpp/cpp 对。
-// 内部机制为 C++ 类封装(引擎/注册表/存储), 与对外 C 风格接口隔离。
+// 只放跨子系统共用的基础设施: 设备存储 / Tensor 内部实体 / 计算图节点 /
+// 求导引擎 / 算子注册表。子系统(层/优化器/算子)的类声明在各自目录的
+// 头文件中, 不塞入本文件。
 // ============================================================================
 #pragma once
 #include "znn.hpp"
@@ -63,6 +63,9 @@ struct Tensor::Impl {
     size_t nbytes() const;            // numel × 元素大小
 };
 
+// 层对象逻辑上可变(参数被 Optimizer 更新), const 方法内取可变参数指针
+Tensor* mut(const Tensor& t);
+
 // ============================================================ 计算图
 
 // 前向建图节点: 创建序即拓扑序(动态图天然性质, 反向免排序)
@@ -107,145 +110,6 @@ public:
 private:
     OpRegistry();
     std::unordered_map<std::string, const OpDef*> table_;
-};
-
-// ============================================================ 优化器实现
-
-class SgdImpl final : public Optimizer {
-public:
-    SgdImpl(std::vector<Tensor*> params, const OptimParam& param);
-    void step() override;
-    void clear() override;
-private:
-    std::vector<Tensor*> params_;
-    OptimParam param_;
-};
-
-class AdamImpl : public Optimizer {
-public:
-    AdamImpl(std::vector<Tensor*> params, const OptimParam& param);
-    void step() override;
-    void clear() override;
-protected:
-    // AdamW 复用动量逻辑, 仅 weight_decay 语义不同(解耦衰减)
-    struct Moment {
-        Tensor m;      // 一阶动量
-        Tensor v;      // 二阶动量
-    };
-    std::vector<Tensor*> params_;
-    std::vector<Moment>  moments_;
-    OptimParam param_;
-};
-
-class AdamWImpl final : public AdamImpl {
-public:
-    using AdamImpl::AdamImpl;
-};
-
-// ============================================================ 内置层实现
-
-class LinearLayer final : public Layer {
-public:
-    LinearLayer(int64_t in, int64_t out, bool bias);
-    Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override;
-    void train(bool) override {}
-private:
-    Tensor w_, b_;
-    bool has_bias_;
-};
-
-class Conv2dLayer final : public Layer {
-public:
-    Conv2dLayer(int64_t in_ch, int64_t out_ch, Shape kernel,
-                const Conv2dOptions& options, bool bias);
-    Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override;
-    void train(bool) override {}
-private:
-    Tensor w_, b_;
-    Conv2dOptions options_;
-    bool has_bias_;
-};
-
-class BatchNorm2dLayer final : public Layer {
-public:
-    BatchNorm2dLayer(int64_t channels, double eps, double momentum);
-    Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override;
-    void train(bool mode) override { training_ = mode; }
-private:
-    Tensor w_, b_;          // 仿射参数 γ/β
-    Tensor mean_, var_;     // running 统计(非训练参数)
-    double eps_, momentum_;
-    bool training_ = true;
-};
-
-class LayerNormLayer final : public Layer {
-public:
-    LayerNormLayer(int64_t normalized_dim, double eps);
-    Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override;
-    void train(bool) override {}
-private:
-    Tensor w_, b_;
-    double eps_;
-};
-
-class EmbeddingLayer final : public Layer {
-public:
-    EmbeddingLayer(int64_t num_embeddings, int64_t embed_dim);
-    Tensor forward(const Tensor& indices) override;
-    std::vector<Tensor*> params() const override;
-    void train(bool) override {}
-private:
-    Tensor w_;
-};
-
-// ReLU/GELU/Sigmoid/Tanh 共用: 无参数, 仅按类型分发到 Activator
-class ActivationLayer final : public Layer {
-public:
-    explicit ActivationLayer(LayerType type);
-    Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override { return {}; }
-    void train(bool) override {}
-private:
-    LayerType type_;
-};
-
-class FlattenLayer final : public Layer {
-public:
-    explicit FlattenLayer(int64_t start_dim);
-    Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override { return {}; }
-    void train(bool) override {}
-private:
-    int64_t start_dim_;
-};
-
-// MaxPool2d/AvgPool2d 共用
-class Pool2dLayer final : public Layer {
-public:
-    Pool2dLayer(LayerType type, Shape kernel, const Pool2dOptions& options);
-    Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override { return {}; }
-    void train(bool) override {}
-private:
-    LayerType type_;
-    Shape kernel_;
-    Pool2dOptions options_;
-};
-
-class DropoutLayer final : public Layer {
-public:
-    DropoutLayer(double rate, unsigned seed);
-    Tensor forward(const Tensor& x) override;
-    std::vector<Tensor*> params() const override { return {}; }
-    void train(bool mode) override { training_ = mode; }
-private:
-    double rate_;
-    unsigned seed_;
-    bool training_ = true;
 };
 
 } // namespace znn
