@@ -128,7 +128,7 @@ CMake 按平台/开关条件启用后端：`ZNN_CUDA / ZNN_METAL / ZNN_VULKAN / 
 - 引用计数存储，shape/stride 支持零拷贝视图（view/slice/transpose/permute/reshape）。
 - dtype: `F32, F16, BF16, I32, I64, U8`（v1 实际启用 F32 + I64 索引；半精度枚举预留）。
 - autograd 元数据：`requires_grad`、`grad`、`grad_fn` 节点（推理模式下不创建）。
-- 数据读取两个原语 `data<T>()`(仅 CPU)/`item<T>()`(任意设备)；跨设备搬运唯一入口 `to_device()`。
+- 数据读取原语 data<T>()(当前设备指针, 同 PyTorch data_ptr 约定)/item<T>()(单值)/strides()/is_contiguous()；跨设备搬运入口 to_device()。
 
 ### 4.2 Device / Allocator
 
@@ -356,10 +356,9 @@ GPU：v1 单默认 stream；多 stream 远期，KernelContext 已预留字段。
 |---|---|---|
 | Span | 指针+长度视图, 零拷贝传参 | 所有内核签名 |
 | TensorMeta | 张量名片(shape/dtype/device, 无数据指针) | run 调 infer 前构造 |
-| TensorView | 内核数据视图(基址/形状/步长, 无句柄权力) | run 解包 Tensor 后传给内核 |
 | KernelContext | 内核上下文(设备 + 预留 stream) | run 构造并传入内核 |
 | BackwardContext | 反向环境: saved 张量/grad_out 入/grad_in 出/reduce_to 广播规约 | backward 逐节点装配 |
-| KernelFunction | 后端无关算体签名(输入输出为 TensorView 纯数据几何, 无句柄权力) | run 解包后经函数指针调用 |
+| KernelFunction | 后端无关算体签名(数据几何经 Tensor 公共访问器获取) | run 经函数指针调用 |
 | ShapeInferenceFunction | 形状推导(分配输出之前) | run 第 2 步 |
 | GradientFunction | 反向规则(nullptr=仅推理) | backward 逐节点调用 |
 | Operator | 注册项: name/infer/grad/ref(对拍基准)/kernels[后端槽位] | 前端引用, run 消费 |

@@ -172,6 +172,14 @@ Device Tensor::device() const {
     ZNN_TODO();
 }
 
+const int64_t* Tensor::strides() const {
+    ZNN_TODO();
+}
+
+bool Tensor::is_contiguous() const {
+    ZNN_TODO();
+}
+
 // ---- Tensor 公共方法: 视图 ----
 
 Tensor Tensor::view(Shape shape) const {

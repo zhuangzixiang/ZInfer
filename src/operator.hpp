@@ -45,19 +45,6 @@ struct TensorMeta
     Device       device;
 };
 
-// 内核数据视图: 纯数据描述符(基址/形状/步长/类型/设备)。
-// 内核拿不到 Tensor 句柄权力——引用计数/求导元数据/再造句柄一律不可,
-// 只能按几何读写数据; 视图生命周期由 OpDispatcher 在调用期间保证。
-// 处于 inputs 位置的 data 约定只读(outputs 可写)。
-struct TensorView
-{
-    void*    data;        // 元素数据基址(已含视图偏移)
-    Shape    shape;
-    int64_t  strides[8];
-    DType    dtype;
-    Device   device;
-};
-
 // 计算内核的执行上下文
 struct KernelContext
 {
@@ -79,9 +66,10 @@ struct BackwardContext
 
 // 形状推导: 推导每个输出的shape(不碰具体数据)!OpDispatcher::run 在分配输出缓冲之前调用
 using ShapeInferenceFunction = void (*)(Span<const TensorMeta*> inputs, const void* options, std::vector<Shape>& outputs);
-// 计算内核: 真正做数学的函数! run 分配输出并解包为 TensorView 后经函数指针调用;
-// inputs/outputs 为纯数据几何(无句柄权力), inputs 的 data 只读
-using KernelFunction = void (*)(KernelContext& context, Span<const TensorView*> inputs, Span<TensorView*> outputs, const void* options);
+// 计算内核: 真正做数学的函数! run 分配输出之后经函数指针调用;
+// 数据几何经 Tensor 公共访问器获取(data<T>/strides/shape/device),
+// inputs 只读约定, outputs 已分配只管写
+using KernelFunction = void (*)(KernelContext& context, Span<const Tensor*> inputs, Span<Tensor*> outputs, const void* options);
 // 反向规则: 求出“对每个输入的梯度”! loss.backward() 时按逆拓扑序逐节点调用
 using GradientFunction = void (*)(BackwardContext& context);
 

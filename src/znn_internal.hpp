@@ -1,9 +1,8 @@
 // ============================================================================
 // znn_internal.hpp — 公共头 znn.hpp 的实现支撑
 //
-// 职责: Storage(引用计数设备缓冲) / Tensor::Impl(张量实体, 即 Tensor::Impl)
-// / mut 辅助 / 全库占位宏。Tensor 公共方法与 Runtime 的实现均在
-// znn_internal.cpp。
+// 职责: Storage(引用计数设备缓冲) / Tensor::Impl(张量实体) / 全库占位宏。
+// Tensor 公共方法与 Runtime 的实现均在 znn_internal.cpp。
 // 本文件不含任何"引擎": 算子契约在 operator.hpp, 派发器在 op_dispatcher,
 // 求导引擎在 autograd, 层/优化器在各自目录。
 // ============================================================================
@@ -43,9 +42,9 @@ private:
 
 // ============================================================ Tensor 内部
 
-struct GraphNode;                 // 定义在 autograd.hpp
-
-// 公共 Tensor 的唯一实体: 存储视图 + 求导元数据
+// 公共 Tensor 的唯一实体: 存储视图。
+// 不含任何计算图信息——tape 与"张量→生产节点"路由归 AutogradEngine 所有,
+// 因此张量本体不需要 friend 授权, 引擎经公共接口工作。
 struct Tensor::Impl {
     Storage*   storage = nullptr;     // null = 空句柄
     int64_t    offset  = 0;           // 元素级偏移(视图)
@@ -56,7 +55,6 @@ struct Tensor::Impl {
 
     bool       requires_grad = false;
     Impl*      grad    = nullptr;     // 惰性分配, 与本 Impl 同形状
-    GraphNode* grad_fn = nullptr;     // 不拥有; 由 AutogradEngine 节点池管理
 
     static Impl* create(const Shape& shape, DType dtype, Device device);
     Impl*        retain();
@@ -65,6 +63,5 @@ struct Tensor::Impl {
     bool   is_contiguous() const;
     size_t nbytes() const;            // numel × 元素大小
 };
-
 
 } // namespace znn
