@@ -41,8 +41,16 @@ Tensor sum_along(const Tensor& x, int64_t dim, bool keepdim);
 void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
                    const Shape& in_shape, Tensor& out);
 
+// 训练态形状变换(材料化+逆梯度); 纯推理态各视图方法直接返回零拷贝视图
+Tensor reshape_for_autograd(const Tensor& x, Shape target);
 // 训练态转置(材料化+逆梯度); 纯推理态 Tensor::transpose 直接返回零拷贝视图
 Tensor transpose_for_autograd(const Tensor& x, int64_t d0, int64_t d1);
+
+// 池化调用的完整选项(公共 Pool2dOptions 不含核尺寸, 核是前端独立参数)
+struct PoolCallOptions {
+    Pool2dOptions pool;
+    Shape         kernel;
+};
 
 // 规约类(sum/mean)共用形状推导: ReduceAttrs 选项
 void infer_reduce(Span<const TensorMeta*> inputs, const void* options, std::vector<Shape>& outs);

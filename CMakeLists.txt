@@ -47,6 +47,10 @@ set(ZNN_OPERATORS
     src/operators/cross_entropy.cpp
     src/operators/mse.cpp
     src/operators/transpose.cpp
+    src/operators/reshape.cpp
+    src/operators/conv2d.cpp
+    src/operators/max_pool2d.cpp
+    src/operators/avg_pool2d.cpp
     src/operators/operator_list.cpp
 )
 

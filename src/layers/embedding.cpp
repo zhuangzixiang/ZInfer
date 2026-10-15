@@ -1,18 +1,20 @@
 // Embedding: 按索引取行
 #include "layers/layers.hpp"
-#include "operator.hpp"
 #include "znn_internal.hpp"
-#include "znn_internal.hpp"
+#include <cmath>
 
 namespace znn {
 
-EmbeddingLayer::EmbeddingLayer(int64_t, int64_t) {
-    // TODO: w_ 按 [num, dim] 分配
+EmbeddingLayer::EmbeddingLayer(int64_t num_embeddings, int64_t embed_dim)
+    : w_(Tensor::randn({num_embeddings, embed_dim})) {
+    const float scale = 1.f / std::sqrt(static_cast<float>(embed_dim));
+    float* wp = w_.data<float>();
+    for (int64_t i = 0; i < w_.numel(); ++i) wp[i] *= scale;
+    w_.requires_grad(true);
 }
 
 Tensor EmbeddingLayer::forward(const Tensor& indices) {
-    // TODO: Tensor::embedding(w_, indices)
-    ZNN_TODO();
+    return Tensor::embedding(w_, indices);
 }
 
 std::vector<Tensor> EmbeddingLayer::params() const {

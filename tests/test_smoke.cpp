@@ -209,6 +209,97 @@ static void test_training_converges() {
     Optimizer::destroy(opt);
 }
 
+
+static void test_conv2d() {
+    // 1x1x3x3 输入, 1x1x2x2 全 1 核, 无补零 → 2x2 窗口和
+    const float x[9] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    const float w[4] = {1, 1, 1, 1};
+    Tensor tx = Tensor::from_host(x, {1, 1, 3, 3});
+    Tensor tw = Tensor::from_host(w, {1, 1, 2, 2});
+    Tensor y = Tensor::conv2d(tx, tw);
+    check(y.dim_count() == 4 && y.size(2) == 2 && y.size(3) == 2, "conv2d out shape");
+    check(y.data<float>()[0] == 12.f && y.data<float>()[1] == 16.f
+          && y.data<float>()[2] == 24.f && y.data<float>()[3] == 28.f, "conv2d values");
+
+    // 有限差分校验卷积梯度
+    auto f = [&tx](float w0) {
+        const float wk[4] = {w0, 1, 1, 1};
+        return Tensor::conv2d(tx, Tensor::from_host(wk, {1, 1, 2, 2}))
+                   .data<float>()[0];
+    };
+    Tensor W = Tensor::from_host(w, {1, 1, 2, 2});
+    W.requires_grad(true);
+    Tensor out = Tensor::conv2d(tx, W);
+    Tensor loss = Tensor::sum(out.flatten(), -1);
+    loss.backward();
+    const float e = 1e-3f;
+    const float gn = (f(1.f + e) - f(1.f - e)) / (2 * e);
+    check(fabsf(gn - W.grad().data<float>()[0]) < 1e-2f, "conv2d fd grad check");
+}
+
+static void test_pool_cat_stack() {
+    const float x[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    Tensor tx = Tensor::from_host(x, {1, 1, 2, 4});
+    Tensor mp = Tensor::max_pool2d(tx, {1, 2});
+    check(mp.size(3) == 2 && mp.data<float>()[0] == 2.f && mp.data<float>()[1] == 4.f, "max pool values");
+    Tensor ap = Tensor::avg_pool2d(tx, {1, 2});
+    check(ap.data<float>()[0] == 1.5f && ap.data<float>()[1] == 3.5f, "avg pool values");
+
+    // max pool 梯度只给窗口最大位置
+    Tensor T = Tensor::from_host(x, {1, 1, 2, 4});
+    T.requires_grad(true);
+    Tensor l = Tensor::sum(Tensor::max_pool2d(T, {1, 2}).flatten(), -1);
+    l.backward();
+    check(T.grad().data<float>()[1] == 1.f && T.grad().data<float>()[0] == 0.f,
+          "max pool grad routes to max");
+
+    const float a[4] = {1, 2, 3, 4};
+    const float b[4] = {5, 6, 7, 8};
+    Tensor ta = Tensor::from_host(a, {2, 2});
+    Tensor tb = Tensor::from_host(b, {2, 2});
+    Tensor c0 = Tensor::cat(ta, tb, 0);
+    check(c0.shape()[0] == 4 && c0.data<float>()[3] == 4.f && c0.data<float>()[4] == 5.f, "cat dim0");
+    Tensor c1 = Tensor::cat(ta, tb, 1);
+    check(c1.shape()[1] == 4 && c1.data<float>()[1] == 2.f && c1.data<float>()[2] == 5.f, "cat dim1");
+    Tensor st = Tensor::stack({ta, tb}, 0);
+    check(st.shape()[0] == 2 && st.data<float>()[4] == 5.f, "stack values");
+
+    // cat 梯度按区间切片
+    Tensor ra = Tensor::from_host(a, {2, 2});
+    Tensor rb = Tensor::from_host(b, {2, 2});
+    ra.requires_grad(true);
+    rb.requires_grad(true);
+    Tensor ls = Tensor::sum(Tensor::cat(ra, rb, 1).flatten(), -1);
+    ls.backward();
+    check(ra.grad().data<float>()[3] == 4.f && rb.grad().data<float>()[0] == 5.f, "cat grad slices");
+}
+
+static void test_embedding_reshape() {
+    // embedding 取行
+    const float w[6] = {1, 2, 3, 4, 5, 6};
+    const int64_t idx[3] = {2, 0, 1};
+    Tensor tw = Tensor::from_host(w, {3, 2});
+    Tensor ti = Tensor::from_host(idx, {3}, DType::I64);
+    Tensor e = Tensor::embedding(tw, ti);
+    check(e.shape().rank == 2 && e.size(1) == 2 && e.data<float>()[0] == 5.f
+          && e.data<float>()[2] == 1.f, "embedding gather");
+    Tensor W = Tensor::from_host(w, {3, 2});
+    W.requires_grad(true);
+    Tensor le = Tensor::sum(Tensor::embedding(W, Tensor::from_host(idx, {3}, DType::I64)).flatten(), -1);
+    le.backward();
+    check(W.grad().data<float>()[4] == 1.f && W.grad().data<float>()[0] == 1.f, "embedding scatter grad");
+
+    // reshape 训练态梯度回传: y = reshape(x{2,3} → {3,2}) 求 sum
+    const float xr[6] = {1, 2, 3, 4, 5, 6};
+    Tensor X = Tensor::from_host(xr, {2, 3});
+    X.requires_grad(true);
+    Tensor lr = Tensor::sum(X.reshape({3, 2}).flatten(), -1);
+    lr.backward();
+    bool all_one = true;
+    for (int64_t i = 0; i < 6; ++i) all_one = all_one && X.grad().data<float>()[i] == 1.f;
+    check(all_one, "reshape autograd identity grad");
+}
+
 int main() {
     std::fprintf(stderr, "t1\n"); test_shape();
     std::fprintf(stderr, "t2\n"); test_create_and_read();

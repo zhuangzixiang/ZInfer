@@ -1,7 +1,5 @@
 // Pool2d: MaxPool2d/AvgPool2d 共用层(NCHW)
 #include "layers/layers.hpp"
-#include "operator.hpp"
-#include "znn_internal.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
@@ -11,8 +9,10 @@ Pool2dLayer::Pool2dLayer(LayerType type, Shape kernel, const Pool2dOptions& opti
 }
 
 Tensor Pool2dLayer::forward(const Tensor& x) {
-    // TODO: 按类型分发 Tensor::max_pool2d / avg_pool2d
-    ZNN_TODO();
+    if (type_ == LayerType::MaxPool2d) {
+        return Tensor::max_pool2d(x, kernel_, options_);
+    }
+    return Tensor::avg_pool2d(x, kernel_, options_);
 }
 
 } // namespace znn

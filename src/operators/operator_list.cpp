@@ -22,6 +22,9 @@ extern const Operator g_conv2d_operator, g_max_pool2d_operator, g_avg_pool2d_ope
 extern const Operator g_embedding_operator, g_attention_operator;
 extern const Operator g_cross_entropy_operator, g_mse_operator;
 extern const Operator g_transpose_operator;
+extern const Operator g_reshape_operator;
+extern const Operator g_conv2d_operator, g_max_pool2d_operator, g_avg_pool2d_operator;
+extern const Operator g_cat_operator, g_stack_operator, g_embedding_operator;
 
 // OpDispatcher 首次使用时读取的算子清单, 以 nullptr 结尾
 const Operator* g_operator_list[] = {
@@ -55,6 +58,13 @@ const Operator* g_operator_list[] = {
     &g_cross_entropy_operator,
     &g_mse_operator,
     &g_transpose_operator,
+    &g_reshape_operator,
+    &g_conv2d_operator,
+    &g_max_pool2d_operator,
+    &g_avg_pool2d_operator,
+    &g_cat_operator,
+    &g_stack_operator,
+    &g_embedding_operator,
     nullptr,
 };
 
