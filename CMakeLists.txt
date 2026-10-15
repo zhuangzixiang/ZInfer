@@ -92,6 +92,14 @@ add_library(znn
 )
 target_include_directories(znn PUBLIC include PRIVATE src third_party/eigen)
 
+# Eigen 多线程 GEMM 走 OpenMP(MSVC /openmp; gcc/clang -fopenmp 由下方统一)
+if(MSVC)
+    target_compile_options(znn PRIVATE /openmp)
+else()
+    find_package(OpenMP REQUIRED)
+    target_link_libraries(znn PRIVATE OpenMP::OpenMP_CXX)
+endif()
+
 # Eigen: 唯一三方依赖(header-only), kernels[CPU] 快速内核使用
 
 if(ZNN_BUILD_TESTS)
