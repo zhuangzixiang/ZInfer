@@ -1,5 +1,5 @@
 // ============================================================================
-// op_def.hpp — 算子契约 (算子作者唯一需要阅读的内部头)
+// operator.hpp — 算子契约 (算子作者唯一需要阅读的内部头)
 //
 // 一个算子由三类函数 + 一份注册项构成:
 //   ShapeInferenceFunction  形状推导: 只看形状不算数据, 在分配输出前运行
@@ -38,15 +38,24 @@ private:
     size_t n = 0;
 };
 
-// --------------------------------------------- 三类函数各自的调用上下文
-
-// 张量"名片": 只有形状/类型/设备, 无数据指针。
-// 专供形状推导——推导不该碰数据, 结构上就杜绝。
 struct TensorMeta
 {
     const Shape* shape;
     DType        dtype;
     Device       device;
+};
+
+// 内核数据视图: 纯数据描述符(基址/形状/步长/类型/设备)。
+// 内核拿不到 Tensor 句柄权力——引用计数/求导元数据/再造句柄一律不可,
+// 只能按几何读写数据; 视图生命周期由 OpDispatcher 在调用期间保证。
+// 处于 inputs 位置的 data 约定只读(outputs 可写)。
+struct TensorView
+{
+    void*    data;        // 元素数据基址(已含视图偏移)
+    Shape    shape;
+    int64_t  strides[8];
+    DType    dtype;
+    Device   device;
 };
 
 // 计算内核的执行上下文
@@ -70,8 +79,9 @@ struct BackwardContext
 
 // 形状推导: 推导每个输出的shape(不碰具体数据)!OpDispatcher::run 在分配输出缓冲之前调用
 using ShapeInferenceFunction = void (*)(Span<const TensorMeta*> inputs, const void* options, std::vector<Shape>& outputs);
-// 计算内核: 真正做数学的函数! run 分配输出之后经函数指针调用
-using KernelFunction = void (*)(KernelContext& context, Span<const Tensor*> inputs, Span<Tensor*> outputs, const void* options);
+// 计算内核: 真正做数学的函数! run 分配输出并解包为 TensorView 后经函数指针调用;
+// inputs/outputs 为纯数据几何(无句柄权力), inputs 的 data 只读
+using KernelFunction = void (*)(KernelContext& context, Span<const TensorView*> inputs, Span<TensorView*> outputs, const void* options);
 // 反向规则: 求出“对每个输入的梯度”! loss.backward() 时按逆拓扑序逐节点调用
 using GradientFunction = void (*)(BackwardContext& context);
 
@@ -86,9 +96,6 @@ struct Operator
     KernelFunction kernels[(int)Device::kDeviceCount];  // 具体的后端快速内核(kernels[CPU] 由 Eigen 版填充)
 };
 
-// --------------------------------------------- 注册数据
-// operators/operator_list.cpp 直接以普通数组定义(无宏);
-// OpDispatcher 首次使用时读取建索引; 以 nullptr 结尾。
 extern const Operator* g_operator_list[];
 
 } // namespace znn
