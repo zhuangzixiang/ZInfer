@@ -14,9 +14,14 @@ AutogradEngine& AutogradEngine::instance() {
 
 GraphNode* AutogradEngine::record(const Operator* op,
                                   Span<const Tensor*> inputs,
-                                  Span<const Tensor*> outputs) {
+                                  Span<const Tensor*> outputs,
+                                  const void* options) {
     GraphNode* n = new GraphNode();       // 节点池: v1.5 性能项
     n->op = op;
+    if (op->options_size > 0 && options) {
+        n->options_copy.resize(op->options_size);
+        std::memcpy(n->options_copy.data(), options, op->options_size);
+    }
     for (size_t i = 0; i < inputs.size(); ++i) {
         n->saved_inputs.push_back(*inputs[i]);   // 句柄共享, 不拷贝数据
     }
@@ -67,6 +72,7 @@ void AutogradEngine::backward(const Tensor& loss) {
         ctx.saved_outputs = Span<const Tensor*>(so.data(), so.size());
         ctx.grad_outputs  = Span<const Tensor*>(go.data(), go.size());
         ctx.grad_inputs   = Span<Tensor*>(gi.data(), gi.size());
+        ctx.options       = n->options_copy.empty() ? nullptr : n->options_copy.data();
         n->op->grad(ctx);
         // 3. 累加到各输入(叶子得到最终梯度; 中间量等待其生产节点读取)
         for (size_t i = 0; i < nin; ++i) {

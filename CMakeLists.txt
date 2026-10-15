@@ -46,6 +46,7 @@ set(ZNN_OPERATORS
     src/operators/attention.cpp
     src/operators/cross_entropy.cpp
     src/operators/mse.cpp
+    src/operators/transpose.cpp
     src/operators/operator_list.cpp
 )
 

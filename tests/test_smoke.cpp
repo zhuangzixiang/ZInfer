@@ -170,16 +170,57 @@ static void test_gradient_checks() {
     check(fabsf(g0n - g0a) < 1e-2f && fabsf(g1n - g1a) < 1e-2f, "finite-diff grad check");
 }
 
+static void test_training_converges() {
+    // 线性回归 y = 2x + 1, Adam 收敛到近似系数
+    const int64_t N = 32;
+    float xs[N], ys[N];
+    for (int64_t i = 0; i < N; ++i) {
+        xs[i] = static_cast<float>(i) / N - 0.5f;
+        ys[i] = 2.f * xs[i] + 1.f;
+    }
+    Tensor X = Tensor::from_host(xs, {N, 1});
+    Tensor Y = Tensor::from_host(ys, {N, 1});
+    std::fprintf(stderr, "setup1\n");
+    std::vector<Layer*> net = {
+        Layer::create(LayerType::Linear, LayerParam{1, 1}),
+    };
+    std::fprintf(stderr, "setup2\n");
+    Optimizer* opt = Optimizer::create(OptimType::Adam, net, OptimParam{0.05});
+    std::fprintf(stderr, "setup3\n");
+    float first = 0.f, last = 0.f;
+    for (int step = 0; step < 400; ++step) {
+        Tensor h = X;
+        for (Layer* l : net) h = l->forward(h);
+        Tensor loss = Loss::mse(h, Y);
+        if (step == 0) first = loss.item<float>();
+        last = loss.item<float>();
+        opt->clear();
+        loss.backward();
+        opt->step();
+        std::fprintf(stderr, "o\n");
+    }
+    Tensor h = X;
+    for (Layer* l : net) h = l->forward(h);
+    const float w = net[0]->params()[0].data<float>()[0];
+    const float bias = net[0]->params()[1].data<float>()[0];
+    check(last < first / 100.f, "training loss drops 100x");
+    check(fabsf(w - 2.f) < 0.05f && fabsf(bias - 1.f) < 0.05f, "params converge to 2 and 1");
+    Layer::destroy(net[0]);
+    Optimizer::destroy(opt);
+}
+
 int main() {
-    test_shape();
-    test_create_and_read();
-    test_views();
-    test_lifetime();
-    test_grad_meta();
-    test_elementwise();
-    test_autograd_chain();
-    test_matmul_reduce_loss();
-    test_gradient_checks();
+    std::fprintf(stderr, "t1\n"); test_shape();
+    std::fprintf(stderr, "t2\n"); test_create_and_read();
+    std::fprintf(stderr, "t3\n"); test_views();
+    std::fprintf(stderr, "t4\n"); test_lifetime();
+    std::fprintf(stderr, "t5\n"); test_grad_meta();
+    std::fprintf(stderr, "t6\n"); test_elementwise();
+    std::fprintf(stderr, "t7\n"); test_autograd_chain();
+    std::fprintf(stderr, "t8\n"); test_matmul_reduce_loss();
+    std::fprintf(stderr, "t9\n"); test_gradient_checks();
+    std::fprintf(stderr, "t10\n"); test_training_converges();
+    std::fprintf(stderr, "done-tests\n");
     if (failures == 0) {
         std::printf("ALL BASIC TESTS PASSED\n");
         return 0;

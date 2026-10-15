@@ -4,6 +4,7 @@
 // ============================================================================
 #include "znn_internal.hpp"
 #include "autograd.hpp"
+#include "operators/shared.hpp"
 #include <cstring>
 #include <type_traits>
 
@@ -434,6 +435,9 @@ Tensor Tensor::slice(int64_t dim, int64_t begin, int64_t end) const {
 
 Tensor Tensor::transpose(int64_t d0, int64_t d1) const {
     require(impl_, "empty tensor");
+    if (Runtime::grad_enabled() && impl_->requires_grad) {
+        return transpose_for_autograd(*this, d0, d1);   // 训练态: 材料化+逆梯度
+    }
     const Shape& sp = impl_->shape;
     const int64_t a = normalize_index(d0, sp.rank);
     const int64_t b = normalize_index(d1, sp.rank);

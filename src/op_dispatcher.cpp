@@ -63,7 +63,7 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
         if (any) {
             out.requires_grad(true);
             const Tensor* out_c[1] = {&out};
-            AutogradEngine::instance().record(op, inputs, Span<const Tensor*>(out_c, 1));
+            AutogradEngine::instance().record(op, inputs, Span<const Tensor*>(out_c, 1), options);
         }
     }
     return out;

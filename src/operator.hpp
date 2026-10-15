@@ -62,6 +62,7 @@ struct BackwardContext
     Span<const Tensor*> saved_outputs;  // 前向输出
     Span<const Tensor*> grad_outputs;   // 上游传来的"对本算子输出的梯度"
     Span<Tensor*>       grad_inputs;    // 待写入:"对各输入的梯度"(框架已分配好)
+    const void*         options;        // 前向调用选项副本(引擎保存, 见 Operator::options_size)
 
     // 前向发生过广播时(如 [B,C]+[C]), 把梯度沿广播维求和规约回输入形状
     static Tensor reduce_to(const Tensor& grad, const Shape& target_shape);
@@ -85,6 +86,9 @@ struct Operator
 
     KernelFunction ref;  // CPU 朴素实现(某后端没有快速内核时保证功能可用)
     KernelFunction kernels[(int)Device::kDeviceCount];  // 具体的后端快速内核(kernels[CPU] 由 Eigen 版填充)
+    // 选项结构体字节数: >0 时引擎把调用方栈上的 options 拷贝进图节点,
+    // 反向时经 BackwardContext::options 交还(梯度规则可读前向选项)
+    size_t options_size = 0;
 };
 
 extern const Operator* g_operator_list[];

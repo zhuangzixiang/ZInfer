@@ -15,6 +15,7 @@ public:
     void clear() override;
 private:
     std::vector<Tensor> params_;
+    std::vector<Tensor> velocity_;   // momentum > 0 时启用
     OptimParam param_;
 };
 
@@ -24,6 +25,7 @@ public:
     void step() override;
     void clear() override;
 protected:
+    int64_t step_count_ = 0;         // 偏差校正用
     // AdamW 复用动量逻辑, 仅 weight_decay 语义不同(解耦衰减)
     struct Moment {
         Tensor m;      // 一阶动量
@@ -31,6 +33,7 @@ protected:
     };
     std::vector<Tensor> params_;
     std::vector<Moment>  moments_;
+    friend class AdamWImpl;          // 解耦衰减需访问私有成员
     OptimParam param_;
 };
 

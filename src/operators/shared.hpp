@@ -41,6 +41,9 @@ Tensor sum_along(const Tensor& x, int64_t dim, bool keepdim);
 void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
                    const Shape& in_shape, Tensor& out);
 
+// 训练态转置(材料化+逆梯度); 纯推理态 Tensor::transpose 直接返回零拷贝视图
+Tensor transpose_for_autograd(const Tensor& x, int64_t d0, int64_t d1);
+
 // 规约类(sum/mean)共用形状推导: ReduceAttrs 选项
 void infer_reduce(Span<const TensorMeta*> inputs, const void* options, std::vector<Shape>& outs);
 
