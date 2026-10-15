@@ -43,9 +43,9 @@ private:
 // ============================================================ Tensor 内部
 
 // 公共 Tensor 的唯一实体: 存储视图。
-// 不含任何计算图信息——tape 与"张量→生产节点"路由归 AutogradEngine 所有,
-// 因此张量本体不需要 friend 授权, 引擎经公共接口工作。
+// 不含任何计算图信息——tape 归 AutogradEngine 所有, 引擎经公共接口工作。
 struct Tensor::Impl {
+    std::atomic<int64_t> refcount = 1;
     Storage*   storage = nullptr;     // null = 空句柄
     int64_t    offset  = 0;           // 元素级偏移(视图)
     Shape      shape;
@@ -54,14 +54,24 @@ struct Tensor::Impl {
     Device     device = Device::CPU;
 
     bool       requires_grad = false;
-    Impl*      grad    = nullptr;     // 惰性分配, 与本 Impl 同形状
+    Tensor     grad;                  // 惰性分配, grad() 首次访问时创建
 
     static Impl* create(const Shape& shape, DType dtype, Device device);
+    ~Impl();
+    static void copy_elements(const Impl* src, Impl* dst);   // dst 连续, src 任意视图
     Impl*        retain();
-    void         release();
+    void         release();           // 归零时释放 grad/Storage 与自身
+
+    // 共享存储派生视图(新实体, 不影响源张量)
+    static Impl* make_view(const Impl* src, const Shape& shape,
+                           const int64_t (&strides)[8], int64_t offset);
 
     bool   is_contiguous() const;
     size_t nbytes() const;            // numel × 元素大小
 };
+
+// ---- 内部共用小工具 ----
+size_t dtype_size(DType dtype);       // 元素字节数
+void   check_cpu(Device device);      // GPU 里程碑前统一报错
 
 } // namespace znn

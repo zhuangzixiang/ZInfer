@@ -98,6 +98,7 @@ public:
 public:
     // ---- 元信息 ----
     const Shape& shape()     const;
+    explicit operator bool() const;             // 句柄是否非空(判空用)
     int64_t      size(int64_t dim) const;    // 支持负索引, -1 = 最后一维
     const int64_t* strides() const;         // 各维步长(元素数), 数组随张量存活
     bool           is_contiguous() const;       // 行主序连续存储与否
@@ -133,7 +134,7 @@ public:
     template <class T> T  item() const;   // 任意设备合法, 同步读取单值
 
     // ---- 自动求导 ----
-    void   requires_grad(bool yes = true);   // 参数张量在训练前设置
+    void   requires_grad(bool yes);           // 参数张量在训练前设置(显式传参, 避免与查询重载歧义)
     bool   requires_grad() const;
     Tensor& grad();                          // 首次访问惰性分配; 供读取与清零
     void   backward() const;                 // 本张量须为标量; 反向填充各 .grad()

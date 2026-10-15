@@ -1,26 +1,66 @@
 // ============================================================================
 // znn_internal.cpp — znn.hpp 的实现支撑
-// (骨架阶段: 逻辑体为 ZNN_TODO 占位; 引擎在 autograd/op_dispatcher, 层/优化器在各自目录)
+// (引擎在 autograd/op_dispatcher; 层/优化器在各自目录; 算子在 operators/)
 // ============================================================================
 #include "znn_internal.hpp"
+#include "autograd.hpp"
+#include <cstring>
+#include <type_traits>
 
 namespace znn {
 
-// ============================================================ Shape 方法
-// 纯结构性实现(填数组/设秩/索引规范化), 随骨架落地
+// ============================================================ 内部小工具
 
-Shape::Shape(std::initializer_list<int64_t> dims) {
-    if (dims.size() > 8) {
-        throw std::runtime_error("znn: shape rank > 8");
+size_t dtype_size(DType dtype) {
+    switch (dtype) {
+        case DType::F32:
+        case DType::I32: return 4;
+        case DType::F16:
+        case DType::BF16: return 2;
+        case DType::I64: return 8;
+        case DType::U8: return 1;
+        default: throw std::runtime_error("znn: unknown dtype");
     }
-    int64_t i = 0;
-    for (int64_t d : dims) {
-        this->dims[i++] = d;
+}
+
+void check_cpu(Device device) {
+    if (device != Device::CPU) {
+        throw std::runtime_error("znn: device not built in (GPU 里程碑)");
     }
-    rank = i;
+}
+
+// 见头文件声明: dst 连续, src 任意 strided 视图
+void Tensor::Impl::copy_elements(const Tensor::Impl* src, Tensor::Impl* dst) {
+    const int64_t total = static_cast<int64_t>(dst->nbytes() / dtype_size(dst->dtype));
+    const size_t esz = dtype_size(dst->dtype);
+    char* out = static_cast<char*>(dst->storage->data());
+    const char* base = static_cast<const char*>(src->storage->data());
+    if (src->is_contiguous()) {
+        std::memcpy(out, base + src->offset * esz, dst->nbytes());
+        return;
+    }
+    int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    const int64_t rank = dst->shape.rank;
+    for (int64_t i = 0; i < total; ++i) {
+        int64_t off = src->offset;
+        for (int64_t d = 0; d < rank; ++d) {
+            off += idx[d] * src->strides[d];
+        }
+        std::memcpy(out + i * esz, base + off * esz, esz);
+        for (int64_t d = rank - 1; d >= 0; --d) {          // 行主序推进多下标
+            if (++idx[d] < dst->shape.dims[d]) break;
+            idx[d] = 0;
+        }
+    }
 }
 
 namespace {
+
+void require(bool ok, const char* what) {
+    if (!ok) {
+        throw std::runtime_error(std::string("znn: ") + what);
+    }
+}
 
 int64_t normalize_index(int64_t index, int64_t rank) {
     int64_t i = index < 0 ? index + rank : index;
@@ -34,6 +74,19 @@ thread_local bool grad_enabled_flag = true;
 
 } // namespace
 
+// ============================================================ Shape 方法
+
+Shape::Shape(std::initializer_list<int64_t> dims) {
+    if (dims.size() > 8) {
+        throw std::runtime_error("znn: shape rank > 8");
+    }
+    int64_t i = 0;
+    for (int64_t d : dims) {
+        this->dims[i++] = d;
+    }
+    rank = i;
+}
+
 int64_t& Shape::operator[](int64_t index) {
     return dims[normalize_index(index, rank)];
 }
@@ -45,8 +98,12 @@ int64_t Shape::operator[](int64_t index) const {
 // ============================================================ Storage
 
 Storage* Storage::create(size_t bytes, Device device) {
-    // TODO: 按设备分配对齐内存(CPU: aligned new; GPU 后端各自带分配器)
-    ZNN_TODO();
+    check_cpu(device);
+    Storage* s = new Storage(bytes, device);
+    if (bytes > 0) {
+        s->data_ = ::operator new(bytes);    // 未初始化, 调用方负责填充
+    }
+    return s;
 }
 
 Storage::Storage(size_t bytes, Device device)
@@ -54,41 +111,91 @@ Storage::Storage(size_t bytes, Device device)
 }
 
 Storage::~Storage() {
-    // TODO: 按设备释放 data_
+    if (data_) {
+        ::operator delete(data_);
+    }
 }
 
 Storage* Storage::retain() {
-    ZNN_TODO();
+    ++refcount_;
+    return this;
 }
 
 void Storage::release() {
-    ZNN_TODO();
+    if (--refcount_ == 0) {
+        delete this;
+    }
 }
 
 // ============================================================ Tensor::Impl
 
 Tensor::Impl* Tensor::Impl::create(const Shape& shape, DType dtype, Device device) {
-    // TODO: 分配 storage, 按 row-major 计算 strides
-    ZNN_TODO();
+    check_cpu(device);
+    require(shape.rank <= 8, "shape rank > 8");
+    Impl* im = new Impl();
+    im->shape = shape;
+    im->dtype = dtype;
+    im->device = device;
+    int64_t stride = 1;
+    for (int64_t d = shape.rank - 1; d >= 0; --d) {        // row-major 步长
+        im->strides[d] = stride;
+        stride *= shape.dims[d];
+    }
+    im->storage = Storage::create(static_cast<size_t>(stride) * dtype_size(dtype), device);
+    return im;
 }
 
 Tensor::Impl* Tensor::Impl::retain() {
-    ZNN_TODO();
+    ++refcount;
+    return this;
 }
 
 void Tensor::Impl::release() {
-    ZNN_TODO();
+    if (--refcount == 0) {
+        delete this;    // ~Impl 递归释放 grad(Tensor 成员)与 storage
+    }
+}
+
+Tensor::Impl::~Impl() {
+    if (storage) {
+        storage->release();
+    }
+}
+
+Tensor::Impl* Tensor::Impl::make_view(const Impl* src, const Shape& shape,
+                                      const int64_t (&strides)[8], int64_t offset) {
+    Impl* v = new Impl();
+    v->storage = src->storage ? src->storage->retain() : nullptr;
+    v->offset = offset;
+    v->shape = shape;
+    for (int64_t d = 0; d < 8; ++d) {
+        v->strides[d] = strides[d];
+    }
+    v->dtype = src->dtype;
+    v->device = src->device;
+    return v;
 }
 
 bool Tensor::Impl::is_contiguous() const {
-    ZNN_TODO();
+    int64_t expect = 1;
+    for (int64_t d = shape.rank - 1; d >= 0; --d) {
+        if (shape.dims[d] != 1 && strides[d] != expect) {
+            return false;
+        }
+        expect *= shape.dims[d];
+    }
+    return true;
 }
 
 size_t Tensor::Impl::nbytes() const {
-    ZNN_TODO();
+    int64_t n = 1;
+    for (int64_t d = 0; d < shape.rank; ++d) {
+        n *= shape.dims[d];
+    }
+    return static_cast<size_t>(n) * dtype_size(dtype);
 }
 
-// ---- Tensor 公共方法: 句柄生命周期 ----
+// ============================================================ 句柄生命周期
 
 Tensor::Tensor()
     : impl_(nullptr) {
@@ -124,116 +231,275 @@ Tensor::~Tensor() {
     if (impl_) impl_->release();
 }
 
-// ---- Tensor 公共方法: 创建 ----
+// ============================================================ 创建
+
+Tensor Tensor::empty(Shape shape, DType dtype, Device device) {
+    Tensor t;
+    t.impl_ = Tensor::Impl::create(shape, dtype, device);
+    return t;
+}
 
 Tensor Tensor::zeros(Shape shape, DType dtype, Device device) {
-    ZNN_TODO();
+    Tensor t = Tensor::empty(shape, dtype, device);
+    std::memset(t.impl_->storage->data(), 0, t.impl_->nbytes());
+    return t;
 }
 
 Tensor Tensor::ones(Shape shape, DType dtype, Device device) {
-    ZNN_TODO();
-}
-
-Tensor Tensor::empty(Shape shape, DType dtype, Device device) {
-    ZNN_TODO();
+    Tensor t = Tensor::empty(shape, dtype, device);
+    if (dtype == DType::F32) {
+        float* p = t.data<float>();
+        for (int64_t i = 0; i < t.numel(); ++i) p[i] = 1.f;
+    } else if (dtype == DType::I64) {
+        int64_t* p = t.data<int64_t>();
+        for (int64_t i = 0; i < t.numel(); ++i) p[i] = 1;
+    } else {
+        throw std::runtime_error("znn: ones supports F32/I64 in v1");
+    }
+    return t;
 }
 
 Tensor Tensor::full(Shape shape, double value, DType dtype, Device device) {
-    ZNN_TODO();
+    require(dtype == DType::F32, "full supports F32 in v1");
+    Tensor t = Tensor::empty(shape, dtype, device);
+    float* p = t.data<float>();
+    for (int64_t i = 0; i < t.numel(); ++i) {
+        p[i] = static_cast<float>(value);
+    }
+    return t;
 }
 
 Tensor Tensor::from_host(const void* data, Shape shape, DType dtype, Device device) {
-    ZNN_TODO();
+    Tensor t = Tensor::empty(shape, dtype, device);
+    if (t.numel() > 0) {
+        std::memcpy(t.impl_->storage->data(), data, t.impl_->nbytes());
+    }
+    return t;
 }
 
-// ---- Tensor 公共方法: 元信息 ----
+// ============================================================ 元信息
 
 const Shape& Tensor::shape() const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    return impl_->shape;
+}
+
+Tensor::operator bool() const {
+    return impl_ != nullptr;
 }
 
 int64_t Tensor::size(int64_t dim) const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    return impl_->shape[dim];
 }
 
 int64_t Tensor::numel() const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    int64_t n = 1;
+    for (int64_t d = 0; d < impl_->shape.rank; ++d) {
+        n *= impl_->shape.dims[d];
+    }
+    return n;
 }
 
 int64_t Tensor::dim_count() const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    return impl_->shape.rank;
 }
 
 DType Tensor::dtype() const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    return impl_->dtype;
 }
 
 Device Tensor::device() const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    return impl_->device;
 }
 
 const int64_t* Tensor::strides() const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    return impl_->strides;
 }
 
 bool Tensor::is_contiguous() const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    return impl_->is_contiguous();
 }
 
-// ---- Tensor 公共方法: 视图 ----
+// ============================================================ 视图
 
 Tensor Tensor::view(Shape shape) const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    require(impl_->is_contiguous(), "view requires contiguous storage");
+    return reshape(shape);
 }
 
 Tensor Tensor::reshape(Shape shape) const {
-    ZNN_TODO();
+    require(impl_ && impl_->is_contiguous(), "reshape of non-contiguous: clone() first (v1)");
+    const int64_t total = numel();
+    int64_t got = 1;
+    int64_t infer_at = -1;
+    for (int64_t d = 0; d < shape.rank; ++d) {
+        if (shape.dims[d] == -1) {
+            require(infer_at < 0, "reshape: at most one -1");
+            infer_at = d;
+        } else {
+            got *= shape.dims[d];
+        }
+    }
+    if (infer_at >= 0) {
+        require(total % got == 0, "reshape: size mismatch");
+        shape.dims[infer_at] = total / got;
+        got = total;
+    }
+    require(got == total, "reshape: size mismatch");
+    int64_t strides[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    int64_t s = 1;
+    for (int64_t d = shape.rank - 1; d >= 0; --d) {
+        strides[d] = s;
+        s *= shape.dims[d];
+    }
+    Tensor t;
+    t.impl_ = Tensor::Impl::make_view(impl_, shape, strides, impl_->offset);
+    return t;
 }
 
 Tensor Tensor::flatten(int64_t start_dim, int64_t end_dim) const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    const Shape& sp = impl_->shape;
+    const int64_t a = normalize_index(start_dim, sp.rank);
+    const int64_t b = normalize_index(end_dim, sp.rank);
+    require(a <= b, "flatten: dim range invalid");
+    Shape out;
+    for (int64_t d = 0; d < a; ++d) out.dims[out.rank++] = sp.dims[d];
+    int64_t n = 1;
+    for (int64_t d = a; d <= b; ++d) n *= sp.dims[d];
+    out.dims[out.rank++] = n;
+    for (int64_t d = b + 1; d < sp.rank; ++d) out.dims[out.rank++] = sp.dims[d];
+    return reshape(out);
 }
 
 Tensor Tensor::squeeze(int64_t dim) const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    const Shape& sp = impl_->shape;
+    Shape out;
+    if (dim == -1) {                                       // 去掉所有长度 1 的维
+        for (int64_t d = 0; d < sp.rank; ++d) {
+            if (sp.dims[d] != 1) out.dims[out.rank++] = sp.dims[d];
+        }
+    } else {
+        const int64_t i = normalize_index(dim, sp.rank);
+        require(sp.dims[i] == 1, "squeeze: dim is not 1");
+        for (int64_t d = 0; d < sp.rank; ++d) {
+            if (d != i) out.dims[out.rank++] = sp.dims[d];
+        }
+    }
+    return reshape(out);
 }
 
 Tensor Tensor::unsqueeze(int64_t dim) const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    const Shape& sp = impl_->shape;
+    const int64_t i = normalize_index(dim, sp.rank + 1);
+    Shape out;
+    for (int64_t d = 0; d < i; ++d) out.dims[out.rank++] = sp.dims[d];
+    out.dims[out.rank++] = 1;
+    for (int64_t d = i; d < sp.rank; ++d) out.dims[out.rank++] = sp.dims[d];
+    return reshape(out);
 }
 
 Tensor Tensor::slice(int64_t dim, int64_t begin, int64_t end) const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    const Shape& sp = impl_->shape;
+    const int64_t d = normalize_index(dim, sp.rank);
+    require(begin >= 0 && end <= sp.dims[d] && begin < end, "slice: range invalid");
+    Shape shape = sp;
+    shape.dims[d] = end - begin;
+    int64_t strides[8];
+    for (int64_t k = 0; k < 8; ++k) strides[k] = impl_->strides[k];
+    Tensor t;
+    t.impl_ = Tensor::Impl::make_view(impl_, shape, strides,
+                                      impl_->offset + begin * impl_->strides[d]);
+    return t;
 }
 
 Tensor Tensor::transpose(int64_t d0, int64_t d1) const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    const Shape& sp = impl_->shape;
+    const int64_t a = normalize_index(d0, sp.rank);
+    const int64_t b = normalize_index(d1, sp.rank);
+    require(a != b, "transpose: dims must differ");
+    Shape shape = sp;
+    int64_t strides[8];
+    for (int64_t k = 0; k < 8; ++k) strides[k] = impl_->strides[k];
+    shape.dims[a] = sp.dims[b];
+    shape.dims[b] = sp.dims[a];
+    strides[a] = impl_->strides[b];
+    strides[b] = impl_->strides[a];
+    Tensor t;
+    t.impl_ = Tensor::Impl::make_view(impl_, shape, strides, impl_->offset);
+    return t;
 }
 
 Tensor Tensor::permute(std::initializer_list<int64_t> dims) const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    const Shape& sp = impl_->shape;
+    require(static_cast<int64_t>(dims.size()) == sp.rank, "permute: rank mismatch");
+    Shape shape;
+    shape.rank = sp.rank;
+    int64_t strides[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    int64_t d = 0;
+    for (int64_t k : dims) {
+        const int64_t i = normalize_index(k, sp.rank);
+        shape.dims[d] = sp.dims[i];
+        strides[d] = impl_->strides[i];
+        ++d;
+    }
+    Tensor t;
+    t.impl_ = Tensor::Impl::make_view(impl_, shape, strides, impl_->offset);
+    return t;
 }
 
-// ---- Tensor 公共方法: 设备/拷贝 ----
+// ============================================================ 设备/拷贝
 
 Tensor Tensor::to_device(Device device) const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    if (impl_->device == device) {
+        return *this;                                      // 同设备: 共享返回(~1ns)
+    }
+    check_cpu(device);                                     // GPU 里程碑
+    Tensor t = Tensor::empty(impl_->shape, impl_->dtype, device);
+    Impl::copy_elements(impl_, t.impl_);
+    return t;
 }
 
 Tensor Tensor::clone() const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    Tensor t = Tensor::empty(impl_->shape, impl_->dtype, impl_->device);
+    Impl::copy_elements(impl_, t.impl_);
+    return t;
 }
 
-// ---- Tensor 公共方法: 数据读取(模板显式实例化在文件尾) ----
+// ============================================================ 数据读取
 
 template <class T>
 T* Tensor::data() const {
-    ZNN_TODO();
+    require(impl_ && impl_->storage, "empty tensor");
+    if ((std::is_same<T, float>::value && impl_->dtype != DType::F32) ||
+        (std::is_same<T, int64_t>::value && impl_->dtype != DType::I64)) {
+        throw std::runtime_error("znn: data<T> dtype mismatch");
+    }
+    return reinterpret_cast<T*>(static_cast<char*>(impl_->storage->data())
+                                + impl_->offset * dtype_size(impl_->dtype));
 }
 
 template <class T>
 T Tensor::item() const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    require(numel() == 1, "item on non-scalar");
+    check_cpu(impl_->device);
+    return *data<T>();
 }
 
 template float*   Tensor::data<float>() const;
@@ -241,26 +507,38 @@ template int64_t* Tensor::data<int64_t>() const;
 template float    Tensor::item<float>() const;
 template int64_t  Tensor::item<int64_t>() const;
 
-// ---- Tensor 公共方法: 自动求导 ----
+// ============================================================ 自动求导
 
 void Tensor::requires_grad(bool yes) {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    impl_->requires_grad = yes;
 }
 
 bool Tensor::requires_grad() const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    return impl_->requires_grad;
 }
 
 Tensor& Tensor::grad() {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    if (!impl_->grad) {                                    // 惰性分配, 零初始化
+        impl_->grad = Tensor::zeros(impl_->shape, impl_->dtype, impl_->device);
+    }
+    return impl_->grad;
 }
 
 void Tensor::backward() const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    AutogradEngine::instance().backward(*this);
 }
 
 Tensor Tensor::detach() const {
-    ZNN_TODO();
+    require(impl_, "empty tensor");
+    int64_t strides[8];
+    for (int64_t k = 0; k < 8; ++k) strides[k] = impl_->strides[k];
+    Tensor t;
+    t.impl_ = Tensor::Impl::make_view(impl_, impl_->shape, strides, impl_->offset);
+    return t;
 }
 
 // ============================================================ Runtime
