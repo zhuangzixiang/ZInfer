@@ -256,3 +256,30 @@
   WER 弹窗"挂起", 排查要靠 stderr 分段标记; (2)本环境 bash heredoc
   会把反斜杠-n 变成真实换行, 多行插入一律改用 python/Edit 工具
 - 架构 9/10 | 精简 8/10 | 可理解 9/10 | 可维护 9/10 | 可扩展 9/10
+
+---
+
+## [11] 块 D 完成: 全部内置算子实装(conv/pool/cat/stack/embedding/
+##      reshape 族/LN/BN/attention)
+
+**内容**
+- reshape 算子: 训练态 reshape/view/flatten/squeeze/unsqueeze 材料化
+  +逆梯度; 推理态保持零拷贝视图——CNN 的 Flatten 训练路径打通
+- conv2d(NCHW, pad/stride/dilation, v1 groups=1) 前向+标准 dX/dW 反传
+- max/avg_pool2d: max 反传重找窗口最大(免存掩码), avg 均摊有效元素
+- cat(可变输入)/stack: 反传按区间切片+reshape 回原形
+- embedding: gather + scatter-add 反传
+- layer_norm / batch_norm2d 算子: 标准反传公式; BN 训练态经共享存储
+  就地更新 running 统计(eval 用 running); 层封装(含 train 切换)
+- attention: [B,H,L,D] 单算子前向(S·softmax·PV)+完整反传
+  (dV=P^T dO, dP=dO V^T, softmax 反传, dQ/dK); causal 留 v1.1
+- Shape.h/.w 是 NCHW 别名方法而非字段, 二维几何参数一律 [0]/[1] 索引
+
+**测试**: conv 手算值+FD 梯度、池化值+max 路由梯度、cat/stack 值+
+区间梯度、embedding gather/scatter、reshape 恒等梯度、LN 零均值、
+BN 通道均值、attention 单位注意力——全部通过。
+
+**反思**: 架构 9/10(全部经注册算子路径, 无旁路内核) | 精简 8/10 |
+可理解 9/10 | 可维护 9/10 | 可扩展 9/10。
+剩余: Eigen 内核提速 / sum·mean·softmax 任意维 / permute·slice 训练态 /
+causal attention / GPU 里程碑。

@@ -42,6 +42,9 @@ set(ZNN_OPERATORS
     src/operators/conv2d.cpp
     src/operators/max_pool2d.cpp
     src/operators/avg_pool2d.cpp
+    src/operators/layer_norm.cpp
+    src/operators/batch_norm2d.cpp
+    src/operators/attention.cpp
     src/operators/embedding.cpp
     src/operators/attention.cpp
     src/operators/cross_entropy.cpp
@@ -51,6 +54,9 @@ set(ZNN_OPERATORS
     src/operators/conv2d.cpp
     src/operators/max_pool2d.cpp
     src/operators/avg_pool2d.cpp
+    src/operators/layer_norm.cpp
+    src/operators/batch_norm2d.cpp
+    src/operators/attention.cpp
     src/operators/operator_list.cpp
 )
 

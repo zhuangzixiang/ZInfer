@@ -300,6 +300,39 @@ static void test_embedding_reshape() {
     check(all_one, "reshape autograd identity grad");
 }
 
+
+static void test_norms_attention() {
+    // layer_norm: 末维归一化, 输出每行均值≈偏置
+    const float lx[4] = {1, 2, 3, 6};
+    Tensor ln_x = Tensor::from_host(lx, {2, 2});
+    Layer* ln = Layer::create(LayerType::LayerNorm, LayerParam{2});
+    Tensor ly = ln->forward(ln_x);
+    const float m0 = (ly.data<float>()[0] + ly.data<float>()[1]) / 2.f;
+    check(fabsf(m0) < 1e-5f, "layer norm zero mean");
+    Layer::destroy(ln);
+
+    // batch_norm2d: 训练后输出每通道均值≈偏置
+    LayerParam bp;
+    bp.channels = 2;
+    Layer* bn = Layer::create(LayerType::BatchNorm2d, bp);
+    const float bx[16] = {1, 10, 2, 11, 3, 12, 4, 13,
+                          5, 20, 6, 21, 7, 22, 8, 23};
+    Tensor bx_t = Tensor::from_host(bx, {2, 2, 2, 2});
+    Tensor by = bn->forward(bx_t);
+    float s0 = 0.f;
+    for (int64_t i = 0; i < 8; ++i) s0 += by.data<float>()[i * 2];
+    check(fabsf(s0 / 8.f) < 1e-4f, "batch norm per-channel mean");
+    Layer::destroy(bn);
+
+    // attention: B=1,H=1,L=2,D=2 手算
+    const float q[4] = {1, 0, 0, 1};
+    const float v[4] = {1, 2, 3, 4};
+    Tensor tq = Tensor::from_host(q, {1, 1, 2, 2});
+    Tensor tv = Tensor::from_host(v, {1, 1, 2, 2});
+    Tensor att = Tensor::attention(tq, tq, tv);
+    // S = I → P = I → O = V
+    check(att.data<float>()[0] == 1.f && att.data<float>()[3] == 4.f, "attention identity q");
+}
 int main() {
     std::fprintf(stderr, "t1\n"); test_shape();
     std::fprintf(stderr, "t2\n"); test_create_and_read();

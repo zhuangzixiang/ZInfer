@@ -1,19 +1,19 @@
 // LayerNorm: 层归一化 + 仿射
 #include "layers/layers.hpp"
-#include "operator.hpp"
-#include "znn_internal.hpp"
 #include "znn_internal.hpp"
 
 namespace znn {
 
-LayerNormLayer::LayerNormLayer(int64_t, double eps)
-    : eps_(eps) {
-    // TODO: w_/b_ 按维度分配
+Tensor layer_norm_apply(const Tensor& x, const Tensor& w, const Tensor& b, double eps);
+
+LayerNormLayer::LayerNormLayer(int64_t normalized_dim, double eps)
+    : w_(Tensor::ones({normalized_dim})), b_(Tensor::zeros({normalized_dim})), eps_(eps) {
+    w_.requires_grad(true);
+    b_.requires_grad(true);
 }
 
 Tensor LayerNormLayer::forward(const Tensor& x) {
-    // TODO: 均值方差归一化 + 仿射
-    ZNN_TODO();
+    return layer_norm_apply(x, w_, b_, eps_);
 }
 
 std::vector<Tensor> LayerNormLayer::params() const {
