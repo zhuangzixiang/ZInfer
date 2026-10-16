@@ -2,6 +2,7 @@
 #include "autograd.hpp"
 #include "operators/shared.hpp"
 #include "znn_internal.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 #include <stdexcept>
 #include <vector>
 
@@ -48,7 +49,7 @@ void AutogradEngine::backward(const Tensor& loss) {
         if (!n->op->grad) {
             continue;
         }
-        // 1. 分配本节点各输入的梯度缓冲(规则只管写)
+        // 1. 分配本节点各输入的梯度缓冲(跟随输入设备)
         const size_t nin = n->saved_inputs.size();
         std::vector<Tensor> in_grads(nin);
         for (size_t i = 0; i < nin; ++i) {
@@ -56,16 +57,40 @@ void AutogradEngine::backward(const Tensor& loss) {
                                         n->saved_inputs[i].dtype(),
                                         n->saved_inputs[i].device());
         }
-        // 2. 装配上下文(输出梯度读各输出自身的 grad 累加缓冲)
+        // 1.5 GPU 梯度规则桥接: 梯度规则当前为 CPU 实现, CUDA 张量
+        //     先暂存到 CPU 副本, 规则跑完后结果拷回原设备。
+        //     (架构不变: GradientFunction 签名不动; CUDA 原生梯度内核
+        //      按算子槽位模式后续补齐后此桥接自动短路)
+        bool has_cuda = false;
+        for (size_t i = 0; i < nin; ++i) {
+            has_cuda = has_cuda || n->saved_inputs[i].device() == Device::CUDA;
+        }
+        std::vector<Tensor> cpu_saved_in, cpu_saved_out, cpu_grad_out, cpu_grad_in;
+        if (has_cuda) {
+            cpu_saved_in.resize(nin);
+            cpu_saved_out.resize(n->saved_outputs.size());
+            cpu_grad_out.resize(n->saved_outputs.size());
+            cpu_grad_in.resize(nin);
+            for (size_t i = 0; i < nin; ++i) {
+                cpu_saved_in[i] = n->saved_inputs[i].to_device(Device::CPU);
+                cpu_grad_in[i] = Tensor::zeros(n->saved_inputs[i].shape(),
+                                               n->saved_inputs[i].dtype(), Device::CPU);
+            }
+            for (size_t i = 0; i < n->saved_outputs.size(); ++i) {
+                cpu_saved_out[i] = n->saved_outputs[i].to_device(Device::CPU);
+                cpu_grad_out[i] = n->saved_outputs[i].grad().to_device(Device::CPU);
+            }
+        }
+        // 2. 装配上下文
         std::vector<const Tensor*> si(nin), so(n->saved_outputs.size()), go(n->saved_outputs.size());
         std::vector<Tensor*> gi(nin);
         for (size_t i = 0; i < nin; ++i) {
-            si[i] = &n->saved_inputs[i];
-            gi[i] = &in_grads[i];
+            si[i] = has_cuda ? &cpu_saved_in[i] : &n->saved_inputs[i];
+            gi[i] = has_cuda ? &cpu_grad_in[i] : &in_grads[i];
         }
         for (size_t i = 0; i < so.size(); ++i) {
-            so[i] = &n->saved_outputs[i];
-            go[i] = &n->saved_outputs[i].grad();
+            so[i] = has_cuda ? &cpu_saved_out[i] : &n->saved_outputs[i];
+            go[i] = has_cuda ? &cpu_grad_out[i] : &n->saved_outputs[i].grad();
         }
         BackwardContext ctx;
         ctx.saved_inputs  = Span<const Tensor*>(si.data(), si.size());
@@ -74,6 +99,17 @@ void AutogradEngine::backward(const Tensor& loss) {
         ctx.grad_inputs   = Span<Tensor*>(gi.data(), gi.size());
         ctx.options       = n->options_copy.empty() ? nullptr : n->options_copy.data();
         n->op->grad(ctx);
+        // 2.5 GPU 桥接回拷: CPU 梯度结果 → 原设备
+        if (has_cuda) {
+            for (size_t i = 0; i < nin; ++i) {
+                const Device dev = n->saved_inputs[i].device();
+                if (dev == Device::CUDA && n->saved_inputs[i].requires_grad()) {
+                    Tensor& acc = n->saved_inputs[i].grad();
+                    Tensor cpu_sum = Tensor::add(acc.to_device(Device::CPU), cpu_grad_in[i]);
+                    acc = cpu_sum.to_device(Device::CUDA);
+                }
+            }
+        }
         // 3. 累加到各输入(叶子得到最终梯度; 中间量等待其生产节点读取)
         for (size_t i = 0; i < nin; ++i) {
             if (n->saved_inputs[i].requires_grad()) {

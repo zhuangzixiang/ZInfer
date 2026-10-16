@@ -2,6 +2,7 @@
 // 纯推理态 Tensor::permute 直接返回零拷贝视图
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -63,7 +64,7 @@ const Operator g_permute_operator = {
     permute_infer,
     permute_grad,
     permute_ref,
-    {},                          // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::permute_cuda, nullptr, nullptr},
     sizeof(PermuteOptions),
 };
 

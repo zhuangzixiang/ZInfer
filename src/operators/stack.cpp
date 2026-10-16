@@ -1,6 +1,7 @@
 // stack: 沿新维度 dim 堆叠(所有输入同形); 梯度 = 沿 dim 取片再压回原形
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 #include <vector>
 
 namespace znn {
@@ -72,7 +73,7 @@ const Operator g_stack_operator = {
     stack_infer,
     stack_grad,
     stack_ref,
-    {},                          // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::stack_cuda, nullptr, nullptr},
     sizeof(StackOptions),
 };
 

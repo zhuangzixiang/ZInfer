@@ -2,6 +2,7 @@
 // S = QK^T/√D → softmax → O = PV, 梯度按标准公式逐步回传
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 #include <cmath>
 #include <vector>
 
@@ -135,7 +136,7 @@ const Operator g_attention_operator = {
     attention_infer,
     attention_grad,
     attention_ref,
-    {},                          // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::attention_cuda, nullptr, nullptr},
     sizeof(AttentionOptions),
 };
 

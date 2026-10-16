@@ -1,6 +1,7 @@
 // layer_norm: 末维归一化 + 仿射; 梯度按标准 LN 反传公式
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 #include <cmath>
 
 namespace znn {
@@ -102,7 +103,7 @@ const Operator g_layer_norm_operator = {
     layer_norm_infer,
     layer_norm_grad,
     layer_norm_ref,
-    {},                          // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::layer_norm_cuda, nullptr, nullptr},
     sizeof(LayerNormOptions),
 };
 

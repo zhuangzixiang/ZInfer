@@ -576,7 +576,12 @@ template <class T>
 T Tensor::item() const {
     require(impl_, "empty tensor");
     require(numel() == 1, "item on non-scalar");
-    check_cpu(impl_->device);
+    if (impl_->device == Device::CUDA) {                   // GPU: 自动同步拷回单值
+        T v;
+        cuda_backend::copy_device_to_host(&v, impl_->storage->data(),
+                                          sizeof(T));
+        return v;
+    }
     return *data<T>();
 }
 

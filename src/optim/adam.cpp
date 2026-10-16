@@ -1,6 +1,7 @@
 // Adam: 动量 + 偏差校正(L2 衰减并入梯度); AdamW 见 adamw.cpp
 #include "optim.hpp"
 #include "znn_internal.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 #include <cmath>
 
 namespace znn {
@@ -21,11 +22,19 @@ void AdamImpl::step() {
         if (!p.grad()) {
             continue;
         }
-        if (!moments_[i].m) {                     // 惰性分配动量缓冲
-            moments_[i].m = Tensor::zeros(p.shape());
-            moments_[i].v = Tensor::zeros(p.shape());
-        }
         const int64_t n = p.numel();
+        if (!moments_[i].m) {                     // 惰性分配(跟随参数设备)
+            moments_[i].m = Tensor::zeros(p.shape(), DType::F32, p.device());
+            moments_[i].v = Tensor::zeros(p.shape(), DType::F32, p.device());
+        }
+        if (p.device() == Device::CUDA) {         // GPU: 原生内核更新
+            cuda_backend::adam_step_cuda(
+                p.data<float>(), p.grad().data<float>(),
+                moments_[i].m.data<float>(), moments_[i].v.data<float>(),
+                n, param_.lr, b1, b2, param_.eps, param_.weight_decay,
+                bias1, bias2);
+            continue;
+        }
         const float* g = p.grad().data<float>();
         float* pp = p.data<float>();
         float* m = moments_[i].m.data<float>();

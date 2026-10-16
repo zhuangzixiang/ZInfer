@@ -1,6 +1,7 @@
 // SGD: p -= lr * (grad + weight_decay*p) [+ 动量]
 #include "optim.hpp"
 #include "znn_internal.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -20,11 +21,21 @@ void SgdImpl::step() {
         if (!p.grad()) {
             continue;
         }
+        const int64_t n = p.numel();
+        if (p.device() == Device::CUDA) {                 // GPU: 原生内核更新
+            if (param_.momentum > 0 && !velocity_[i]) {
+                velocity_[i] = Tensor::zeros(p.shape(), DType::F32, Device::CUDA);
+            }
+            cuda_backend::sgd_step_cuda(
+                p.data<float>(), p.grad().data<float>(),
+                param_.momentum > 0 ? velocity_[i].data<float>() : nullptr,
+                n, param_.lr, param_.momentum, param_.weight_decay);
+            continue;
+        }
         const float* g = p.grad().data<float>();
         float* pp = p.data<float>();
-        const int64_t n = p.numel();
         if (param_.momentum > 0) {
-            if (!velocity_[i]) {             // 惰性分配速度缓冲
+            if (!velocity_[i]) {
                 velocity_[i] = Tensor::zeros(p.shape());
             }
             float* v = velocity_[i].data<float>();

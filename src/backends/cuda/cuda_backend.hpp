@@ -57,5 +57,27 @@ void avg_pool2d_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const v
 // 矩阵
 void matmul_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 
+// 第三批(embedding/视图族/cat/stack/arange/randn/LN/BN/attention)
+void embedding_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void reshape_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void transpose_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void permute_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void slice_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void cat_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void stack_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void arange_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void randn_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void layer_norm_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void batch_norm2d_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void attention_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+
+// ---- 优化器 CUDA 入口(审计修复2) ----
+void sgd_step_cuda(float* p, const float* g, float* vel, long long n,
+                   float lr, float momentum, float wd);
+void adam_step_cuda(float* p, const float* g, float* m, float* v, long long n,
+                    float lr, float b1, float b2, float eps, float wd,
+                    float bias1, float bias2);
+void memset0_cuda(void* p, size_t bytes);
+
 } // namespace cuda_backend
 } // namespace znn

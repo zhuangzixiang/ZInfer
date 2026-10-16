@@ -1,6 +1,7 @@
 // embedding: 按索引取行(indices: I64 任意形状); 梯度 scatter-add 回权重
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -60,7 +61,7 @@ const Operator g_embedding_operator = {
     embedding_infer,
     embedding_grad,
     embedding_ref,
-    {},                          // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::embedding_cuda, nullptr, nullptr},
 };
 
 Tensor Tensor::embedding(const Tensor& weight, const Tensor& indices) {

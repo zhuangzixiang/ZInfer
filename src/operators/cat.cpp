@@ -1,6 +1,7 @@
 // cat: 沿 dim 拼接(可变输入数); 梯度 = 按各输入区间切片回传
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 #include <vector>
 
 namespace znn {
@@ -84,7 +85,7 @@ const Operator g_cat_operator = {
     cat_infer,
     cat_grad,
     cat_ref,
-    {},                          // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::cat_cuda, nullptr, nullptr},
     sizeof(CatOptions),
 };
 

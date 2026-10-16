@@ -47,5 +47,23 @@ ZNN_CUDA_KERNEL_NULL(conv2d_cuda)
 ZNN_CUDA_KERNEL_NULL(max_pool2d_cuda)
 ZNN_CUDA_KERNEL_NULL(avg_pool2d_cuda)
 
+ZNN_CUDA_KERNEL_NULL(embedding_cuda)
+ZNN_CUDA_KERNEL_NULL(reshape_cuda)
+ZNN_CUDA_KERNEL_NULL(transpose_cuda)
+ZNN_CUDA_KERNEL_NULL(permute_cuda)
+ZNN_CUDA_KERNEL_NULL(slice_cuda)
+ZNN_CUDA_KERNEL_NULL(cat_cuda)
+ZNN_CUDA_KERNEL_NULL(stack_cuda)
+ZNN_CUDA_KERNEL_NULL(arange_cuda)
+ZNN_CUDA_KERNEL_NULL(randn_cuda)
+ZNN_CUDA_KERNEL_NULL(layer_norm_cuda)
+ZNN_CUDA_KERNEL_NULL(batch_norm2d_cuda)
+ZNN_CUDA_KERNEL_NULL(attention_cuda)
+
+void sgd_step_cuda(float*, const float*, float*, long long, float, float, float) { unavailable(); }
+void adam_step_cuda(float*, const float*, float*, float*, long long,
+                    float, float, float, float, float, float, float) { unavailable(); }
+void memset0_cuda(void*, size_t) { unavailable(); }
+
 } // namespace cuda_backend
 } // namespace znn

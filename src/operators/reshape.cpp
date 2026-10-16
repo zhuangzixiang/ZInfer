@@ -2,6 +2,7 @@
 // 纯推理态 Tensor::reshape/view/flatten/squeeze/unsqueeze 直接返回零拷贝视图。
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -35,7 +36,7 @@ const Operator g_reshape_operator = {
     reshape_infer,
     reshape_grad,
     reshape_ref,
-    {},                          // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::reshape_cuda, nullptr, nullptr},
     sizeof(ReshapeOptions),
 };
 
