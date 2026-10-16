@@ -100,12 +100,13 @@ rule CXX_EXECUTABLE_LINKER__gpu_smoke_Release
 
 
 #############################################
-# Rule for compiling CXX files.
+# Rule for compiling CUDA files.
 
-rule CXX_COMPILER__gpu_bench_unscanned_Release
-  deps = msvc
-  command = ${LAUNCHER}${CODE_CHECK}E:\Tools\IDEs\VS\2019\Community\VC\Tools\MSVC\14.29.30133\bin\Hostx64\x64\cl.exe  /nologo /TP $DEFINES $INCLUDES $FLAGS /showIncludes /Fo$out /Fd$TARGET_COMPILE_PDB /FS -c $in
-  description = Building CXX object $out
+rule CUDA_COMPILER__gpu_bench_unscanned_Release
+  depfile = $DEP_FILE
+  deps = gcc
+  command = ${LAUNCHER}${CODE_CHECK}C:\PROGRA~1\NVIDIA~2\CUDA\v13.4\bin\nvcc.exe -forward-unknown-to-host-compiler $DEFINES $INCLUDES $FLAGS -MD -MT $out -MF $DEP_FILE -x cu -c $in -o $out -Xcompiler=-Fd$TARGET_COMPILE_PDB,-FS
+  description = Building CUDA object $out
 
 
 #############################################

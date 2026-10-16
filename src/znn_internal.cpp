@@ -104,8 +104,6 @@ int64_t normalize_index(int64_t index, int64_t rank) {
     return i;
 }
 
-thread_local bool grad_enabled_flag = true;
-
 } // namespace
 
 // ============================================================ Shape 方法
@@ -642,6 +640,13 @@ Tensor Tensor::detach() const {
 
 // ============================================================ Runtime
 
+namespace dynlib { void set_cublas_precision(bool tf32); }  // 实现在 dynlib.cpp
+
+namespace {
+thread_local bool grad_enabled_flag = true;
+Precision precision_flag = Precision::AUTO;     // 全局精度(非 thread_local, 避免 CXX/CUDA 混合链接问题)
+}
+
 bool Runtime::device_available(Device device) {
     if (device == Device::CPU) {
         return true;
@@ -651,6 +656,12 @@ bool Runtime::device_available(Device device) {
     }
     return false;                                          // Metal/Vulkan 未编入
 }
+
+void Runtime::set_precision(Precision p) {
+    precision_flag = p;
+    dynlib::set_cublas_precision(p != Precision::FP32);
+}
+Precision Runtime::precision() { return precision_flag; }
 
 void Runtime::set_grad_enabled(bool yes) {
     grad_enabled_flag = yes;

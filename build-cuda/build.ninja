@@ -833,9 +833,10 @@ build gpu_smoke.exe: CXX_EXECUTABLE_LINKER__gpu_smoke_Release CMakeFiles\gpu_smo
 
 build cmake_object_order_depends_target_gpu_bench: phony || cmake_object_order_depends_target_znn
 
-build CMakeFiles\gpu_bench.dir\tests\gpu_bench.cpp.obj: CXX_COMPILER__gpu_bench_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\tests\gpu_bench.cpp || cmake_object_order_depends_target_gpu_bench
+build CMakeFiles\gpu_bench.dir\tests\gpu_bench.cpp.obj: CUDA_COMPILER__gpu_bench_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\tests\gpu_bench.cpp || cmake_object_order_depends_target_gpu_bench
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8
+  DEP_FILE = CMakeFiles\gpu_bench.dir\tests\gpu_bench.cpp.obj.d
+  FLAGS = -D_WINDOWS -Xcompiler=" /GR /EHsc" -Xcompiler=-utf-8 -Xcompiler="-O2 -Ob2" -DNDEBUG -std=c++17 "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MD
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include
   OBJECT_DIR = CMakeFiles\gpu_bench.dir
   OBJECT_FILE_DIR = CMakeFiles\gpu_bench.dir\tests

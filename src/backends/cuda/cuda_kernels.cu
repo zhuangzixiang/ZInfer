@@ -158,15 +158,16 @@ void matmul_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
         // 行主序 y[M,N] = a[M,K] × b[K,N]
         // 列主序等价: y^T[N,M] = b^T[N,K] × a^T[K,M]
         // sgemm(m=N, n=M, k=K, A=b_ptr(ld=N), B=a_ptr(ld=K), C=y_ptr(ld=N))
+        // TF32 通过 cublasSetMathMode 启用(比 GemmEx 简单且已验证)
         dynlib::cublas_sgemm(
             dynlib::cublas_handle,
             CUBLAS_OP_N, CUBLAS_OP_N,
             N, M, K,
             &alpha,
-            b.data<float>(), N,     // A = b 的列主序视角(即 b^T), N×K, ld=N
-            a.data<float>(), K,     // B = a 的列主序视角(即 a^T), K×M, ld=K
+            b.data<float>(), N,
+            a.data<float>(), K,
             &beta,
-            y.data<float>(), N);    // C = y 的列主序视角(即 y^T), N×M, ld=N
+            y.data<float>(), N);
         return;
     }
 

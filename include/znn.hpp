@@ -38,11 +38,19 @@ namespace znn {
 // ---------------------------------------------------------------- Runtime
 // 运行时环境开关与查询
 
+// 计算精度配置(仅影响 GEMM 类算子: matmul/linear/conv2d/attention)
+//   FP32: 纯 FP32(默认, 调试/对拍)
+//   TF32: Tensor Core 加速(与 FP32 范围相同, 尾数 19 位, 零精度风险, Ampere+)
+//   AUTO: 最优可用(TF32 → FP32 兜底)
+enum class Precision : uint8_t { FP32 = 0, TF32, AUTO };
+
 class Runtime {
 public:
     static bool device_available(Device dev);   // 后端是否编入且可用(编译开关决定)
     static void set_grad_enabled(bool yes);     // false = 全局暂停建图(验证/推理段)
     static bool grad_enabled();
+    static void set_precision(Precision p);     // GEMM 精度(仅 GPU 后端生效)
+    static Precision precision();
 };
 
 // ---------------------------------------------------------------- Tensor

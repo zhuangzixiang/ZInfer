@@ -25,6 +25,8 @@ decltype(&cublasCreate)    cublas_create     = nullptr;
 decltype(&cublasDestroy)   cublas_destroy    = nullptr;
 decltype(&cublasSgemm)     cublas_sgemm      = nullptr;
 decltype(&cublasSetStream) cublas_set_stream = nullptr;
+CublasGemmExFn cublas_gemm_ex    = nullptr;
+decltype(&cublasSetMathMode) cublas_set_math_mode = nullptr;
 
 bool available_cublas() {
     static bool done = false;
@@ -48,9 +50,15 @@ bool available_cublas() {
                 ZNN_DLSYM(h, "cublasSgemm_v2"));
             cublas_set_stream = reinterpret_cast<decltype(cublas_set_stream)>(
                 ZNN_DLSYM(h, "cublasSetStream_v2"));
+            cublas_gemm_ex = reinterpret_cast<CublasGemmExFn>(
+                ZNN_DLSYM(h, "cublasGemmEx"));
             if (cublas_create && cublas_sgemm) {
                 if (cublas_create(&cublas_handle) == CUBLAS_STATUS_SUCCESS) {
                     ok = true;
+                    // 默认启用 TF32(可通过 set_precision(FP32) 关闭)
+                    if (cublas_set_math_mode) {
+                        cublas_set_math_mode(cublas_handle, CUBLAS_TF32_TENSOR_OP_MATH);
+                    }
                 }
             }
         }
@@ -60,6 +68,16 @@ bool available_cublas() {
 }
 
 #endif // ZNN_CUDA
+
+
+
+void set_cublas_precision(bool tf32) {
+    if (cublas_set_math_mode && cublas_handle) {
+        cublas_set_math_mode(
+            cublas_handle,
+            tf32 ? CUBLAS_TF32_TENSOR_OP_MATH : CUBLAS_DEFAULT_MATH);
+    }
+}
 
 } // namespace dynlib
 } // namespace znn

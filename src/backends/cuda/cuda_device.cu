@@ -68,4 +68,3 @@ void memset0(void* p, size_t bytes) {
 
 } // namespace cuda_backend
 } // namespace znn
-#include "backends/cuda/cuda_backend.hpp"

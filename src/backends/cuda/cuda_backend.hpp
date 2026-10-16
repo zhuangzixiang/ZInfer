@@ -85,5 +85,6 @@ void adam_step_cuda(float* p, const float* g, float* m, float* v, long long n,
                     float bias1, float bias2);
 void memset0_cuda(void* p, size_t bytes);
 
+
 } // namespace cuda_backend
 } // namespace znn

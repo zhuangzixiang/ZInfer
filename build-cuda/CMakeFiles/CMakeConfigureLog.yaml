@@ -63,8 +63,8 @@ events:
     checks:
       - "Detecting CXX compiler ABI info"
     directories:
-      source: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-y9ejra"
-      binary: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-y9ejra"
+      source: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-bznvgr"
+      binary: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-bznvgr"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "89"
       CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /GR /EHsc"
@@ -75,11 +75,11 @@ events:
       variable: "CMAKE_CXX_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-y9ejra'
+        Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-bznvgr'
         
-        Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_61a39
-        [1/2] E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP   /DWIN32 /D_WINDOWS /GR /EHsc  /Zi /Ob0 /Od /RTC1 -MDd /showIncludes /FoCMakeFiles\\cmTC_61a39.dir\\CMakeCXXCompilerABI.cpp.obj /FdCMakeFiles\\cmTC_61a39.dir\\ /FS -c E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\share\\cmake-4.0\\Modules\\CMakeCXXCompilerABI.cpp
-        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --msvc-ver=1929 --intdir=CMakeFiles\\cmTC_61a39.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_61a39.dir\\CMakeCXXCompilerABI.cpp.obj  /out:cmTC_61a39.exe /implib:cmTC_61a39.lib /pdb:cmTC_61a39.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
+        Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_a6467
+        [1/2] E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP   /DWIN32 /D_WINDOWS /GR /EHsc  /Zi /Ob0 /Od /RTC1 -MDd /showIncludes /FoCMakeFiles\\cmTC_a6467.dir\\CMakeCXXCompilerABI.cpp.obj /FdCMakeFiles\\cmTC_a6467.dir\\ /FS -c E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\share\\cmake-4.0\\Modules\\CMakeCXXCompilerABI.cpp
+        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --msvc-ver=1929 --intdir=CMakeFiles\\cmTC_a6467.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_a6467.dir\\CMakeCXXCompilerABI.cpp.obj  /out:cmTC_a6467.exe /implib:cmTC_a6467.lib /pdb:cmTC_a6467.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
         
       exitCode: 0
   -
@@ -346,8 +346,8 @@ events:
     checks:
       - "Detecting CUDA compiler ABI info"
     directories:
-      source: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-6u4ail"
-      binary: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-6u4ail"
+      source: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-y9782w"
+      binary: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-y9782w"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "89"
       CMAKE_CUDA_FLAGS: " -Xcompiler=-utf-8"
@@ -358,10 +358,10 @@ events:
       variable: "CMAKE_CUDA_ABI_COMPILED"
       cached: true
       stdout: |
-        Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-6u4ail'
+        Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-y9782w'
         
-        Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_fa6ea
-        [1/2] C:\\PROGRA~1\\NVIDIA~2\\CUDA\\v13.4\\bin\\nvcc.exe -forward-unknown-to-host-compiler   -Xcompiler=-utf-8  -Xcompiler=" -Zi -Ob0 -Od /RTC1" "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MDd   -Xcompiler=-v -MD -MT CMakeFiles\\cmTC_fa6ea.dir\\CMakeCUDACompilerABI.cu.obj -MF CMakeFiles\\cmTC_fa6ea.dir\\CMakeCUDACompilerABI.cu.obj.d -x cu -c E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\share\\cmake-4.0\\Modules\\CMakeCUDACompilerABI.cu -o CMakeFiles\\cmTC_fa6ea.dir\\CMakeCUDACompilerABI.cu.obj -Xcompiler=-FdCMakeFiles\\cmTC_fa6ea.dir\\,-FS
+        Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_9f30a
+        [1/2] C:\\PROGRA~1\\NVIDIA~2\\CUDA\\v13.4\\bin\\nvcc.exe -forward-unknown-to-host-compiler   -Xcompiler=-utf-8  -Xcompiler=" -Zi -Ob0 -Od /RTC1" "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MDd   -Xcompiler=-v -MD -MT CMakeFiles\\cmTC_9f30a.dir\\CMakeCUDACompilerABI.cu.obj -MF CMakeFiles\\cmTC_9f30a.dir\\CMakeCUDACompilerABI.cu.obj.d -x cu -c E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\share\\cmake-4.0\\Modules\\CMakeCUDACompilerABI.cu -o CMakeFiles\\cmTC_9f30a.dir\\CMakeCUDACompilerABI.cu.obj -Xcompiler=-FdCMakeFiles\\cmTC_9f30a.dir\\,-FS
         cl: 命令行 warning D9002 :忽略未知选项“-v”\x0d
         CMakeCUDACompilerABI.cu\x0d
         cl: 命令行 warning D9002 :忽略未知选项“-v”\x0d
@@ -369,7 +369,7 @@ events:
         CMakeCUDACompilerABI.cu\x0d
         cl: 命令行 warning D9002 :忽略未知选项“-v”\x0d
         E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\share\\cmake-4.0\\Modules\\CMakeCompilerCUDAArch.h(10): warning C4305: “return”: 从“int”到“bool”截断\x0d
-        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_fa6ea.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_fa6ea.dir\\CMakeCUDACompilerABI.cu.obj  /out:cmTC_fa6ea.exe /implib:cmTC_fa6ea.lib /pdb:cmTC_fa6ea.pdb /version:0.0 /machine:x64 -v /debug /INCREMENTAL  cudadevrt.lib  cudart_static.lib -LIBPATH:"C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/lib/x64" && cd ."
+        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_9f30a.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_9f30a.dir\\CMakeCUDACompilerABI.cu.obj  /out:cmTC_9f30a.exe /implib:cmTC_9f30a.lib /pdb:cmTC_9f30a.pdb /version:0.0 /machine:x64 -v /debug /INCREMENTAL  cudadevrt.lib  cudart_static.lib -LIBPATH:"C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/lib/x64" && cd ."
         
       exitCode: 0
   -
@@ -393,10 +393,10 @@ events:
       Parsed CUDA implicit link information:
         link line regex: [^( *|.*[/\\])(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)|link\\.exe|lld-link(\\.exe)?|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
         linker tool regex: [^[ 	]*(->|")?[ 	]*(([^"]*[/\\])?(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)|link\\.exe|lld-link(\\.exe)?))("|,| |$)]
-        ignore line: [Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-6u4ail']
+        ignore line: [Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-y9782w']
         ignore line: []
-        ignore line: [Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_fa6ea]
-        ignore line: [[1/2] C:\\PROGRA~1\\NVIDIA~2\\CUDA\\v13.4\\bin\\nvcc.exe -forward-unknown-to-host-compiler   -Xcompiler=-utf-8  -Xcompiler=" -Zi -Ob0 -Od /RTC1" "--generate-code=arch=compute_89 code=[compute_89 sm_89]" -Xcompiler=-MDd   -Xcompiler=-v -MD -MT CMakeFiles\\cmTC_fa6ea.dir\\CMakeCUDACompilerABI.cu.obj -MF CMakeFiles\\cmTC_fa6ea.dir\\CMakeCUDACompilerABI.cu.obj.d -x cu -c E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\share\\cmake-4.0\\Modules\\CMakeCUDACompilerABI.cu -o CMakeFiles\\cmTC_fa6ea.dir\\CMakeCUDACompilerABI.cu.obj -Xcompiler=-FdCMakeFiles\\cmTC_fa6ea.dir\\ -FS]
+        ignore line: [Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_9f30a]
+        ignore line: [[1/2] C:\\PROGRA~1\\NVIDIA~2\\CUDA\\v13.4\\bin\\nvcc.exe -forward-unknown-to-host-compiler   -Xcompiler=-utf-8  -Xcompiler=" -Zi -Ob0 -Od /RTC1" "--generate-code=arch=compute_89 code=[compute_89 sm_89]" -Xcompiler=-MDd   -Xcompiler=-v -MD -MT CMakeFiles\\cmTC_9f30a.dir\\CMakeCUDACompilerABI.cu.obj -MF CMakeFiles\\cmTC_9f30a.dir\\CMakeCUDACompilerABI.cu.obj.d -x cu -c E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\share\\cmake-4.0\\Modules\\CMakeCUDACompilerABI.cu -o CMakeFiles\\cmTC_9f30a.dir\\CMakeCUDACompilerABI.cu.obj -Xcompiler=-FdCMakeFiles\\cmTC_9f30a.dir\\ -FS]
         ignore line: [cl: 命令行 warning D9002 :忽略未知选项“-v”\x0d]
         ignore line: [CMakeCUDACompilerABI.cu\x0d]
         ignore line: [cl: 命令行 warning D9002 :忽略未知选项“-v”\x0d]
@@ -404,7 +404,7 @@ events:
         ignore line: [CMakeCUDACompilerABI.cu\x0d]
         ignore line: [cl: 命令行 warning D9002 :忽略未知选项“-v”\x0d]
         ignore line: [E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\share\\cmake-4.0\\Modules\\CMakeCompilerCUDAArch.h(10): warning C4305: “return”: 从“int”到“bool”截断\x0d]
-        ignore line: [[2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_fa6ea.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_fa6ea.dir\\CMakeCUDACompilerABI.cu.obj  /out:cmTC_fa6ea.exe /implib:cmTC_fa6ea.lib /pdb:cmTC_fa6ea.pdb /version:0.0 /machine:x64 -v /debug /INCREMENTAL  cudadevrt.lib  cudart_static.lib -LIBPATH:"C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/lib/x64" && cd ."]
+        ignore line: [[2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_9f30a.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_9f30a.dir\\CMakeCUDACompilerABI.cu.obj  /out:cmTC_9f30a.exe /implib:cmTC_9f30a.lib /pdb:cmTC_9f30a.pdb /version:0.0 /machine:x64 -v /debug /INCREMENTAL  cudadevrt.lib  cudart_static.lib -LIBPATH:"C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/lib/x64" && cd ."]
         ignore line: []
         ignore line: []
         linker tool for 'CUDA': E:/Tools/IDEs/VS/2019/Community/VC/Tools/MSVC/14.29.30133/bin/Hostx64/x64/link.exe
@@ -433,8 +433,8 @@ events:
       - "CMakeLists.txt:127 (find_package)"
     description: "Detecting CXX OpenMP compiler info"
     directories:
-      source: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-mrzdk9"
-      binary: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-mrzdk9"
+      source: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-gxm07j"
+      binary: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-gxm07j"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "89"
       CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /GR /EHsc"
@@ -444,11 +444,11 @@ events:
       variable: "OpenMP_COMPILE_RESULT_CXX_openmp"
       cached: true
       stdout: |
-        Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-mrzdk9'
+        Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-gxm07j'
         
-        Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_2c7cc
-        [1/2] E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP   /DWIN32 /D_WINDOWS /GR /EHsc -openmp /Zi /Ob0 /Od  -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_2c7cc.dir\\OpenMPTryFlag.cpp.obj /FdCMakeFiles\\cmTC_2c7cc.dir\\ /FS -c E:\\Documents\\ZShared\\ZProjs\\ZSpeedAI\\ZInfer\\build-cuda\\CMakeFiles\\CMakeScratch\\TryCompile-mrzdk9\\OpenMPTryFlag.cpp
-        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --msvc-ver=1929 --intdir=CMakeFiles\\cmTC_2c7cc.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_2c7cc.dir\\OpenMPTryFlag.cpp.obj  /out:cmTC_2c7cc.exe /implib:cmTC_2c7cc.lib /pdb:cmTC_2c7cc.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
+        Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_f78dd
+        [1/2] E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP   /DWIN32 /D_WINDOWS /GR /EHsc -openmp /Zi /Ob0 /Od  -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_f78dd.dir\\OpenMPTryFlag.cpp.obj /FdCMakeFiles\\cmTC_f78dd.dir\\ /FS -c E:\\Documents\\ZShared\\ZProjs\\ZSpeedAI\\ZInfer\\build-cuda\\CMakeFiles\\CMakeScratch\\TryCompile-gxm07j\\OpenMPTryFlag.cpp
+        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --msvc-ver=1929 --intdir=CMakeFiles\\cmTC_f78dd.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_f78dd.dir\\OpenMPTryFlag.cpp.obj  /out:cmTC_f78dd.exe /implib:cmTC_f78dd.lib /pdb:cmTC_f78dd.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
         
       exitCode: 0
   -
@@ -459,8 +459,8 @@ events:
       - "CMakeLists.txt:127 (find_package)"
     description: "Detecting CUDA OpenMP compiler info"
     directories:
-      source: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-w2uo41"
-      binary: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-w2uo41"
+      source: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-y08p99"
+      binary: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-y08p99"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "89"
       CMAKE_CUDA_FLAGS: " -Xcompiler=-utf-8"
@@ -470,12 +470,12 @@ events:
       variable: "OpenMP_COMPILE_RESULT_CUDA_openmp"
       cached: true
       stdout: |
-        Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-w2uo41'
+        Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-y08p99'
         
-        Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_10d47
-        [1/2] C:\\PROGRA~1\\NVIDIA~2\\CUDA\\v13.4\\bin\\nvcc.exe -forward-unknown-to-host-compiler   -Xcompiler=-utf-8 -openmp -Xcompiler=" -Zi -Ob0 -Od /RTC1" "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MDd -MD -MT CMakeFiles\\cmTC_10d47.dir\\OpenMPTryFlag.cu.obj -MF CMakeFiles\\cmTC_10d47.dir\\OpenMPTryFlag.cu.obj.d -x cu -c E:\\Documents\\ZShared\\ZProjs\\ZSpeedAI\\ZInfer\\build-cuda\\CMakeFiles\\CMakeScratch\\TryCompile-w2uo41\\OpenMPTryFlag.cu -o CMakeFiles\\cmTC_10d47.dir\\OpenMPTryFlag.cu.obj -Xcompiler=-FdCMakeFiles\\cmTC_10d47.dir\\,-FS
+        Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_1822d
+        [1/2] C:\\PROGRA~1\\NVIDIA~2\\CUDA\\v13.4\\bin\\nvcc.exe -forward-unknown-to-host-compiler   -Xcompiler=-utf-8 -openmp -Xcompiler=" -Zi -Ob0 -Od /RTC1" "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MDd -MD -MT CMakeFiles\\cmTC_1822d.dir\\OpenMPTryFlag.cu.obj -MF CMakeFiles\\cmTC_1822d.dir\\OpenMPTryFlag.cu.obj.d -x cu -c E:\\Documents\\ZShared\\ZProjs\\ZSpeedAI\\ZInfer\\build-cuda\\CMakeFiles\\CMakeScratch\\TryCompile-y08p99\\OpenMPTryFlag.cu -o CMakeFiles\\cmTC_1822d.dir\\OpenMPTryFlag.cu.obj -Xcompiler=-FdCMakeFiles\\cmTC_1822d.dir\\,-FS
         OpenMPTryFlag.cu\x0d
-        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_10d47.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_10d47.dir\\OpenMPTryFlag.cu.obj  /out:cmTC_10d47.exe /implib:cmTC_10d47.lib /pdb:cmTC_10d47.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL -v -openmp  cudadevrt.lib  cudart.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib -LIBPATH:"C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/lib/x64" && cd ."
+        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_1822d.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_1822d.dir\\OpenMPTryFlag.cu.obj  /out:cmTC_1822d.exe /implib:cmTC_1822d.lib /pdb:cmTC_1822d.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL -v -openmp  cudadevrt.lib  cudart.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib -LIBPATH:"C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/lib/x64" && cd ."
         
       exitCode: 0
   -
@@ -487,12 +487,12 @@ events:
     message: |
       Parsed CUDA OpenMP implicit link information from above output:
         link line regex: [^( *|.*[/\\])(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)|link\\.exe|lld-link(\\.exe)?|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
-        ignore line: [Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-w2uo41']
+        ignore line: [Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-y08p99']
         ignore line: []
-        ignore line: [Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_10d47]
-        ignore line: [[1/2] C:\\PROGRA~1\\NVIDIA~2\\CUDA\\v13.4\\bin\\nvcc.exe -forward-unknown-to-host-compiler   -Xcompiler=-utf-8 -openmp -Xcompiler=" -Zi -Ob0 -Od /RTC1" "--generate-code=arch=compute_89 code=[compute_89 sm_89]" -Xcompiler=-MDd -MD -MT CMakeFiles\\cmTC_10d47.dir\\OpenMPTryFlag.cu.obj -MF CMakeFiles\\cmTC_10d47.dir\\OpenMPTryFlag.cu.obj.d -x cu -c E:\\Documents\\ZShared\\ZProjs\\ZSpeedAI\\ZInfer\\build-cuda\\CMakeFiles\\CMakeScratch\\TryCompile-w2uo41\\OpenMPTryFlag.cu -o CMakeFiles\\cmTC_10d47.dir\\OpenMPTryFlag.cu.obj -Xcompiler=-FdCMakeFiles\\cmTC_10d47.dir\\ -FS]
+        ignore line: [Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_1822d]
+        ignore line: [[1/2] C:\\PROGRA~1\\NVIDIA~2\\CUDA\\v13.4\\bin\\nvcc.exe -forward-unknown-to-host-compiler   -Xcompiler=-utf-8 -openmp -Xcompiler=" -Zi -Ob0 -Od /RTC1" "--generate-code=arch=compute_89 code=[compute_89 sm_89]" -Xcompiler=-MDd -MD -MT CMakeFiles\\cmTC_1822d.dir\\OpenMPTryFlag.cu.obj -MF CMakeFiles\\cmTC_1822d.dir\\OpenMPTryFlag.cu.obj.d -x cu -c E:\\Documents\\ZShared\\ZProjs\\ZSpeedAI\\ZInfer\\build-cuda\\CMakeFiles\\CMakeScratch\\TryCompile-y08p99\\OpenMPTryFlag.cu -o CMakeFiles\\cmTC_1822d.dir\\OpenMPTryFlag.cu.obj -Xcompiler=-FdCMakeFiles\\cmTC_1822d.dir\\ -FS]
         ignore line: [OpenMPTryFlag.cu\x0d]
-        ignore line: [[2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_10d47.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_10d47.dir\\OpenMPTryFlag.cu.obj  /out:cmTC_10d47.exe /implib:cmTC_10d47.lib /pdb:cmTC_10d47.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL -v -openmp  cudadevrt.lib  cudart.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib -LIBPATH:"C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/lib/x64" && cd ."]
+        ignore line: [[2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_1822d.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_1822d.dir\\OpenMPTryFlag.cu.obj  /out:cmTC_1822d.exe /implib:cmTC_1822d.lib /pdb:cmTC_1822d.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL -v -openmp  cudadevrt.lib  cudart.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib -LIBPATH:"C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/lib/x64" && cd ."]
         ignore line: []
         ignore line: []
         implicit libs: []
@@ -509,8 +509,8 @@ events:
       - "CMakeLists.txt:127 (find_package)"
     description: "Detecting CXX OpenMP version"
     directories:
-      source: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-3met8d"
-      binary: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-3met8d"
+      source: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-tjx3sf"
+      binary: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-tjx3sf"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "89"
       CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /GR /EHsc"
@@ -520,11 +520,11 @@ events:
       variable: "OpenMP_SPECTEST_CXX_"
       cached: true
       stdout: |
-        Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-3met8d'
+        Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-tjx3sf'
         
-        Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_3b74d
-        [1/2] E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP   /DWIN32 /D_WINDOWS /GR /EHsc -openmp /Zi /Ob0 /Od  -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_3b74d.dir\\OpenMPCheckVersion.cpp.obj /FdCMakeFiles\\cmTC_3b74d.dir\\ /FS -c E:\\Documents\\ZShared\\ZProjs\\ZSpeedAI\\ZInfer\\build-cuda\\CMakeFiles\\CMakeScratch\\TryCompile-3met8d\\OpenMPCheckVersion.cpp
-        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --msvc-ver=1929 --intdir=CMakeFiles\\cmTC_3b74d.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_3b74d.dir\\OpenMPCheckVersion.cpp.obj  /out:cmTC_3b74d.exe /implib:cmTC_3b74d.lib /pdb:cmTC_3b74d.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
+        Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_c7b40
+        [1/2] E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP   /DWIN32 /D_WINDOWS /GR /EHsc -openmp /Zi /Ob0 /Od  -std:c++17 -MDd /showIncludes /FoCMakeFiles\\cmTC_c7b40.dir\\OpenMPCheckVersion.cpp.obj /FdCMakeFiles\\cmTC_c7b40.dir\\ /FS -c E:\\Documents\\ZShared\\ZProjs\\ZSpeedAI\\ZInfer\\build-cuda\\CMakeFiles\\CMakeScratch\\TryCompile-tjx3sf\\OpenMPCheckVersion.cpp
+        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --msvc-ver=1929 --intdir=CMakeFiles\\cmTC_c7b40.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_c7b40.dir\\OpenMPCheckVersion.cpp.obj  /out:cmTC_c7b40.exe /implib:cmTC_c7b40.lib /pdb:cmTC_c7b40.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL /subsystem:console  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib && cd ."
         
       exitCode: 0
   -
@@ -535,8 +535,8 @@ events:
       - "CMakeLists.txt:127 (find_package)"
     description: "Detecting CUDA OpenMP version"
     directories:
-      source: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-opc7eg"
-      binary: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-opc7eg"
+      source: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-li34aw"
+      binary: "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-li34aw"
     cmakeVariables:
       CMAKE_CUDA_ARCHITECTURES: "89"
       CMAKE_CUDA_FLAGS: " -Xcompiler=-utf-8"
@@ -546,12 +546,12 @@ events:
       variable: "OpenMP_SPECTEST_CUDA_"
       cached: true
       stdout: |
-        Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-opc7eg'
+        Change Dir: 'E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/CMakeFiles/CMakeScratch/TryCompile-li34aw'
         
-        Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_c6cb1
-        [1/2] C:\\PROGRA~1\\NVIDIA~2\\CUDA\\v13.4\\bin\\nvcc.exe -forward-unknown-to-host-compiler   -Xcompiler=-utf-8 -openmp -Xcompiler=" -Zi -Ob0 -Od /RTC1" "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MDd -MD -MT CMakeFiles\\cmTC_c6cb1.dir\\OpenMPCheckVersion.cu.obj -MF CMakeFiles\\cmTC_c6cb1.dir\\OpenMPCheckVersion.cu.obj.d -x cu -c E:\\Documents\\ZShared\\ZProjs\\ZSpeedAI\\ZInfer\\build-cuda\\CMakeFiles\\CMakeScratch\\TryCompile-opc7eg\\OpenMPCheckVersion.cu -o CMakeFiles\\cmTC_c6cb1.dir\\OpenMPCheckVersion.cu.obj -Xcompiler=-FdCMakeFiles\\cmTC_c6cb1.dir\\,-FS
+        Run Build Command(s): E:/Tools/IDEs/Cmake/cmake-4.0.3/bin/ninja.exe -v cmTC_5a3ad
+        [1/2] C:\\PROGRA~1\\NVIDIA~2\\CUDA\\v13.4\\bin\\nvcc.exe -forward-unknown-to-host-compiler   -Xcompiler=-utf-8 -openmp -Xcompiler=" -Zi -Ob0 -Od /RTC1" "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MDd -MD -MT CMakeFiles\\cmTC_5a3ad.dir\\OpenMPCheckVersion.cu.obj -MF CMakeFiles\\cmTC_5a3ad.dir\\OpenMPCheckVersion.cu.obj.d -x cu -c E:\\Documents\\ZShared\\ZProjs\\ZSpeedAI\\ZInfer\\build-cuda\\CMakeFiles\\CMakeScratch\\TryCompile-li34aw\\OpenMPCheckVersion.cu -o CMakeFiles\\cmTC_5a3ad.dir\\OpenMPCheckVersion.cu.obj -Xcompiler=-FdCMakeFiles\\cmTC_5a3ad.dir\\,-FS
         OpenMPCheckVersion.cu\x0d
-        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_c6cb1.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_c6cb1.dir\\OpenMPCheckVersion.cu.obj  /out:cmTC_c6cb1.exe /implib:cmTC_c6cb1.lib /pdb:cmTC_c6cb1.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL  cudadevrt.lib  cudart.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib -LIBPATH:"C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/lib/x64" && cd ."
+        [2/2] C:\\WINDOWS\\system32\\cmd.exe /C "cd . && E:\\Tools\\IDEs\\Cmake\\cmake-4.0.3\\bin\\cmake.exe -E vs_link_exe --intdir=CMakeFiles\\cmTC_5a3ad.dir --rc="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\rc.exe" --mt="E:\\Windows Kits\\10\\bin\\10.0.22621.0\\x64\\mt.exe" --manifests  -- E:\\Tools\\IDEs\\VS\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30133\\bin\\Hostx64\\x64\\link.exe /nologo CMakeFiles\\cmTC_5a3ad.dir\\OpenMPCheckVersion.cu.obj  /out:cmTC_5a3ad.exe /implib:cmTC_5a3ad.lib /pdb:cmTC_5a3ad.pdb /version:0.0 /machine:x64  /debug /INCREMENTAL  cudadevrt.lib  cudart.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib -LIBPATH:"C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.4/lib/x64" && cd ."
         
       exitCode: 0
 ...
