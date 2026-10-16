@@ -45,10 +45,29 @@
 需要任务粒度控制(v1.1 记录; 大矩阵基准 4.2× 是真实收益)。
 准确率 97.29%(数值噪声范围内, >97% ✓)。
 
+## 2026-10-16 · GPU cuBLAS: FP32 vs TF32 Tensor Core(matmul)
+
+环境: RTX 4070 Ti SUPER(Ada, sm_89) / CUDA 13.4 / 同一二进制。
+公平性: 数据常驻 GPU(GPU 建张量, 零 PCIe 往返),
+`Runtime::set_precision(FP32/TF32)` 切档, to_device(CPU) 同步计时。
+
+| 矩阵 | FP32(sgemm) | TF32(gemmEx FAST_TF32) | 加速比 |
+|---|---:|---:|---:|
+| 512³  | 5.00 TF/s  | 14.39 TF/s  | 2.9× |
+| 1024³ | 5.07 TF/s  | 7.96  TF/s  | 1.6× |
+| 2048³ | 11.02 TF/s | 18.87 TF/s  | 1.7× |
+| 4096³ | 14.89 TF/s | 28.68 TF/s  | **1.93×** |
+
+- FP32 峰值 ~15 TF/s ≈ 该卡 FP32 标称算力, cuBLAS sgemm 已打满;
+  TF32 经 cublasGemmEx(CUBLAS_COMPUTE_32F_FAST_TF32)启用 Tensor Core。
+- 512³ 加速比最高但绝对吞吐低(占用不足); 1024³ 在过渡区。
+- 对拍注意: TF32 尾数 19 位, 与 FP32 结果差 ~1e-3,
+  数值对拍须 `set_precision(FP32)` 后再比对(测试已如此处理)。
+
 ## 已知瓶颈(后续优化目标)
 
-1. MLP 训练步加速比(2.5×)低于 GEMM 理论值: 逐元素算子(add/relu/
-   cross_entropy 反传)仍走朴素循环, 且每步有小张量分配开销;
+1. TF32 目前仅 matmul 内核; linear/conv2d/attention 仍走 sgemm,
+   待统一到同一 gemmEx 入口(收益同类);
 2. conv2d im2col 有一次显式拷贝(col_buf), 可用 stride-map 直接 GEMM 消除;
-4. autograd 节点为裸 new, 未引入节点池(DESIGN §13.3 规划项);
-5. sum/mean/softmax 仍限末维, permute/slice 未接入训练图。
+3. autograd 节点为裸 new, 未引入节点池(DESIGN §13.3 规划项);
+4. FP16/BF16 混合精度未接入(Ada 卡 Tensor Core FP16 峰值再翻倍)。

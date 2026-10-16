@@ -30,6 +30,9 @@ OpDispatcher::OpDispatcher() {
     }
 }
 
+void OpDispatcher::set_precision(Precision p) { precision_ = p; }
+Precision OpDispatcher::precision() const { return precision_; }
+
 const Operator* OpDispatcher::find(const char* name) const {
     auto it = table_.find(name);
     return it == table_.end() ? nullptr : it->second;
@@ -64,7 +67,7 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
     if (!kernel) {
         throw std::runtime_error(std::string("znn: no kernel for operator ") + op->name);
     }
-    KernelContext ctx{dev, nullptr};
+    KernelContext ctx{dev, nullptr, precision_};
     const bool fallback = dev != Device::CPU && kernel == op->ref;
     if (!fallback) {
         kernel(ctx, inputs, Span<Tensor*>(outs, 1), options);
@@ -84,7 +87,7 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
         }
         Tensor cpu_out = Tensor::empty(out.shape(), out.dtype(), Device::CPU);
         Tensor* cpu_outs[1] = {&cpu_out};
-        KernelContext cpu_ctx{Device::CPU, nullptr};
+        KernelContext cpu_ctx{Device::CPU, nullptr, precision_};
         kernel(cpu_ctx, Span<const Tensor*>(cpu_ptrs.data(), cpu_ptrs.size()),
                Span<Tensor*>(cpu_outs, 1), options);
         Impl_copy_back(cpu_out, out);

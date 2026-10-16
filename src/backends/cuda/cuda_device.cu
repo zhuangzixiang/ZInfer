@@ -7,6 +7,7 @@
 // ============================================================================
 #include <cuda_runtime.h>
 #include <stdexcept>
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 namespace cuda_backend {

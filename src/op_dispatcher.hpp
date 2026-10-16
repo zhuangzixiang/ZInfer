@@ -28,6 +28,10 @@ class OpDispatcher {
 public:
     static OpDispatcher& instance();
 
+    // 精度配置(Runtime::set_precision 委托到此处; 成员变量, 非全局)
+    void set_precision(Precision p);
+    Precision precision() const;
+
     // 按名字查算子(nullptr = 未登记); 字符串驱动场景用
     const Operator* find(const char* name) const;
 
@@ -37,6 +41,7 @@ public:
 private:
     OpDispatcher();     // 遍历 g_operator_list 建 name→Operator 索引
     std::unordered_map<std::string, const Operator*> table_;
+    Precision precision_ = Precision::AUTO;
 };
 
 } // namespace znn

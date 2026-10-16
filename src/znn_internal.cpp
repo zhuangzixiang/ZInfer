@@ -5,6 +5,7 @@
 #include "znn_internal.hpp"
 #include "backends/cuda/cuda_backend.hpp"
 #include "autograd.hpp"
+#include "op_dispatcher.hpp"
 #include "operators/shared.hpp"
 #include <cstring>
 #include <type_traits>
@@ -644,7 +645,6 @@ namespace dynlib { void set_cublas_precision(bool tf32); }  // 实现在 dynlib.
 
 namespace {
 thread_local bool grad_enabled_flag = true;
-Precision precision_flag = Precision::AUTO;     // 全局精度(非 thread_local, 避免 CXX/CUDA 混合链接问题)
 }
 
 bool Runtime::device_available(Device device) {
@@ -658,10 +658,11 @@ bool Runtime::device_available(Device device) {
 }
 
 void Runtime::set_precision(Precision p) {
-    precision_flag = p;
-    dynlib::set_cublas_precision(p != Precision::FP32);
+    OpDispatcher::instance().set_precision(p);
 }
-Precision Runtime::precision() { return precision_flag; }
+Precision Runtime::precision() {
+    return OpDispatcher::instance().precision();
+}
 
 void Runtime::set_grad_enabled(bool yes) {
     grad_enabled_flag = yes;

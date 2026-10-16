@@ -501,7 +501,8 @@ static void test_cuda_parity() {
     }
     check(rd == 0.f, "cuda relu parity");
 
-    // matmul: 朴素 GPU GEMM vs Eigen CPU
+    // matmul 对拍: 切 FP32(与 CPU Eigen 逐位一致)
+    Runtime::set_precision(Precision::FP32);
     Tensor m1 = Tensor::randn({32, 48}, 13);
     Tensor m2 = Tensor::randn({48, 24}, 14);
     Tensor cpu_mm = Tensor::matmul(m1, m2);

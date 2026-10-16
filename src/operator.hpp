@@ -49,10 +49,12 @@ struct TensorMeta
 };
 
 // 计算内核的执行上下文
+// Precision 定义在 znn.hpp 公共头(用户 API 需要), 此处直接使用
 struct KernelContext
 {
-    Device device;              // 本次在哪个后端执行(委托型内核可多后端复用)
-    void*  stream = nullptr;    // 预留: GPU 里程碑填异步流, v1 恒为 nullptr
+    Device device;               // 本次在哪个后端执行
+    void*  stream = nullptr;     // 预留: GPU 里程碑填异步流
+    Precision precision = Precision::AUTO;  // GEMM 精度(由派发器填充)
 };
 
 // 反向规则的执行上下文: 框架备好一切, 规则只负责填充 grad_inputs

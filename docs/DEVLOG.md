@@ -389,3 +389,43 @@ kernels[CUDA] 槽位, 派发器按输入设备自动选择——无需改机制�
 而非写共享存储, 导致梯度为 0), 改为 host 构造 + from_host 按设备上传。
 
 **验证**: 默认构建全绿(全部测试含有限差分梯度校验通过)。
+
+---
+
+## [15] 性能委托块: dynlib 统一动态加载 + cuBLAS GEMM + Eigen 逐元素 + TF32
+
+**内容**(提交 212c1a5..07d68e1, 7 个提交)
+1. 审计修复: e82b7b6 之后逐行审计的全部 bug 修复
+   (item d2h / CUDA 优化器 / 梯度 GPU 桥接→算子组合)
+2. dynlib.hpp/.cpp: 统一动态加载(LoadLibrary/dlopen + 函数指针 +
+   available_xxx 查询), cuBLAS 全部符号经此加载, 缺 DLL 时自动降级
+3. cuBLAS GEMM 委托: matmul/linear(视图展开)/conv2d(im2col) 三处走
+   cublasSgemm; 逐元素 13 算子走 Eigen unary/binary_kernel_fast(SIMD)
+4. GPU 常驻基准: gpu_bench 改为 GPU 上建张量(数据常驻), 消除
+   "CPU 建张量→派发器选 CPU 内核"的假象; item() 改 to_device 同步
+   (避免非标量 CUDA 张量触发 require 崩溃路径)
+5. Precision 公共 API: FP32/TF32/AUTO 三档, 存 OpDispatcher 成员
+   (零全局/静态变量), 经 KernelContext 逐调用下发内核
+6. TF32 正确实施: matmul_cuda 检查 ctx.precision,
+   TF32/AUTO 且 cublas_gemm_ex 可用 → cublasGemmEx
+   (CUBLAS_COMPUTE_32F_FAST_TF32, Tensor Core),
+   否则 → cublasSgemm; 对拍测试切 FP32 位精确比对后恢复 AUTO
+
+**数据**
+- TF32 GEMM(RTX 4070 Ti SUPER, 数据常驻): 4096³ 16.37→31.67 TF/s
+  (1.93×), 2048³ 1.83×, 1024³ 1.51×, 512³ 3.8×(小矩阵 FP32 未达峰)
+- CPU 逐元素 Eigen 批量: MLP 训练步 +15%
+- MNIST 回归 97.16%(>97% 线), 19 测试 + CUDA 对拍全绿
+
+**弯路(用户点名批评, 记录在案)**
+- 第一次 TF32 用 cublasSetMathMode(旧 API, CUDA 13.4 上 Tensor Core
+  不生效, 仅 +4%), 且中途引入 thread_local → 违反无全局变量铁律。
+  全部回退, 保留外部配置逻辑, 换 cublasGemmEx 正确实施
+- 教训: 换加速方案前先查当前 CUDA 版本的 API 生效路径;
+  实现方式不允许中途随意切换, 先验证机制再写代码
+
+**反思**: 架构 9/10(单一派发路径, 精度经 KernelContext 下发,
+零全局变量, DLL 缺失自动降级且路径透明) | 实现纪律 6/10
+(方案切换随意 + 中途引入违规实现, 用户两次点名) |
+收益确认 10/10(公平 A/B: 同一二进制, 数据常驻, 正确同步)。
+cuda_device.cu 尾部遗留 include 垃圾于本块发现并清理。
