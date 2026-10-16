@@ -55,38 +55,14 @@ static void softmax_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> ou
 }
 
 static void softmax_grad(BackwardContext& c) {
+    // 组合实现: dx = s * (g - sum(g*s, dim, keepdim))
+    // 全部经算子(mul/sum/sub), 自动走当前后端
     const SoftmaxOptions* o = static_cast<const SoftmaxOptions*>(c.options);
     const Tensor& g = *c.grad_outputs[0];
     const Tensor& y = *c.saved_outputs[0];
-    Tensor& gi = *c.grad_inputs[0];
-    const Shape& s = y.shape();
-    const int64_t dim = o->dim < 0 ? o->dim + s.rank : o->dim;
-    const int64_t n = s[dim];
-    const int64_t sd = y.strides()[dim];
-    const float* gp = g.data<float>();
-    const float* yp = y.data<float>();
-    float* ip = gi.data<float>();
-    int64_t outer = 1;
-    for (int64_t d = 0; d < s.rank; ++d) {
-        if (d != dim) outer *= s[d];
-    }
-    int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-    for (int64_t o2 = 0; o2 < outer; ++o2) {
-        int64_t base = 0;
-        for (int64_t d = 0; d < s.rank; ++d) {
-            if (d != dim) base += idx[d] * y.strides()[d];
-        }
-        float dot = 0.f;
-        for (int64_t k = 0; k < n; ++k) dot += gp[base + k * sd] * yp[base + k * sd];
-        for (int64_t k = 0; k < n; ++k) {
-            ip[base + k * sd] = yp[base + k * sd] * (gp[base + k * sd] - dot);
-        }
-        for (int64_t d = s.rank - 1; d >= 0; --d) {
-            if (d == dim) continue;
-            if (++idx[d] < s[d]) break;
-            idx[d] = 0;
-        }
-    }
+    Tensor gs = Tensor::mul(g, y);
+    Tensor dot = Tensor::sum(gs, o->dim, true);           // keepdim 广播安全
+    *c.grad_inputs[0] = Tensor::mul(y, Tensor::sub(g, dot));
 }
 
 const Operator g_softmax_operator = {

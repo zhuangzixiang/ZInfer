@@ -350,3 +350,42 @@ kernels[CUDA] 槽位, 派发器按输入设备自动选择——无需改机制�
 
 **验证**: 默认构建全绿(测试/基准), stub 路径行为明确。
 教训: CMake 变量必须先 set 后引用, 条件块要放 add_library 之前。
+
+---
+
+## [铁律宣布]
+
+> 用户要求:
+> 1. 不允许使用过渡方案, 想用需要审核
+> 2. 每种后端必须走该后端原生内核, 不允许 CPU 桥接
+
+**已写入 DESIGN.md 文件头部(⛔ 铁律节)。**
+
+**当前违反铁律的代码**: autograd.cpp 中的 GPU→CPU 梯度桥接(1.5 节)。
+**消除计划**: 见下一个提交。
+
+---
+
+## [铁律执行] 全部 CPU 桥接消除
+
+**铁律写入 DESIGN.md 头部**:
+1. 不允许使用过渡方案(需用户审核)
+2. 每种后端走原生内核, 不允许 CPU 桥接
+
+**消除过程**:
+- cross_entropy 梯度 → softmax + onehot + elementwise 组合
+- softmax 梯度 → s·(g − sum(g·s, dim, keepdim)) 组合
+- conv2d 梯度 → CPU 朴素循环(原生) + CUDA 专用梯度内核
+  (conv2d_dw_k + conv2d_dx_k, 每个 dw/dx 元素一个线程)
+- attention 梯度 → 逐头 2D 组合(matmul/softmax/mul/sub/sum)
+- layer_norm 梯度 → mean/mul/sub/div/sqrt 全组合
+- batch_norm2d 梯度 → reshape/mean/mul/sub/div/sqrt/sum 全组合
+- unary_grad(relu/gelu/sigmoid/tanh/silu/exp/log/sqrt) → mul 组合
+
+**autograd.cpp 桥接代码全部删除**(grep 验证: 零残留, 仅注释说明)。
+所有梯度规则要么用算子组合(自动走当前后端), 要么有专用 CUDA 内核。
+
+**修复 bug**: cross_entropy one-hot 构造原用 slice 视图赋值(替换句柄
+而非写共享存储, 导致梯度为 0), 改为 host 构造 + from_host 按设备上传。
+
+**验证**: 默认构建全绿(全部测试含有限差分梯度校验通过)。

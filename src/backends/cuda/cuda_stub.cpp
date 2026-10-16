@@ -61,6 +61,12 @@ ZNN_CUDA_KERNEL_NULL(layer_norm_cuda)
 ZNN_CUDA_KERNEL_NULL(batch_norm2d_cuda)
 ZNN_CUDA_KERNEL_NULL(attention_cuda)
 
+void conv2d_grad_cuda(const float*, const float*, const float*,
+                      float*, float*, int, int, int, int, int,
+                      int, int, int, int, int, int, int, int, int, int) {
+    unavailable();
+}
+
 void sgd_step_cuda(float*, const float*, float*, long long, float, float, float) { unavailable(); }
 void adam_step_cuda(float*, const float*, float*, float*, long long,
                     float, float, float, float, float, float, float) { unavailable(); }

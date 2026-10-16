@@ -33,29 +33,27 @@ static void ce_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, co
 }
 
 static void ce_grad(BackwardContext& c) {
+    // 组合实现: dx = (softmax(x) - onehot(t)) * g / N
+    // 全部经算子(softmax/mul/sub), 自动走当前后端内核
     const Tensor& x = *c.saved_inputs[0];
     const Tensor& t = *c.saved_inputs[1];
-    Tensor& gi = *c.grad_inputs[0];
+    const Tensor& g = *c.grad_outputs[0];
     const int64_t n = x.size(0);
     const int64_t cl = x.size(1);
-    const float* xp = x.data<float>();
-    const int64_t* tp = t.data<int64_t>();
-    float* ip = gi.data<float>();
-    const float scale = *c.grad_outputs[0]->data<float>() / static_cast<float>(n);
+    // softmax(x): 走 softmax 算子(有 CUDA 内核)
+    Tensor sm = Activator::softmax(x);
+    // onehot(t): host 构造后按目标设备上传(数据准备, 非 CPU 桥接)
+    Tensor t_cpu = t.to_device(Device::CPU);
+    std::vector<float> oh_host(static_cast<size_t>(n * cl), 0.f);
     for (int64_t i = 0; i < n; ++i) {
-        const float* row = xp + i * cl;
-        float* irow = ip + i * cl;
-        float m = row[0];
-        for (int64_t j = 1; j < cl; ++j) m = m < row[j] ? row[j] : m;
-        float s = 0.f;
-        for (int64_t j = 0; j < cl; ++j) {
-            irow[j] = expf(row[j] - m);
-            s += irow[j];
-        }
-        for (int64_t j = 0; j < cl; ++j) {
-            irow[j] = (irow[j] / s - (j == tp[i] ? 1.f : 0.f)) * scale;
-        }
+        oh_host[i * cl + t_cpu.data<int64_t>()[i]] = 1.f;
     }
+    Tensor oh = Tensor::from_host(oh_host.data(), Shape{n, cl}, DType::F32, x.device());
+    // (sm - oh) * g / N: 全算子组合
+    Tensor diff = Tensor::sub(sm, oh);
+    Tensor scaled = Tensor::mul(diff, g);                  // g 标量广播
+    *c.grad_inputs[0] = Tensor::mul(scaled,
+        Tensor::full(Shape{}, 1.0 / static_cast<float>(n), DType::F32, x.device()));
 }
 
 const Operator g_cross_entropy_operator = {

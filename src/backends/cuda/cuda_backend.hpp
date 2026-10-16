@@ -72,6 +72,13 @@ void batch_norm2d_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const
 void linear_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void attention_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 
+// conv2d 梯度(专用, 铁律: 不允许 CPU 桥接)
+void conv2d_grad_cuda(const float* x, const float* w, const float* g,
+                      float* dx, float* dw,
+                      int N, int C, int H, int W, int O,
+                      int KH, int KW, int HO, int WO,
+                      int sh, int sw, int ph, int pw, int dh, int dw_, int G);
+
 // ---- 优化器 CUDA 入口(审计修复2) ----
 void sgd_step_cuda(float* p, const float* g, float* vel, long long n,
                    float lr, float momentum, float wd);

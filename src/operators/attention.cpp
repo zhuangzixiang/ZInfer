@@ -1,5 +1,5 @@
 // attention: scaled_dot_product_attention(q,k,v: [B,H,L,D]);
-// S = QK^T/√D → softmax → O = PV, 梯度按标准公式逐步回传
+// 前向 = CPU 朴素 / CUDA 两遍内核; 反向 = 算子组合(自动走当前后端)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
@@ -24,7 +24,7 @@ static void attention_infer(Span<const TensorMeta*> in, const void*,
     outs.push_back(*in[0]->shape);
 }
 
-// 单头小工具: C = A[M,K] @ B[K,N](朴素)
+// ---- CPU 参考内核(朴素) ----
 static void gemm(const float* a, const float* b, float* c,
                  int64_t M, int64_t K, int64_t N, float scale, bool at) {
     for (int64_t m = 0; m < M; ++m) {
@@ -59,9 +59,9 @@ static void attention_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> 
             if (oc->causal) {
                 for (int64_t i = 0; i < L; ++i)
                     for (int64_t j = i + 1; j < L; ++j)
-                        s[i * L + j] = -3.4e38f;                 // 屏蔽未来位置
+                        s[i * L + j] = -3.4e38f;
             }
-            for (int64_t i = 0; i < L; ++i) {                    // 行 softmax(数值稳定)
+            for (int64_t i = 0; i < L; ++i) {                    // 行 softmax
                 float m = s[i * L];
                 for (int64_t j = 1; j < L; ++j) m = m < s[i * L + j] ? s[i * L + j] : m;
                 float z = 0.f;
@@ -76,59 +76,41 @@ static void attention_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> 
     }
 }
 
+// ---- 反向: 全算子组合(matmul/softmax/mul/sub/sum), 自动走当前后端 ----
 static void attention_grad(BackwardContext& c) {
-    const AttentionOptions* oc = static_cast<const AttentionOptions*>(c.options);
     const Tensor& q = *c.saved_inputs[0];
     const Tensor& k = *c.saved_inputs[1];
     const Tensor& v = *c.saved_inputs[2];
     const Tensor& g = *c.grad_outputs[0];
-    Tensor& dq = *c.grad_inputs[0];
-    Tensor& dk = *c.grad_inputs[1];
-    Tensor& dv = *c.grad_inputs[2];
     const int64_t B = q.size(0), H = q.size(1), L = q.size(2), D = q.size(3);
     const float scale = 1.f / std::sqrt(static_cast<float>(D));
-    std::vector<float> s(static_cast<size_t>(L * L));
-    std::vector<float> p(static_cast<size_t>(L * L));
-    std::vector<float> dp(static_cast<size_t>(L * L));
-    std::vector<float> ds(static_cast<size_t>(L * L));
-    for (int64_t b = 0; b < B; ++b) {
-        for (int64_t h = 0; h < H; ++h) {
-            const float* qp = q.data<float>() + ((b * H + h) * L) * D;
-            const float* kp = k.data<float>() + ((b * H + h) * L) * D;
-            const float* vp = v.data<float>() + ((b * H + h) * L) * D;
-            const float* gp = g.data<float>() + ((b * H + h) * L) * D;
-            float* dqp = dq.data<float>() + ((b * H + h) * L) * D;
-            float* dkp = dk.data<float>() + ((b * H + h) * L) * D;
-            float* dvp = dv.data<float>() + ((b * H + h) * L) * D;
-            gemm(qp, kp, s.data(), L, D, L, scale, false);       // 重算前向 S/P
-            if (oc->causal) {
-                for (int64_t i = 0; i < L; ++i)
-                    for (int64_t j = i + 1; j < L; ++j)
-                        s[i * L + j] = -3.4e38f;
-            }
-            for (int64_t i = 0; i < L; ++i) {
-                float m = s[i * L];
-                for (int64_t j = 1; j < L; ++j) m = m < s[i * L + j] ? s[i * L + j] : m;
-                float z = 0.f;
-                for (int64_t j = 0; j < L; ++j) {
-                    p[i * L + j] = expf(s[i * L + j] - m);
-                    z += p[i * L + j];
-                }
-                for (int64_t j = 0; j < L; ++j) p[i * L + j] /= z;
-            }
-            gemm(p.data(), gp, dvp, L, L, D, 1.f, true);         // dV = P^T @ dO
-            gemm(gp, vp, dp.data(), L, D, L, 1.f, true);         // dP = dO @ V^T
-            for (int64_t i = 0; i < L; ++i) {                    // softmax 反传
-                float dot = 0.f;
-                for (int64_t j = 0; j < L; ++j) dot += dp[i * L + j] * p[i * L + j];
-                for (int64_t j = 0; j < L; ++j) {
-                    ds[i * L + j] = p[i * L + j] * (dp[i * L + j] - dot);
-                }
-            }
-            gemm(ds.data(), kp, dqp, L, L, D, scale, false);     // dQ = dS @ K ·scale
-            gemm(ds.data(), qp, dkp, L, L, D, scale, true);      // dK = dS^T @ Q·scale
-        }
+    const Device dev = q.device();
+    const int64_t BH = B * H;
+    Tensor dQ = Tensor::zeros(q.shape(), DType::F32, dev);
+    Tensor dK = Tensor::zeros(k.shape(), DType::F32, dev);
+    Tensor dV = Tensor::zeros(v.shape(), DType::F32, dev);
+    Tensor sc_t = Tensor::full(Shape{}, scale, DType::F32, dev);
+    for (int64_t bh = 0; bh < BH; ++bh) {
+        const int64_t b = bh / H, h = bh % H;
+        Tensor qh = q.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D});
+        Tensor kh = k.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D});
+        Tensor vh = v.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D});
+        Tensor gh = g.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D});
+        Tensor S = Tensor::mul(Tensor::matmul(qh, kh.transpose(0, 1)), sc_t);
+        Tensor P = Activator::softmax(S);
+        Tensor dVh = Tensor::matmul(P.transpose(0, 1), gh);      // dV = P^T @ dO
+        Tensor dPh = Tensor::matmul(gh, vh.transpose(0, 1));     // dP = dO @ V^T
+        Tensor dot = Tensor::sum(Tensor::mul(dPh, P), 1, true);  // softmax 反传
+        Tensor dSh = Tensor::mul(P, Tensor::sub(dPh, dot));
+        Tensor dQh = Tensor::mul(Tensor::matmul(dSh, kh), sc_t);     // dQ = dS @ K·scale
+        Tensor dKh = Tensor::mul(Tensor::matmul(dSh.transpose(0, 1), qh), sc_t);
+        dQ.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D}) = dQh;
+        dK.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D}) = dKh;
+        dV.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D}) = dVh;
     }
+    *c.grad_inputs[0] = dQ;
+    *c.grad_inputs[1] = dK;
+    *c.grad_inputs[2] = dV;
 }
 
 const Operator g_attention_operator = {

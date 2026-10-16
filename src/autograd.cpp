@@ -1,8 +1,7 @@
 // autograd.cpp — 自动求导引擎实现
+// 铁律: 梯度规则经算子组合自动走当前后端, 无 CPU 桥接
 #include "autograd.hpp"
-#include "operators/shared.hpp"
 #include "znn_internal.hpp"
-#include "backends/cuda/cuda_backend.hpp"
 #include <stdexcept>
 #include <vector>
 
@@ -57,42 +56,17 @@ void AutogradEngine::backward(const Tensor& loss) {
                                         n->saved_inputs[i].dtype(),
                                         n->saved_inputs[i].device());
         }
-        // 1.5 GPU 梯度规则桥接(过渡方案, 逐步消除):
-        //     用指针循环的梯度规则在 CUDA 张量上会段错误,
-        //     先桥接到 CPU 跑完再拷回; 已改为算子组合(Tensor::mul 等)
-        //     的规则自动走 CUDA 内核, 不经此桥接。
-        //     消除路径: 每个梯度规则从指针循环改为算子组合,
-        //     当全部组合化后此桥接代码整体删除。
-        bool has_cuda = false;
-        for (size_t i = 0; i < nin; ++i) {
-            has_cuda = has_cuda || n->saved_inputs[i].device() == Device::CUDA;
-        }
-        std::vector<Tensor> cpu_saved_in, cpu_saved_out, cpu_grad_out, cpu_grad_in;
-        if (has_cuda) {
-            cpu_saved_in.resize(nin);
-            cpu_saved_out.resize(n->saved_outputs.size());
-            cpu_grad_out.resize(n->saved_outputs.size());
-            cpu_grad_in.resize(nin);
-            for (size_t i = 0; i < nin; ++i) {
-                cpu_saved_in[i] = n->saved_inputs[i].to_device(Device::CPU);
-                cpu_grad_in[i] = Tensor::zeros(n->saved_inputs[i].shape(),
-                                               n->saved_inputs[i].dtype(), Device::CPU);
-            }
-            for (size_t i = 0; i < n->saved_outputs.size(); ++i) {
-                cpu_saved_out[i] = n->saved_outputs[i].to_device(Device::CPU);
-                cpu_grad_out[i] = n->saved_outputs[i].grad().to_device(Device::CPU);
-            }
-        }
-        // 2. 装配上下文
-        std::vector<const Tensor*> si(nin), so(n->saved_outputs.size()), go(n->saved_outputs.size());
+        // 2. 装配上下文(直接用原始张量; 梯度规则经算子组合自动走当前后端)
+        std::vector<const Tensor*> si(nin), so(n->saved_outputs.size()),
+                                    go(n->saved_outputs.size());
         std::vector<Tensor*> gi(nin);
         for (size_t i = 0; i < nin; ++i) {
-            si[i] = has_cuda ? &cpu_saved_in[i] : &n->saved_inputs[i];
-            gi[i] = has_cuda ? &cpu_grad_in[i] : &in_grads[i];
+            si[i] = &n->saved_inputs[i];
+            gi[i] = &in_grads[i];
         }
         for (size_t i = 0; i < so.size(); ++i) {
-            so[i] = has_cuda ? &cpu_saved_out[i] : &n->saved_outputs[i];
-            go[i] = has_cuda ? &cpu_grad_out[i] : &n->saved_outputs[i].grad();
+            so[i] = &n->saved_outputs[i];
+            go[i] = &n->saved_outputs[i].grad();
         }
         BackwardContext ctx;
         ctx.saved_inputs  = Span<const Tensor*>(si.data(), si.size());
@@ -101,17 +75,6 @@ void AutogradEngine::backward(const Tensor& loss) {
         ctx.grad_inputs   = Span<Tensor*>(gi.data(), gi.size());
         ctx.options       = n->options_copy.empty() ? nullptr : n->options_copy.data();
         n->op->grad(ctx);
-        // 2.5 GPU 桥接回拷: CPU 梯度结果 → 原设备
-        if (has_cuda) {
-            for (size_t i = 0; i < nin; ++i) {
-                const Device dev = n->saved_inputs[i].device();
-                if (dev == Device::CUDA && n->saved_inputs[i].requires_grad()) {
-                    Tensor& acc = n->saved_inputs[i].grad();
-                    Tensor cpu_sum = Tensor::add(acc.to_device(Device::CPU), cpu_grad_in[i]);
-                    acc = cpu_sum.to_device(Device::CUDA);
-                }
-            }
-        }
         // 3. 累加到各输入(叶子得到最终梯度; 中间量等待其生产节点读取)
         for (size_t i = 0; i < nin; ++i) {
             if (n->saved_inputs[i].requires_grad()) {
@@ -131,6 +94,37 @@ void AutogradEngine::backward(const Tensor& loss) {
 }
 
 namespace {
+
+// 沿 dim 求和(keepdim 控制保留长度 1 的维), CPU 直写
+Tensor sum_along(const Tensor& x, int64_t dim, bool keepdim) {
+    Shape out;
+    for (int64_t d = 0; d < x.dim_count(); ++d) {
+        if (d != dim) {
+            out.dims[out.rank++] = x.size(d);
+        }
+    }
+    Tensor r = Tensor::zeros(out, x.dtype(), x.device());
+    const float* xp = x.data<float>();
+    float* rp = r.data<float>();
+    const int64_t* xs = x.strides();
+    const int64_t* rs = r.strides();
+    int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    for (int64_t i = 0; i < x.numel(); ++i) {
+        int64_t ro = 0;
+        for (int64_t d = 0; d < x.dim_count(); ++d) {
+            if (d != dim) {
+                const int64_t rd = d > dim ? d - 1 : d;
+                ro += idx[d] * rs[rd];
+            }
+        }
+        rp[ro] += xp[i];
+        for (int64_t d = x.dim_count() - 1; d >= 0; --d) {
+            if (++idx[d] < x.size(d)) break;
+            idx[d] = 0;
+        }
+    }
+    return keepdim ? r.unsqueeze(dim) : r;
+}
 
 } // namespace
 

@@ -299,5 +299,94 @@ void avg_pool2d_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
         o->pool.pad[0], o->pool.pad[1]);
 }
 
+
+// ---- conv2d 梯度 CUDA 内核(专用, 铁律: 不允许 CPU 桥接) ----
+__global__ void conv2d_dw_k(const float* x, const float* g, float* dw,
+                            int N, int C, int H, int W, int O,
+                            int KH, int KW, int HO, int WO,
+                            int sh, int sw, int ph, int pw, int dh, int dw_, int G) {
+    // dw[oc, c, ki, kj] = Σ_{n,ho,wo} g[n,oc,ho,wo] · x[n,c,ho·sh+ki·dh-p, wo·sw+kj·dw_-pw]
+    const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
+    const int64_t total = (int64_t)O * (C / G) * KH * KW;
+    if (i >= total) return;
+    const int kj = i % KW;
+    const int64_t t0 = i / KW;
+    const int ki = t0 % KH;
+    const int64_t t1 = t0 / KH;
+    const int cg = t1 % (C / G);                           // 组内通道
+    const int oc = t1 / (C / G);
+    const int Cg = C / G;
+    const int Og = O / G;
+    const int grp = oc / Og;
+    const int c = grp * Cg + cg;                           // 全局输入通道
+    float acc = 0.f;
+    for (int n = 0; n < N; ++n) {
+        for (int ho = 0; ho < HO; ++ho) {
+            const int ii = ho * sh + ki * dh - ph;
+            if (ii < 0 || ii >= H) continue;
+            for (int wo = 0; wo < WO; ++wo) {
+                const int jj = wo * sw + kj * dw_ - pw;
+                if (jj < 0 || jj >= W) continue;
+                acc += g[((n * O + oc) * HO + ho) * WO + wo]
+                     * x[((n * C + c) * H + ii) * W + jj];
+            }
+        }
+    }
+    dw[i] = acc;
+}
+
+__global__ void conv2d_dx_k(const float* g, const float* w, float* dx,
+                            int N, int C, int H, int W, int O,
+                            int KH, int KW, int HO, int WO,
+                            int sh, int sw, int ph, int pw, int dh, int dw_, int G) {
+    // dx[n,c,i,j] = Σ_{oc,ki,kj} g[n,oc,ho,wo] · w[oc,c,ki,kj]
+    //   where ho·sh + ki·dh - ph = i AND wo·sw + kj·dw_ - pw = j
+    //   → ho = (i + ph - ki·dh) / sh (须整除且在范围内)
+    const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
+    const int64_t total = (int64_t)N * C * H * W;
+    if (i >= total) return;
+    const int j = i % W;
+    const int64_t t0 = i / W;
+    const int ii = t0 % H;
+    const int64_t t1 = t0 / H;
+    const int c = t1 % C;
+    const int n = t1 / C;
+    const int Cg = C / G;
+    const int Og = O / G;
+    const int grp = c / Cg;
+    float acc = 0.f;
+    for (int oc = grp * Og; oc < (grp + 1) * Og; ++oc) {
+        for (int ki = 0; ki < KH; ++ki) {
+            const int ho_num = ii + ph - ki * dh;
+            if (ho_num < 0 || ho_num % sh != 0) continue;
+            const int ho = ho_num / sh;
+            if (ho >= HO) continue;
+            for (int kj = 0; kj < KW; ++kj) {
+                const int wo_num = j + pw - kj * dw_;
+                if (wo_num < 0 || wo_num % sw != 0) continue;
+                const int wo = wo_num / sw;
+                if (wo >= WO) continue;
+                const int cg = c - grp * Cg;
+                acc += g[((n * O + oc) * HO + ho) * WO + wo]
+                     * w[(((int64_t)oc * Cg + cg) * KH + ki) * KW + kj];
+            }
+        }
+    }
+    dx[i] = acc;
+}
+
+void conv2d_grad_cuda(const float* x, const float* w, const float* g,
+                      float* dx, float* dw,
+                      int N, int C, int H, int W, int O,
+                      int KH, int KW, int HO, int WO,
+                      int sh, int sw, int ph, int pw, int dh, int dw_, int G) {
+    const int64_t dw_total = (int64_t)O * (C / G) * KH * KW;
+    conv2d_dw_k<<<(int)((dw_total + 255) / 256), 256>>>(
+        x, g, dw, N, C, H, W, O, KH, KW, HO, WO, sh, sw, ph, pw, dh, dw_, G);
+    const int64_t dx_total = (int64_t)N * C * H * W;
+    conv2d_dx_k<<<(int)((dx_total + 255) / 256), 256>>>(
+        g, w, dx, N, C, H, W, O, KH, KW, HO, WO, sh, sw, ph, pw, dh, dw_, G);
+}
+
 } // namespace cuda_backend
 } // namespace znn

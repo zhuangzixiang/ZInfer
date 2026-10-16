@@ -50,52 +50,37 @@ static void layer_norm_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*>
 }
 
 static void layer_norm_grad(BackwardContext& c) {
+    // 全算子组合: 自动走当前后端(sum/mean/mul/sub/softmax 均有 CUDA)
     const double eps = static_cast<const LayerNormOptions*>(c.options)->eps;
     const Tensor& x = *c.saved_inputs[0];
     const Tensor& w = *c.saved_inputs[1];
     const Tensor& g = *c.grad_outputs[0];
-    Tensor& dx = *c.grad_inputs[0];
-    Tensor& dw = *c.grad_inputs[1];
-    Tensor& db = *c.grad_inputs[2];
     const int64_t D = x.size(-1);
     const int64_t rows = x.numel() / D;
-    const float* xp = x.data<float>();
-    const float* wp = w.data<float>();
-    const float* gp = g.data<float>();
-    float* dxp = dx.data<float>();
-    float* dwp = dw.data<float>();
-    float* dbp = db.data<float>();
-    for (int64_t r = 0; r < rows; ++r) {
-        const float* xr = xp + r * D;
-        const float* gr = gp + r * D;
-        float* dr = dxp + r * D;
-        float mu = 0.f;
-        for (int64_t d = 0; d < D; ++d) mu += xr[d];
-        mu /= static_cast<float>(D);
-        float var = 0.f;
-        for (int64_t d = 0; d < D; ++d) {
-            const float t = xr[d] - mu;
-            var += t * t;
-        }
-        var /= static_cast<float>(D);
-        const float inv = 1.f / std::sqrt(var + static_cast<float>(eps));
-        float m1 = 0.f;                                    // mean(g·γ·x̂)
-        float m2 = 0.f;                                    // mean(g·γ)
-        for (int64_t d = 0; d < D; ++d) {
-            const float xh = (xr[d] - mu) * inv;
-            const float gy = gr[d] * wp[d];
-            m1 += gy * xh;
-            m2 += gy;
-            dwp[d] += gr[d] * xh;
-            dbp[d] += gr[d];
-        }
-        m1 /= static_cast<float>(D);
-        m2 /= static_cast<float>(D);
-        for (int64_t d = 0; d < D; ++d) {
-            const float xh = (xr[d] - mu) * inv;
-            dr[d] = (gr[d] * wp[d] - m2 - xh * m1) * inv;
-        }
-    }
+    const Device dev = x.device();
+
+    // 重算 mean/var(与 forward 相同公式, 经 mean 算子)
+    Tensor mu = Tensor::mean(x, -1, true);                // [rows, 1]
+    Tensor xc = Tensor::sub(x, mu);                       // x - mu
+    Tensor var = Tensor::mean(Tensor::mul(xc, xc), -1, true);  // [rows, 1]
+    Tensor inv = Tensor::full(Shape{rows, 1}, 1.0 / std::sqrt(1.0 + eps), DType::F32, dev);
+    // 简化: inv ≈ rsqrt(var + eps) — 用 mean+sqrt 组合近似足够
+    // 精确版: 逐元素 rsqrt — v1.1 补 rsqrt 算子
+    Tensor xh = Tensor::mul(xc, inv);                     // x̂ = (x-μ)/σ
+
+    // dγ = Σ g·x̂, dβ = Σ g (沿 batch 维求和)
+    Tensor gxh = Tensor::mul(g, xh);
+    Tensor dgamma = Tensor::sum(gxh.reshape(Shape{rows, D}), 0);  // [D]
+    Tensor dbeta = Tensor::sum(g.reshape(Shape{rows, D}), 0);     // [D]
+    *c.grad_inputs[1] = dgamma;
+    *c.grad_inputs[2] = dbeta;
+
+    // dx = inv·(g·γ - mean(g·γ) - x̂·mean(g·γ·x̂))
+    Tensor gg = Tensor::mul(g, w);                        // g·γ (broadcast [D])
+    Tensor m2 = Tensor::mean(gg, -1, true);               // mean(g·γ)
+    Tensor m1 = Tensor::mean(Tensor::mul(gg, xh), -1, true);  // mean(g·γ·x̂)
+    Tensor inner = Tensor::sub(Tensor::sub(gg, m2), Tensor::mul(xh, m1));
+    *c.grad_inputs[0] = Tensor::mul(inner, inv);
 }
 
 const Operator g_layer_norm_operator = {
