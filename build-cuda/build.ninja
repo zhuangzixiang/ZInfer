@@ -825,6 +825,46 @@ build gpu_smoke.exe: CXX_EXECUTABLE_LINKER__gpu_smoke_Release CMakeFiles\gpu_smo
   TARGET_PDB = gpu_smoke.pdb
 
 # =============================================================================
+# Object build statements for EXECUTABLE target gpu_bench
+
+
+#############################################
+# Order-only phony target for gpu_bench
+
+build cmake_object_order_depends_target_gpu_bench: phony || cmake_object_order_depends_target_znn
+
+build CMakeFiles\gpu_bench.dir\tests\gpu_bench.cpp.obj: CXX_COMPILER__gpu_bench_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\tests\gpu_bench.cpp || cmake_object_order_depends_target_gpu_bench
+  CONFIG = Release
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include
+  OBJECT_DIR = CMakeFiles\gpu_bench.dir
+  OBJECT_FILE_DIR = CMakeFiles\gpu_bench.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\gpu_bench.dir\
+  TARGET_PDB = gpu_bench.pdb
+
+
+# =============================================================================
+# Link build statements for EXECUTABLE target gpu_bench
+
+
+#############################################
+# Link the executable gpu_bench.exe
+
+build gpu_bench.exe: CXX_EXECUTABLE_LINKER__gpu_bench_Release CMakeFiles\gpu_bench.dir\tests\gpu_bench.cpp.obj | znn.lib || znn.lib
+  CONFIG = Release
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -MD
+  LINK_FLAGS = /machine:x64 /INCREMENTAL:NO /subsystem:console
+  LINK_LIBRARIES = znn.lib  cudadevrt.lib  cudart.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib
+  LINK_PATH = -LIBPATH:C:\PROGRA~1\NVIDIA~2\CUDA\v13.4\lib\x64
+  OBJECT_DIR = CMakeFiles\gpu_bench.dir
+  POST_BUILD = cd .
+  PRE_LINK = cd .
+  TARGET_COMPILE_PDB = CMakeFiles\gpu_bench.dir\
+  TARGET_FILE = gpu_bench.exe
+  TARGET_IMPLIB = gpu_bench.lib
+  TARGET_PDB = gpu_bench.pdb
+
+# =============================================================================
 # Object build statements for EXECUTABLE target hello
 
 
@@ -984,6 +1024,8 @@ build examples\mnist\rebuild_cache: phony examples\mnist\CMakeFiles\rebuild_cach
 # =============================================================================
 # Target aliases.
 
+build gpu_bench: phony gpu_bench.exe
+
 build gpu_smoke: phony gpu_smoke.exe
 
 build hello: phony hello.exe
@@ -1006,7 +1048,7 @@ build znn_test: phony znn_test.exe
 #############################################
 # Folder: E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda
 
-build all: phony znn.lib znn_test.exe znn_bench.exe gpu_smoke.exe hello.exe examples\mnist\all
+build all: phony znn.lib znn_test.exe znn_bench.exe gpu_smoke.exe gpu_bench.exe hello.exe examples\mnist\all
 
 # =============================================================================
 
