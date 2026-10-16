@@ -115,7 +115,7 @@ add_library(znn
 target_include_directories(znn PUBLIC include PRIVATE src third_party/eigen)
 
 # Eigen 多线程 GEMM 走 OpenMP(MSVC /openmp; gcc/clang -fopenmp 由下方统一)
-if(MSVC)
+if(MSVC AND NOT ZNN_CUDA)
     target_compile_options(znn PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:/openmp>")
 else()
     find_package(OpenMP REQUIRED)
@@ -133,6 +133,13 @@ if(ZNN_BUILD_TESTS)
 
     add_executable(znn_bench tests/bench.cpp)
     target_link_libraries(znn_bench PRIVATE znn)
+
+    if(ZNN_CUDA)
+        add_executable(gpu_smoke tests/gpu_smoke.cpp)
+        target_link_libraries(gpu_smoke PRIVATE znn)
+        add_executable(hello tests/hello.cpp)
+        target_link_libraries(hello PRIVATE znn)
+    endif()
 endif()
 
 if(ZNN_BUILD_EXAMPLES)

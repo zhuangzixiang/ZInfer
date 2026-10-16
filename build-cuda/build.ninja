@@ -51,7 +51,7 @@ build cmake_object_order_depends_target_znn: phony || .
 
 build CMakeFiles\znn.dir\src\znn_internal.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\znn_internal.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src
@@ -60,7 +60,7 @@ build CMakeFiles\znn.dir\src\znn_internal.cpp.obj: CXX_COMPILER__znn_unscanned_R
 
 build CMakeFiles\znn.dir\src\autograd.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\autograd.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src
@@ -69,7 +69,7 @@ build CMakeFiles\znn.dir\src\autograd.cpp.obj: CXX_COMPILER__znn_unscanned_Relea
 
 build CMakeFiles\znn.dir\src\op_dispatcher.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\op_dispatcher.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src
@@ -78,7 +78,7 @@ build CMakeFiles\znn.dir\src\op_dispatcher.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\operators\shared.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\shared.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -87,7 +87,7 @@ build CMakeFiles\znn.dir\src\operators\shared.cpp.obj: CXX_COMPILER__znn_unscann
 
 build CMakeFiles\znn.dir\src\operators\arange.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\arange.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -96,7 +96,7 @@ build CMakeFiles\znn.dir\src\operators\arange.cpp.obj: CXX_COMPILER__znn_unscann
 
 build CMakeFiles\znn.dir\src\operators\randn.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\randn.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -105,7 +105,7 @@ build CMakeFiles\znn.dir\src\operators\randn.cpp.obj: CXX_COMPILER__znn_unscanne
 
 build CMakeFiles\znn.dir\src\operators\add.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\add.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -114,7 +114,7 @@ build CMakeFiles\znn.dir\src\operators\add.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\operators\sub.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\sub.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -123,7 +123,7 @@ build CMakeFiles\znn.dir\src\operators\sub.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\operators\mul.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\mul.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -132,7 +132,7 @@ build CMakeFiles\znn.dir\src\operators\mul.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\operators\div.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\div.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -141,7 +141,7 @@ build CMakeFiles\znn.dir\src\operators\div.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\operators\neg.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\neg.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -150,7 +150,7 @@ build CMakeFiles\znn.dir\src\operators\neg.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\operators\exp.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\exp.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -159,7 +159,7 @@ build CMakeFiles\znn.dir\src\operators\exp.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\operators\log.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\log.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -168,7 +168,7 @@ build CMakeFiles\znn.dir\src\operators\log.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\operators\sqrt.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\sqrt.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -177,7 +177,7 @@ build CMakeFiles\znn.dir\src\operators\sqrt.cpp.obj: CXX_COMPILER__znn_unscanned
 
 build CMakeFiles\znn.dir\src\operators\relu.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\relu.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -186,7 +186,7 @@ build CMakeFiles\znn.dir\src\operators\relu.cpp.obj: CXX_COMPILER__znn_unscanned
 
 build CMakeFiles\znn.dir\src\operators\gelu.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\gelu.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -195,7 +195,7 @@ build CMakeFiles\znn.dir\src\operators\gelu.cpp.obj: CXX_COMPILER__znn_unscanned
 
 build CMakeFiles\znn.dir\src\operators\sigmoid.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\sigmoid.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -204,7 +204,7 @@ build CMakeFiles\znn.dir\src\operators\sigmoid.cpp.obj: CXX_COMPILER__znn_unscan
 
 build CMakeFiles\znn.dir\src\operators\tanh.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\tanh.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -213,7 +213,7 @@ build CMakeFiles\znn.dir\src\operators\tanh.cpp.obj: CXX_COMPILER__znn_unscanned
 
 build CMakeFiles\znn.dir\src\operators\silu.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\silu.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -222,7 +222,7 @@ build CMakeFiles\znn.dir\src\operators\silu.cpp.obj: CXX_COMPILER__znn_unscanned
 
 build CMakeFiles\znn.dir\src\operators\softmax.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\softmax.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -231,7 +231,7 @@ build CMakeFiles\znn.dir\src\operators\softmax.cpp.obj: CXX_COMPILER__znn_unscan
 
 build CMakeFiles\znn.dir\src\operators\sum.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\sum.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -240,7 +240,7 @@ build CMakeFiles\znn.dir\src\operators\sum.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\operators\mean.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\mean.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -249,7 +249,7 @@ build CMakeFiles\znn.dir\src\operators\mean.cpp.obj: CXX_COMPILER__znn_unscanned
 
 build CMakeFiles\znn.dir\src\operators\matmul.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\matmul.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -258,7 +258,7 @@ build CMakeFiles\znn.dir\src\operators\matmul.cpp.obj: CXX_COMPILER__znn_unscann
 
 build CMakeFiles\znn.dir\src\operators\matmul_eigen.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\matmul_eigen.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -267,7 +267,7 @@ build CMakeFiles\znn.dir\src\operators\matmul_eigen.cpp.obj: CXX_COMPILER__znn_u
 
 build CMakeFiles\znn.dir\src\operators\linear_eigen.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\linear_eigen.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -276,7 +276,7 @@ build CMakeFiles\znn.dir\src\operators\linear_eigen.cpp.obj: CXX_COMPILER__znn_u
 
 build CMakeFiles\znn.dir\src\operators\conv2d_eigen.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\conv2d_eigen.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -285,7 +285,7 @@ build CMakeFiles\znn.dir\src\operators\conv2d_eigen.cpp.obj: CXX_COMPILER__znn_u
 
 build CMakeFiles\znn.dir\src\operators\linear.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\linear.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -294,7 +294,7 @@ build CMakeFiles\znn.dir\src\operators\linear.cpp.obj: CXX_COMPILER__znn_unscann
 
 build CMakeFiles\znn.dir\src\operators\cat.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\cat.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -303,7 +303,7 @@ build CMakeFiles\znn.dir\src\operators\cat.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\operators\stack.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\stack.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -312,7 +312,7 @@ build CMakeFiles\znn.dir\src\operators\stack.cpp.obj: CXX_COMPILER__znn_unscanne
 
 build CMakeFiles\znn.dir\src\operators\conv2d.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\conv2d.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -321,7 +321,7 @@ build CMakeFiles\znn.dir\src\operators\conv2d.cpp.obj: CXX_COMPILER__znn_unscann
 
 build CMakeFiles\znn.dir\src\operators\max_pool2d.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\max_pool2d.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -330,7 +330,7 @@ build CMakeFiles\znn.dir\src\operators\max_pool2d.cpp.obj: CXX_COMPILER__znn_uns
 
 build CMakeFiles\znn.dir\src\operators\avg_pool2d.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\avg_pool2d.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -339,7 +339,7 @@ build CMakeFiles\znn.dir\src\operators\avg_pool2d.cpp.obj: CXX_COMPILER__znn_uns
 
 build CMakeFiles\znn.dir\src\operators\layer_norm.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\layer_norm.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -348,7 +348,7 @@ build CMakeFiles\znn.dir\src\operators\layer_norm.cpp.obj: CXX_COMPILER__znn_uns
 
 build CMakeFiles\znn.dir\src\operators\batch_norm2d.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\batch_norm2d.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -357,7 +357,7 @@ build CMakeFiles\znn.dir\src\operators\batch_norm2d.cpp.obj: CXX_COMPILER__znn_u
 
 build CMakeFiles\znn.dir\src\operators\attention.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\attention.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -366,7 +366,7 @@ build CMakeFiles\znn.dir\src\operators\attention.cpp.obj: CXX_COMPILER__znn_unsc
 
 build CMakeFiles\znn.dir\src\operators\embedding.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\embedding.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -375,7 +375,7 @@ build CMakeFiles\znn.dir\src\operators\embedding.cpp.obj: CXX_COMPILER__znn_unsc
 
 build CMakeFiles\znn.dir\src\operators\cross_entropy.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\cross_entropy.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -384,7 +384,7 @@ build CMakeFiles\znn.dir\src\operators\cross_entropy.cpp.obj: CXX_COMPILER__znn_
 
 build CMakeFiles\znn.dir\src\operators\mse.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\mse.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -393,7 +393,7 @@ build CMakeFiles\znn.dir\src\operators\mse.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\operators\transpose.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\transpose.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -402,7 +402,7 @@ build CMakeFiles\znn.dir\src\operators\transpose.cpp.obj: CXX_COMPILER__znn_unsc
 
 build CMakeFiles\znn.dir\src\operators\reshape.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\reshape.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -411,7 +411,7 @@ build CMakeFiles\znn.dir\src\operators\reshape.cpp.obj: CXX_COMPILER__znn_unscan
 
 build CMakeFiles\znn.dir\src\operators\permute.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\permute.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -420,7 +420,7 @@ build CMakeFiles\znn.dir\src\operators\permute.cpp.obj: CXX_COMPILER__znn_unscan
 
 build CMakeFiles\znn.dir\src\operators\slice.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\slice.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -429,7 +429,7 @@ build CMakeFiles\znn.dir\src\operators\slice.cpp.obj: CXX_COMPILER__znn_unscanne
 
 build CMakeFiles\znn.dir\src\operators\operator_list.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\operators\operator_list.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
@@ -438,7 +438,7 @@ build CMakeFiles\znn.dir\src\operators\operator_list.cpp.obj: CXX_COMPILER__znn_
 
 build CMakeFiles\znn.dir\src\layers\layer_factory.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\layers\layer_factory.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
@@ -447,7 +447,7 @@ build CMakeFiles\znn.dir\src\layers\layer_factory.cpp.obj: CXX_COMPILER__znn_uns
 
 build CMakeFiles\znn.dir\src\layers\linear.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\layers\linear.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
@@ -456,7 +456,7 @@ build CMakeFiles\znn.dir\src\layers\linear.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\layers\conv2d.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\layers\conv2d.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
@@ -465,7 +465,7 @@ build CMakeFiles\znn.dir\src\layers\conv2d.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\layers\batch_norm2d.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\layers\batch_norm2d.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
@@ -474,7 +474,7 @@ build CMakeFiles\znn.dir\src\layers\batch_norm2d.cpp.obj: CXX_COMPILER__znn_unsc
 
 build CMakeFiles\znn.dir\src\layers\layer_norm.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\layers\layer_norm.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
@@ -483,7 +483,7 @@ build CMakeFiles\znn.dir\src\layers\layer_norm.cpp.obj: CXX_COMPILER__znn_unscan
 
 build CMakeFiles\znn.dir\src\layers\embedding.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\layers\embedding.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
@@ -492,7 +492,7 @@ build CMakeFiles\znn.dir\src\layers\embedding.cpp.obj: CXX_COMPILER__znn_unscann
 
 build CMakeFiles\znn.dir\src\layers\dropout.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\layers\dropout.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
@@ -501,7 +501,7 @@ build CMakeFiles\znn.dir\src\layers\dropout.cpp.obj: CXX_COMPILER__znn_unscanned
 
 build CMakeFiles\znn.dir\src\layers\activation.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\layers\activation.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
@@ -510,7 +510,7 @@ build CMakeFiles\znn.dir\src\layers\activation.cpp.obj: CXX_COMPILER__znn_unscan
 
 build CMakeFiles\znn.dir\src\layers\flatten.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\layers\flatten.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
@@ -519,7 +519,7 @@ build CMakeFiles\znn.dir\src\layers\flatten.cpp.obj: CXX_COMPILER__znn_unscanned
 
 build CMakeFiles\znn.dir\src\layers\pool2d.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\layers\pool2d.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
@@ -528,7 +528,7 @@ build CMakeFiles\znn.dir\src\layers\pool2d.cpp.obj: CXX_COMPILER__znn_unscanned_
 
 build CMakeFiles\znn.dir\src\optim\optimizer_factory.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\optim\optimizer_factory.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\optim
@@ -537,7 +537,7 @@ build CMakeFiles\znn.dir\src\optim\optimizer_factory.cpp.obj: CXX_COMPILER__znn_
 
 build CMakeFiles\znn.dir\src\optim\sgd.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\optim\sgd.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\optim
@@ -546,7 +546,7 @@ build CMakeFiles\znn.dir\src\optim\sgd.cpp.obj: CXX_COMPILER__znn_unscanned_Rele
 
 build CMakeFiles\znn.dir\src\optim\adam.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\optim\adam.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\optim
@@ -555,7 +555,7 @@ build CMakeFiles\znn.dir\src\optim\adam.cpp.obj: CXX_COMPILER__znn_unscanned_Rel
 
 build CMakeFiles\znn.dir\src\optim\adamw.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\optim\adamw.cpp || cmake_object_order_depends_target_znn
   CONFIG = Release
-  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 /openmp
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
   INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\optim
@@ -711,6 +711,86 @@ build znn_bench.exe: CXX_EXECUTABLE_LINKER__znn_bench_Release CMakeFiles\znn_ben
   TARGET_IMPLIB = znn_bench.lib
   TARGET_PDB = znn_bench.pdb
 
+# =============================================================================
+# Object build statements for EXECUTABLE target gpu_smoke
+
+
+#############################################
+# Order-only phony target for gpu_smoke
+
+build cmake_object_order_depends_target_gpu_smoke: phony || cmake_object_order_depends_target_znn
+
+build CMakeFiles\gpu_smoke.dir\tests\gpu_smoke.cpp.obj: CXX_COMPILER__gpu_smoke_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\tests\gpu_smoke.cpp || cmake_object_order_depends_target_gpu_smoke
+  CONFIG = Release
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include
+  OBJECT_DIR = CMakeFiles\gpu_smoke.dir
+  OBJECT_FILE_DIR = CMakeFiles\gpu_smoke.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\gpu_smoke.dir\
+  TARGET_PDB = gpu_smoke.pdb
+
+
+# =============================================================================
+# Link build statements for EXECUTABLE target gpu_smoke
+
+
+#############################################
+# Link the executable gpu_smoke.exe
+
+build gpu_smoke.exe: CXX_EXECUTABLE_LINKER__gpu_smoke_Release CMakeFiles\gpu_smoke.dir\tests\gpu_smoke.cpp.obj | znn.lib || znn.lib
+  CONFIG = Release
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -MD
+  LINK_FLAGS = /machine:x64 /INCREMENTAL:NO /subsystem:console
+  LINK_LIBRARIES = znn.lib  cudadevrt.lib  cudart.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib
+  LINK_PATH = -LIBPATH:C:\PROGRA~1\NVIDIA~2\CUDA\v13.4\lib\x64
+  OBJECT_DIR = CMakeFiles\gpu_smoke.dir
+  POST_BUILD = cd .
+  PRE_LINK = cd .
+  TARGET_COMPILE_PDB = CMakeFiles\gpu_smoke.dir\
+  TARGET_FILE = gpu_smoke.exe
+  TARGET_IMPLIB = gpu_smoke.lib
+  TARGET_PDB = gpu_smoke.pdb
+
+# =============================================================================
+# Object build statements for EXECUTABLE target hello
+
+
+#############################################
+# Order-only phony target for hello
+
+build cmake_object_order_depends_target_hello: phony || cmake_object_order_depends_target_znn
+
+build CMakeFiles\hello.dir\tests\hello.cpp.obj: CXX_COMPILER__hello_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\tests\hello.cpp || cmake_object_order_depends_target_hello
+  CONFIG = Release
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include
+  OBJECT_DIR = CMakeFiles\hello.dir
+  OBJECT_FILE_DIR = CMakeFiles\hello.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\hello.dir\
+  TARGET_PDB = hello.pdb
+
+
+# =============================================================================
+# Link build statements for EXECUTABLE target hello
+
+
+#############################################
+# Link the executable hello.exe
+
+build hello.exe: CXX_EXECUTABLE_LINKER__hello_Release CMakeFiles\hello.dir\tests\hello.cpp.obj | znn.lib || znn.lib
+  CONFIG = Release
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -MD
+  LINK_FLAGS = /machine:x64 /INCREMENTAL:NO /subsystem:console
+  LINK_LIBRARIES = znn.lib  cudadevrt.lib  cudart.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib
+  LINK_PATH = -LIBPATH:C:\PROGRA~1\NVIDIA~2\CUDA\v13.4\lib\x64
+  OBJECT_DIR = CMakeFiles\hello.dir
+  POST_BUILD = cd .
+  PRE_LINK = cd .
+  TARGET_COMPILE_PDB = CMakeFiles\hello.dir\
+  TARGET_FILE = hello.exe
+  TARGET_IMPLIB = hello.lib
+  TARGET_PDB = hello.pdb
+
 
 #############################################
 # Utility command for test
@@ -831,6 +911,10 @@ build examples\mnist\rebuild_cache: phony examples\mnist\CMakeFiles\rebuild_cach
 # =============================================================================
 # Target aliases.
 
+build gpu_smoke: phony gpu_smoke.exe
+
+build hello: phony hello.exe
+
 build mnist: phony examples\mnist\mnist.exe
 
 build mnist.exe: phony examples\mnist\mnist.exe
@@ -849,7 +933,7 @@ build znn_test: phony znn_test.exe
 #############################################
 # Folder: E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda
 
-build all: phony znn.lib znn_test.exe znn_bench.exe examples\mnist\all
+build all: phony znn.lib znn_test.exe znn_bench.exe gpu_smoke.exe hello.exe examples\mnist\all
 
 # =============================================================================
 
@@ -865,14 +949,14 @@ build examples\mnist\all: phony examples\mnist\mnist.exe
 #############################################
 # Re-run CMake if any of its inputs changed.
 
-build build.ninja E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\build-cuda\cmake_install.cmake E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\build-cuda\examples\mnist\cmake_install.cmake E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\build-cuda\CTestTestfile.cmake E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\build-cuda\examples\mnist\CTestTestfile.cmake: RERUN_CMAKE | CMakeCache.txt CMakeFiles\4.0.3\CMakeCUDACompiler.cmake CMakeFiles\4.0.3\CMakeCXXCompiler.cmake CMakeFiles\4.0.3\CMakeRCCompiler.cmake CMakeFiles\4.0.3\CMakeSystem.cmake E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\CMakeLists.txt E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\examples\mnist\CMakeLists.txt E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCUDACompiler.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCUDACompilerABI.cu E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCUDAInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCXXCompiler.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCXXCompilerABI.cpp E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCXXInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCommonLanguageInclude.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCompilerIdDetection.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCUDACompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCXXCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompilerABI.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompilerId.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompilerSupport.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineRCCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineSystem.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeFindBinUtils.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeGenericSystem.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeInitializeConfigs.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeLanguageInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeNinjaFindMake.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeParseImplicitIncludeInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeParseImplicitLinkInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeParseLibraryArchitecture.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeRCCompiler.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeRCInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeSystem.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeSystemSpecificInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeSystemSpecificInitialize.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestCUDACompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestCXXCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestCompilerCommon.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestRCCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\ADSP-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\ARMCC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\ARMClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\AppleClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Borland-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Bruce-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\CMakeCommonCompilerMacros.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Clang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Clang-DetermineCompilerInternal.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Compaq-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Compaq-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Cray-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\CrayClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Embarcadero-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Fujitsu-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\FujitsuClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\GHS-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\GNU-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\GNU-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\HP-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\HP-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IAR-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMCPP-C-DetermineVersionInternal.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMCPP-CXX-DetermineVersionInternal.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMClang-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMClang-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Intel-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IntelLLVM-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\LCC-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\LCC-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC-CXX-CXXImportStd.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVHPC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVIDIA-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVIDIA-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVIDIA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\OpenWatcom-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\OrangeC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\PGI-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\PathScale-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SCO-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SDCC-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SunPro-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SunPro-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\TI-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\TIClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Tasking-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\TinyCC-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\VisualAge-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\VisualAge-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Watcom-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XL-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XL-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XLClang-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XLClang-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\zOS-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\zOS-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAArchitecturesAll.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAArchitecturesNative.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAArchitecturesValidate.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAFilterImplicitLibs.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAFindToolkit.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDALinkerInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCXXLinkerInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCommonLinkerInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeDetermineLinkerId.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeInspectCUDALinker.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeInspectCXXLinker.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeNVCCFilterImplicitInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeNVCCParseImplicitInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\FeatureTesting.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Linker\MSVC-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Linker\MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Linker\MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Linker\Windows-MSVC-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Linker\Windows-MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Linker\Windows-MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-Determine-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-Initialize.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-NVIDIA-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\WindowsPaths.cmake
+build build.ninja E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\build-cuda\cmake_install.cmake E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\build-cuda\examples\mnist\cmake_install.cmake E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\build-cuda\CTestTestfile.cmake E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\build-cuda\examples\mnist\CTestTestfile.cmake: RERUN_CMAKE | CMakeCache.txt CMakeFiles\4.0.3\CMakeCUDACompiler.cmake CMakeFiles\4.0.3\CMakeCXXCompiler.cmake CMakeFiles\4.0.3\CMakeRCCompiler.cmake CMakeFiles\4.0.3\CMakeSystem.cmake E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\CMakeLists.txt E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\examples\mnist\CMakeLists.txt E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCUDACompiler.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCUDACompilerABI.cu E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCUDAInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCXXCompiler.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCXXCompilerABI.cpp E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCXXInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCommonLanguageInclude.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCompilerIdDetection.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCUDACompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCXXCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompilerABI.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompilerId.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompilerSupport.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineRCCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineSystem.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeFindBinUtils.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeGenericSystem.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeInitializeConfigs.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeLanguageInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeNinjaFindMake.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeParseImplicitIncludeInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeParseImplicitLinkInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeParseLibraryArchitecture.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeRCCompiler.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeRCInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeSystem.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeSystemSpecificInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeSystemSpecificInitialize.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestCUDACompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestCXXCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestCompilerCommon.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestRCCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\ADSP-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\ARMCC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\ARMClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\AppleClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Borland-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Bruce-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\CMakeCommonCompilerMacros.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Clang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Clang-DetermineCompilerInternal.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Compaq-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Compaq-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Cray-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\CrayClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Embarcadero-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Fujitsu-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\FujitsuClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\GHS-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\GNU-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\GNU-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\HP-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\HP-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IAR-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMCPP-C-DetermineVersionInternal.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMCPP-CXX-DetermineVersionInternal.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMClang-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMClang-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Intel-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IntelLLVM-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\LCC-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\LCC-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC-CXX-CXXImportStd.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVHPC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVIDIA-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVIDIA-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVIDIA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\OpenWatcom-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\OrangeC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\PGI-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\PathScale-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SCO-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SDCC-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SunPro-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SunPro-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\TI-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\TIClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Tasking-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\TinyCC-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\VisualAge-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\VisualAge-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Watcom-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XL-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XL-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XLClang-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XLClang-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\zOS-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\zOS-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\FindOpenMP.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\FindPackageHandleStandardArgs.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\FindPackageMessage.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAArchitecturesAll.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAArchitecturesNative.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAArchitecturesValidate.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAFilterImplicitLibs.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAFindToolkit.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDALinkerInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCXXLinkerInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCommonLinkerInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeDetermineLinkerId.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeInspectCUDALinker.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeInspectCXXLinker.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeNVCCFilterImplicitInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeNVCCParseImplicitInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\FeatureTesting.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Linker\MSVC-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Linker\MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Linker\MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Linker\Windows-MSVC-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Linker\Windows-MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Linker\Windows-MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-Determine-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-Initialize.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-NVIDIA-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\WindowsPaths.cmake
   pool = console
 
 
 #############################################
 # A missing CMake input file is not an error.
 
-build CMakeCache.txt CMakeFiles\4.0.3\CMakeCUDACompiler.cmake CMakeFiles\4.0.3\CMakeCXXCompiler.cmake CMakeFiles\4.0.3\CMakeRCCompiler.cmake CMakeFiles\4.0.3\CMakeSystem.cmake E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\CMakeLists.txt E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\examples\mnist\CMakeLists.txt E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCUDACompiler.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCUDACompilerABI.cu E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCUDAInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCXXCompiler.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCXXCompilerABI.cpp E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCXXInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCommonLanguageInclude.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCompilerIdDetection.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCUDACompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCXXCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompilerABI.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompilerId.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompilerSupport.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineRCCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineSystem.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeFindBinUtils.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeGenericSystem.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeInitializeConfigs.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeLanguageInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeNinjaFindMake.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeParseImplicitIncludeInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeParseImplicitLinkInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeParseLibraryArchitecture.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeRCCompiler.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeRCInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeSystem.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeSystemSpecificInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeSystemSpecificInitialize.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestCUDACompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestCXXCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestCompilerCommon.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestRCCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\ADSP-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\ARMCC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\ARMClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\AppleClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Borland-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Bruce-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\CMakeCommonCompilerMacros.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Clang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Clang-DetermineCompilerInternal.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Compaq-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Compaq-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Cray-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\CrayClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Embarcadero-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Fujitsu-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\FujitsuClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\GHS-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\GNU-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\GNU-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\HP-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\HP-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IAR-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMCPP-C-DetermineVersionInternal.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMCPP-CXX-DetermineVersionInternal.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMClang-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMClang-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Intel-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IntelLLVM-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\LCC-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\LCC-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC-CXX-CXXImportStd.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVHPC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVIDIA-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVIDIA-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVIDIA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\OpenWatcom-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\OrangeC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\PGI-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\PathScale-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SCO-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SDCC-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SunPro-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SunPro-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\TI-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\TIClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Tasking-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\TinyCC-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\VisualAge-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\VisualAge-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Watcom-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XL-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XL-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XLClang-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XLClang-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\zOS-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\zOS-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAArchitecturesAll.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAArchitecturesNative.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAArchitecturesValidate.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAFilterImplicitLibs.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAFindToolkit.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDALinkerInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCXXLinkerInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCommonLinkerInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeDetermineLinkerId.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeInspectCUDALinker.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeInspectCXXLinker.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeNVCCFilterImplicitInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeNVCCParseImplicitInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\FeatureTesting.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Linker\MSVC-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Linker\MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Linker\MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Linker\Windows-MSVC-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Linker\Windows-MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Linker\Windows-MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-Determine-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-Initialize.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-NVIDIA-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\WindowsPaths.cmake: phony
+build CMakeCache.txt CMakeFiles\4.0.3\CMakeCUDACompiler.cmake CMakeFiles\4.0.3\CMakeCXXCompiler.cmake CMakeFiles\4.0.3\CMakeRCCompiler.cmake CMakeFiles\4.0.3\CMakeSystem.cmake E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\CMakeLists.txt E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\examples\mnist\CMakeLists.txt E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCUDACompiler.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCUDACompilerABI.cu E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCUDAInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCXXCompiler.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCXXCompilerABI.cpp E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCXXInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCommonLanguageInclude.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeCompilerIdDetection.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCUDACompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCXXCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompilerABI.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompilerId.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineCompilerSupport.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineRCCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeDetermineSystem.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeFindBinUtils.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeGenericSystem.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeInitializeConfigs.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeLanguageInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeNinjaFindMake.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeParseImplicitIncludeInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeParseImplicitLinkInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeParseLibraryArchitecture.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeRCCompiler.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeRCInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeSystem.cmake.in E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeSystemSpecificInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeSystemSpecificInitialize.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestCUDACompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestCXXCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestCompilerCommon.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\CMakeTestRCCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\ADSP-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\ARMCC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\ARMClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\AppleClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Borland-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Bruce-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\CMakeCommonCompilerMacros.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Clang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Clang-DetermineCompilerInternal.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Compaq-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Compaq-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Cray-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\CrayClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Embarcadero-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Fujitsu-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\FujitsuClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\GHS-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\GNU-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\GNU-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\HP-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\HP-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IAR-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMCPP-C-DetermineVersionInternal.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMCPP-CXX-DetermineVersionInternal.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMClang-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IBMClang-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Intel-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\IntelLLVM-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\LCC-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\LCC-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC-CXX-CXXImportStd.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVHPC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVIDIA-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVIDIA-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\NVIDIA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\OpenWatcom-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\OrangeC-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\PGI-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\PathScale-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SCO-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SDCC-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SunPro-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\SunPro-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\TI-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\TIClang-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Tasking-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\TinyCC-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\VisualAge-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\VisualAge-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\Watcom-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XL-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XL-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XLClang-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\XLClang-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\zOS-C-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Compiler\zOS-CXX-DetermineCompiler.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\FindOpenMP.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\FindPackageHandleStandardArgs.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\FindPackageMessage.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAArchitecturesAll.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAArchitecturesNative.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAArchitecturesValidate.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAFilterImplicitLibs.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDAFindToolkit.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCUDALinkerInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCXXLinkerInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeCommonLinkerInformation.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeDetermineLinkerId.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeInspectCUDALinker.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeInspectCXXLinker.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeNVCCFilterImplicitInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\CMakeNVCCParseImplicitInfo.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Internal\FeatureTesting.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Linker\MSVC-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Linker\MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Linker\MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Linker\Windows-MSVC-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Linker\Windows-MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Linker\Windows-MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-Determine-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-Initialize.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-MSVC-CXX.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-MSVC.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows-NVIDIA-CUDA.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\Windows.cmake E$:\Tools\IDEs\Cmake\cmake-4.0.3\share\cmake-4.0\Modules\Platform\WindowsPaths.cmake: phony
 
 
 #############################################

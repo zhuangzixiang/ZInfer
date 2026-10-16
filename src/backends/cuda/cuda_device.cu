@@ -32,7 +32,12 @@ __global__ void add_kernel(const float* x, const float* y, float* z, long long n
 
 bool available() {
     int count = 0;
-    return cudaGetDeviceCount(&count) == cudaSuccess && count > 0;
+    if (cudaGetDeviceCount(&count) != cudaSuccess || count <= 0) {
+        return false;
+    }
+    cudaSetDevice(0);               // 显式初始化 CUDA 上下文(静态库必需)
+    cudaFree(nullptr);             // 触发惰性上下文创建
+    return true;
 }
 
 void* alloc(size_t bytes) {

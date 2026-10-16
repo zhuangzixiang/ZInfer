@@ -3,6 +3,7 @@
 // (引擎在 autograd/op_dispatcher; 层/优化器在各自目录; 算子在 operators/)
 // ============================================================================
 #include "znn_internal.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 #include "autograd.hpp"
 #include "operators/shared.hpp"
 #include <cstring>
@@ -186,7 +187,6 @@ void Storage::release() {
 // ============================================================ Tensor::Impl
 
 Tensor::Impl* Tensor::Impl::create(const Shape& shape, DType dtype, Device device) {
-    check_cpu(device);
     require(shape.rank <= 8, "shape rank > 8");
     Impl* im = new Impl();
     im->shape = shape;
@@ -548,9 +548,23 @@ Tensor Tensor::to_device(Device device) const {
     if (impl_->device == device) {
         return *this;                                      // 同设备: 共享返回(~1ns)
     }
-    check_cpu(device);                                     // GPU 里程碑
     Tensor t = Tensor::empty(impl_->shape, impl_->dtype, device);
-    Impl::copy_elements(impl_, t.impl_);
+    if ((impl_->device == Device::CPU && device == Device::CUDA)
+        || (impl_->device == Device::CUDA && device == Device::CPU)) {
+        // 跨设备同步拷贝(v1 同步语义; 非连续视图先紧凑化)
+        Tensor src = impl_->is_contiguous() ? *this : clone();
+        if (device == Device::CUDA) {
+            cuda_backend::copy_host_to_device(t.impl_->storage->data(),
+                                              src.impl_->storage->data(),
+                                              t.impl_->nbytes());
+        } else {
+            cuda_backend::copy_device_to_host(t.impl_->storage->data(),
+                                              src.impl_->storage->data(),
+                                              t.impl_->nbytes());
+        }
+        return t;
+    }
+    Impl::copy_elements(impl_, t.impl_);                   // CPU↔CPU
     return t;
 }
 
