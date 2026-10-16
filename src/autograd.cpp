@@ -57,10 +57,12 @@ void AutogradEngine::backward(const Tensor& loss) {
                                         n->saved_inputs[i].dtype(),
                                         n->saved_inputs[i].device());
         }
-        // 1.5 GPU 梯度规则桥接: 梯度规则当前为 CPU 实现, CUDA 张量
-        //     先暂存到 CPU 副本, 规则跑完后结果拷回原设备。
-        //     (架构不变: GradientFunction 签名不动; CUDA 原生梯度内核
-        //      按算子槽位模式后续补齐后此桥接自动短路)
+        // 1.5 GPU 梯度规则桥接(过渡方案, 逐步消除):
+        //     用指针循环的梯度规则在 CUDA 张量上会段错误,
+        //     先桥接到 CPU 跑完再拷回; 已改为算子组合(Tensor::mul 等)
+        //     的规则自动走 CUDA 内核, 不经此桥接。
+        //     消除路径: 每个梯度规则从指针循环改为算子组合,
+        //     当全部组合化后此桥接代码整体删除。
         bool has_cuda = false;
         for (size_t i = 0; i < nin; ++i) {
             has_cuda = has_cuda || n->saved_inputs[i].device() == Device::CUDA;

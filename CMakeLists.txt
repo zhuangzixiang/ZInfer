@@ -43,6 +43,7 @@ set(ZNN_OPERATORS
     src/operators/mean.cpp
     src/operators/matmul.cpp
     src/operators/matmul_eigen.cpp
+    src/operators/linear_eigen.cpp
     src/operators/conv2d_eigen.cpp
     src/operators/linear.cpp
     src/operators/cat.cpp
@@ -91,7 +92,8 @@ if(ZNN_CUDA)
         src/backends/cuda/cuda_device.cu
         src/backends/cuda/cuda_kernels.cu
         src/backends/cuda/cuda_kernels2.cu
-        src/backends/cuda/cuda_kernels3.cu)
+        src/backends/cuda/cuda_kernels3.cu
+        src/backends/cuda/linear_cuda.cu)
     set(CUDA_STANDARD 17)
 else()
     set(ZNN_CUDA_SRC src/backends/cuda/cuda_stub.cpp)

@@ -47,6 +47,7 @@ ZNN_CUDA_KERNEL_NULL(conv2d_cuda)
 ZNN_CUDA_KERNEL_NULL(max_pool2d_cuda)
 ZNN_CUDA_KERNEL_NULL(avg_pool2d_cuda)
 
+ZNN_CUDA_KERNEL_NULL(linear_cuda)
 ZNN_CUDA_KERNEL_NULL(embedding_cuda)
 ZNN_CUDA_KERNEL_NULL(reshape_cuda)
 ZNN_CUDA_KERNEL_NULL(transpose_cuda)

@@ -69,6 +69,7 @@ void arange_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*
 void randn_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void layer_norm_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void batch_norm2d_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void linear_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void attention_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 
 // ---- 优化器 CUDA 入口(审计修复2) ----
