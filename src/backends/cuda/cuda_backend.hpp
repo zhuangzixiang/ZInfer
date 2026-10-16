@@ -45,6 +45,15 @@ void gelu_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void sigmoid_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void tanh_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void silu_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+// 第二批(softmax/规约/损失/卷积/池化)
+void softmax_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void sum_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void mean_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void cross_entropy_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void mse_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void conv2d_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void max_pool2d_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void avg_pool2d_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 // 矩阵
 void matmul_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 

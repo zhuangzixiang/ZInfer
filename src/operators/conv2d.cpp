@@ -2,6 +2,7 @@
 // 梯度 dX/dW 按标准卷积反传公式直接累加
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -117,7 +118,7 @@ const Operator g_conv2d_operator = {
     conv2d_infer,
     conv2d_grad,
     conv2d_ref,
-    {conv2d_cpu_kernel()},       // kernels[CPU] = Eigen(非连续输入内部回退)
+    {conv2d_cpu_kernel(), cuda_backend::conv2d_cuda, nullptr, nullptr},
     sizeof(Conv2dOptions),
 };
 

@@ -89,7 +89,8 @@ if(ZNN_CUDA)
     enable_language(CUDA)
     set(ZNN_CUDA_SRC
         src/backends/cuda/cuda_device.cu
-        src/backends/cuda/cuda_kernels.cu)
+        src/backends/cuda/cuda_kernels.cu
+        src/backends/cuda/cuda_kernels2.cu)
     set(CUDA_STANDARD 17)
 else()
     set(ZNN_CUDA_SRC src/backends/cuda/cuda_stub.cpp)

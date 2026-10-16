@@ -1,6 +1,7 @@
 // mean: 沿任意 dim 平均 = sum / n; 梯度 = 广播回填 / n
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 #include <cstring>
 
 namespace znn {
@@ -36,7 +37,7 @@ const Operator g_mean_operator = {
     infer_reduce,
     mean_grad,
     mean_ref,
-    {},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::mean_cuda, nullptr, nullptr},
     sizeof(ReduceAttrs),
 };
 

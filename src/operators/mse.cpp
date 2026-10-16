@@ -1,6 +1,7 @@
 // mse: 均方误差(同形) → 标量; 梯度 = 2(pred-target)/N
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -41,7 +42,7 @@ const Operator g_mse_operator = {
     mse_infer,
     mse_grad,
     mse_ref,
-    {},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::mse_cuda, nullptr, nullptr},
 };
 
 Tensor Loss::mse(const Tensor& pred, const Tensor& target) {

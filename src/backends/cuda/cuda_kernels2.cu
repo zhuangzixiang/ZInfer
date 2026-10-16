@@ -1,0 +1,303 @@
+// ============================================================================
+// cuda_kernels2.cu — 第二批 CUDA 内核: softmax / 规约 / 损失 / 卷积 / 池化
+// (逐元素与 GEMM 见 cuda_kernels.cu)
+// ============================================================================
+#include "backends/cuda/cuda_backend.hpp"
+#include "operator.hpp"
+#include "operators/shared.hpp"
+#include <cuda_runtime.h>
+#include <stdexcept>
+
+namespace znn {
+namespace cuda_backend {
+
+namespace {
+
+constexpr int kBlock = 256;
+
+void require_contiguous1c(const Tensor& x, const Tensor& y) {
+    if (!x.is_contiguous() || !y.is_contiguous()) {
+        throw std::runtime_error("znn cuda: needs contiguous (v1)");
+    }
+}
+
+void require_contiguous2c(const Tensor& a, const Tensor& b, const Tensor& y) {
+    if (!a.is_contiguous() || !b.is_contiguous() || !y.is_contiguous()) {
+        throw std::runtime_error("znn cuda: needs contiguous (v1)");
+    }
+}
+
+} // namespace
+
+// ---- softmax(末维; 行内多线程两遍归约, 数值稳定) ----
+__global__ void softmax_lastdim_k(const float* x, float* y, int64_t n, int64_t d) {
+    const int64_t r = blockIdx.x * (int64_t)blockDim.y + threadIdx.y;
+    if (r >= n) return;
+    const float* xr = x + r * d;
+    float* yr = y + r * d;
+    extern __shared__ float red[];                       // [2][blockDim.y][blockDim.x]
+    float* smax = red;
+    float* ssum = red + blockDim.y * blockDim.x;
+    const int tx = threadIdx.x;
+    const int ty = threadIdx.y;
+    const int lane = ty * blockDim.x + tx;
+
+    float local_max = -3.4e38f;                          // 1) 行最大
+    for (int64_t i = tx; i < d; i += blockDim.x) {
+        local_max = local_max < xr[i] ? xr[i] : local_max;
+    }
+    smax[lane] = local_max;
+    __syncthreads();
+    for (int s = blockDim.x / 2; s > 0; s >>= 1) {       // warp 树归约
+        if (tx < s) smax[lane] = smax[lane] < smax[lane + s] ? smax[lane + s] : smax[lane];
+        __syncthreads();
+    }
+    const float row_max = smax[ty * blockDim.x];
+
+    float local_sum = 0.f;                               // 2) exp 求和
+    for (int64_t i = tx; i < d; i += blockDim.x) {
+        yr[i] = expf(xr[i] - row_max);
+        local_sum += yr[i];
+    }
+    ssum[lane] = local_sum;
+    __syncthreads();
+    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+        if (tx < s) ssum[lane] += ssum[lane + s];
+        __syncthreads();
+    }
+    const float row_sum = ssum[ty * blockDim.x];
+    for (int64_t i = tx; i < d; i += blockDim.x) {
+        yr[i] /= row_sum;                                // 3) 归一化
+    }
+}
+
+void softmax_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                  const void*) {
+    require_contiguous1c(*in[0], *out[0]);
+    const Tensor& x = *in[0];
+    const int64_t d = x.size(-1);
+    const int64_t n = x.numel() / d;
+    dim3 block(32, 8);
+    dim3 grid(static_cast<unsigned>((n + 7) / 8));
+    softmax_lastdim_k<<<grid, block, 2 * 8 * 32 * sizeof(float)>>>(
+        x.data<float>(), out[0]->data<float>(), n, d);
+}
+
+// ---- sum / mean(末维; 每块一行) ----
+__global__ void sum_lastdim_k(const float* x, float* y, int64_t n, int64_t d, float inv) {
+    if (blockIdx.x >= n) return;
+    extern __shared__ float acc[];
+    const float* xr = x + blockIdx.x * d;
+    float l = 0.f;
+    for (int64_t i = threadIdx.x; i < d; i += blockDim.x) l += xr[i];
+    acc[threadIdx.x] = l;
+    __syncthreads();
+    if (threadIdx.x == 0) {
+        float s = 0.f;
+        for (int i = 0; i < blockDim.x; ++i) s += acc[i];
+        y[blockIdx.x] = s * inv;
+    }
+}
+
+void sum_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
+    require_contiguous1c(*in[0], *out[0]);
+    const Tensor& x = *in[0];
+    const int64_t d = x.size(-1);
+    const int64_t n = x.numel() / d;
+    sum_lastdim_k<<<static_cast<unsigned>(n), kBlock, kBlock * sizeof(float)>>>(
+        x.data<float>(), out[0]->data<float>(), n, d, 1.f);
+}
+
+void mean_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
+    require_contiguous1c(*in[0], *out[0]);
+    const Tensor& x = *in[0];
+    const int64_t d = x.size(-1);
+    const int64_t n = x.numel() / d;
+    sum_lastdim_k<<<static_cast<unsigned>(n), kBlock, kBlock * sizeof(float)>>>(
+        x.data<float>(), out[0]->data<float>(), n, d,
+        1.f / static_cast<float>(d));
+}
+
+// ---- cross_entropy(logits[N,C] + targets[N] → 标量, 单块两遍) ----
+__global__ void cross_entropy_k(const float* x, const int64_t* t, float* loss,
+                                int64_t n, int64_t c) {
+    extern __shared__ float acc[];
+    float l = 0.f;
+    for (int64_t i = threadIdx.x; i < n; i += blockDim.x) {
+        const float* row = x + i * c;
+        float m = row[0];
+        for (int64_t j = 1; j < c; ++j) m = m < row[j] ? row[j] : m;
+        float s = 0.f;
+        for (int64_t j = 0; j < c; ++j) s += expf(row[j] - m);
+        l += m + logf(s) - row[t[i]];
+    }
+    acc[threadIdx.x] = l;
+    __syncthreads();
+    if (threadIdx.x == 0) {
+        float s = 0.f;
+        for (int i = 0; i < blockDim.x; ++i) s += acc[i];
+        loss[0] = s / static_cast<float>(n);
+    }
+}
+
+void cross_entropy_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                        const void*) {
+    require_contiguous2c(*in[0], *in[1], *out[0]);
+    const Tensor& x = *in[0];
+    cross_entropy_k<<<1, kBlock, kBlock * sizeof(float)>>>(
+        x.data<float>(), in[1]->data<int64_t>(), out[0]->data<float>(),
+        x.size(0), x.size(1));
+}
+
+// ---- mse(同形 → 标量) ----
+__global__ void mse_k(const float* p, const float* t, float* loss, int64_t n) {
+    extern __shared__ float acc[];
+    float l = 0.f;
+    for (int64_t i = threadIdx.x; i < n; i += blockDim.x) {
+        const float d = p[i] - t[i];
+        l += d * d;
+    }
+    acc[threadIdx.x] = l;
+    __syncthreads();
+    if (threadIdx.x == 0) {
+        float s = 0.f;
+        for (int i = 0; i < blockDim.x; ++i) s += acc[i];
+        loss[0] = s / static_cast<float>(n);
+    }
+}
+
+void mse_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
+    require_contiguous2c(*in[0], *in[1], *out[0]);
+    mse_k<<<1, kBlock, kBlock * sizeof(float)>>>(
+        in[0]->data<float>(), in[1]->data<float>(), out[0]->data<float>(),
+        in[0]->numel());
+}
+
+// ---- conv2d(每线程一个输出元素, 直接朴素含分组) ----
+__global__ void conv2d_k(const float* x, const float* w, float* y,
+                         int N, int C, int H, int W, int O, int KH, int KW,
+                         int HO, int WO,
+                         int sh, int sw, int ph, int pw, int dh, int dw, int G) {
+    const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
+    const int64_t total = (int64_t)N * O * HO * WO;
+    if (i >= total) return;
+    const int wo = i % WO;
+    const int64_t t0 = i / WO;
+    const int ho = t0 % HO;
+    const int64_t t1 = t0 / HO;
+    const int oc = t1 % O;
+    const int n = t1 / O;
+    const int Cg = C / G;
+    const int Og = O / G;
+    const int g = oc / Og;
+    float acc = 0.f;
+    for (int c = g * Cg; c < (g + 1) * Cg; ++c) {
+        for (int ki = 0; ki < KH; ++ki) {
+            const int ii = ho * sh + ki * dh - ph;
+            if (ii < 0 || ii >= H) continue;
+            for (int kj = 0; kj < KW; ++kj) {
+                const int jj = wo * sw + kj * dw - pw;
+                if (jj < 0 || jj >= W) continue;
+                acc += x[((n * C + c) * H + ii) * W + jj]
+                     * w[(((int64_t)oc * Cg + (c - g * Cg)) * KH + ki) * KW + kj];
+            }
+        }
+    }
+    y[i] = acc;
+}
+
+void conv2d_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                 const void* options) {
+    require_contiguous2c(*in[0], *in[1], *out[0]);
+    const Conv2dOptions* o = static_cast<const Conv2dOptions*>(options);
+    const Tensor& x = *in[0];
+    const Tensor& w = *in[1];
+    Tensor& y = *out[0];
+    conv2d_k<<<static_cast<unsigned>((y.numel() + kBlock - 1) / kBlock), kBlock>>>(
+        x.data<float>(), w.data<float>(), y.data<float>(),
+        x.size(0), x.size(1), x.size(2), x.size(3),
+        w.size(0), w.size(2), w.size(3), y.size(2), y.size(3),
+        o->stride[0], o->stride[1], o->pad[0], o->pad[1],
+        o->dilation[0], o->dilation[1], o->groups);
+}
+
+// ---- max/avg pool(每线程一个输出元素) ----
+__global__ void max_pool_k(const float* x, float* y,
+                           int N, int C, int H, int W, int HO, int WO,
+                           int kh, int kw, int sh, int sw, int ph, int pw) {
+    const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
+    const int64_t total = (int64_t)N * C * HO * WO;
+    if (i >= total) return;
+    const int wo = i % WO;
+    const int64_t t0 = i / WO;
+    const int ho = t0 % HO;
+    const int64_t nc = t0 / HO;
+    const int64_t base = nc * H * W;
+    float m = -3.4e38f;
+    for (int ki = 0; ki < kh; ++ki) {
+        const int ii = ho * sh + ki - ph;
+        if (ii < 0 || ii >= H) continue;
+        for (int kj = 0; kj < kw; ++kj) {
+            const int jj = wo * sw + kj - pw;
+            if (jj < 0 || jj >= W) continue;
+            const float v = x[base + ii * W + jj];
+            m = m < v ? v : m;
+        }
+    }
+    y[i] = m;
+}
+
+__global__ void avg_pool_k(const float* x, float* y,
+                           int N, int C, int H, int W, int HO, int WO,
+                           int kh, int kw, int sh, int sw, int ph, int pw) {
+    const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
+    const int64_t total = (int64_t)N * C * HO * WO;
+    if (i >= total) return;
+    const int wo = i % WO;
+    const int64_t t0 = i / WO;
+    const int ho = t0 % HO;
+    const int64_t nc = t0 / HO;
+    const int64_t base = nc * H * W;
+    float acc = 0.f;
+    int cnt = 0;
+    for (int ki = 0; ki < kh; ++ki) {
+        const int ii = ho * sh + ki - ph;
+        if (ii < 0 || ii >= H) continue;
+        for (int kj = 0; kj < kw; ++kj) {
+            const int jj = wo * sw + kj - pw;
+            if (jj < 0 || jj >= W) continue;
+            acc += x[base + ii * W + jj];
+            ++cnt;
+        }
+    }
+    y[i] = cnt ? acc / cnt : 0.f;
+}
+
+void max_pool2d_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                     const void* options) {
+    require_contiguous1c(*in[0], *out[0]);
+    const PoolCallOptions* o = static_cast<const PoolCallOptions*>(options);
+    const Tensor& x = *in[0];
+    Tensor& y = *out[0];
+    max_pool_k<<<static_cast<unsigned>((y.numel() + kBlock - 1) / kBlock), kBlock>>>(
+        x.data<float>(), y.data<float>(),
+        x.size(0), x.size(1), x.size(2), x.size(3), y.size(2), y.size(3),
+        o->kernel[0], o->kernel[1], o->pool.stride[0], o->pool.stride[1],
+        o->pool.pad[0], o->pool.pad[1]);
+}
+
+void avg_pool2d_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                     const void* options) {
+    require_contiguous1c(*in[0], *out[0]);
+    const PoolCallOptions* o = static_cast<const PoolCallOptions*>(options);
+    const Tensor& x = *in[0];
+    Tensor& y = *out[0];
+    avg_pool_k<<<static_cast<unsigned>((y.numel() + kBlock - 1) / kBlock), kBlock>>>(
+        x.data<float>(), y.data<float>(),
+        x.size(0), x.size(1), x.size(2), x.size(3), y.size(2), y.size(3),
+        o->kernel[0], o->kernel[1], o->pool.stride[0], o->pool.stride[1],
+        o->pool.pad[0], o->pool.pad[1]);
+}
+
+} // namespace cuda_backend
+} // namespace znn

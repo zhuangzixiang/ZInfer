@@ -1,6 +1,7 @@
 // avg_pool2d: NCHW 平均池化; 梯度均摊到窗口内有效元素
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -96,7 +97,7 @@ const Operator g_avg_pool2d_operator = {
     avg_pool2d_infer,
     avg_pool2d_grad,
     avg_pool2d_ref,
-    {},                          // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::avg_pool2d_cuda, nullptr, nullptr},
     sizeof(PoolCallOptions),
 };
 

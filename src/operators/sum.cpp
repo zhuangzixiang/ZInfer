@@ -1,6 +1,7 @@
 // sum: 沿任意 dim 求和(ReduceAttrs 选项经节点副本传入梯度规则)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 #include <cstring>
 
 namespace znn {
@@ -29,7 +30,7 @@ const Operator g_sum_operator = {
     infer_reduce,
     sum_grad,
     sum_ref,
-    {},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::sum_cuda, nullptr, nullptr},
     sizeof(ReduceAttrs),
 };
 

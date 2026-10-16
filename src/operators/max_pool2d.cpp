@@ -1,6 +1,7 @@
 // max_pool2d: NCHW 最大池化; 梯度经"重找窗口最大位置"回填(无需保存掩码)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 
 namespace znn {
 
@@ -95,7 +96,7 @@ const Operator g_max_pool2d_operator = {
     max_pool2d_infer,
     max_pool2d_grad,
     max_pool2d_ref,
-    {},                          // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, cuda_backend::max_pool2d_cuda, nullptr, nullptr},
     sizeof(PoolCallOptions),
 };
 

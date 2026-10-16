@@ -38,6 +38,14 @@ ZNN_CUDA_KERNEL_NULL(sigmoid_cuda)
 ZNN_CUDA_KERNEL_NULL(tanh_cuda)
 ZNN_CUDA_KERNEL_NULL(silu_cuda)
 ZNN_CUDA_KERNEL_NULL(matmul_cuda)
+ZNN_CUDA_KERNEL_NULL(softmax_cuda)
+ZNN_CUDA_KERNEL_NULL(sum_cuda)
+ZNN_CUDA_KERNEL_NULL(mean_cuda)
+ZNN_CUDA_KERNEL_NULL(cross_entropy_cuda)
+ZNN_CUDA_KERNEL_NULL(mse_cuda)
+ZNN_CUDA_KERNEL_NULL(conv2d_cuda)
+ZNN_CUDA_KERNEL_NULL(max_pool2d_cuda)
+ZNN_CUDA_KERNEL_NULL(avg_pool2d_cuda)
 
 } // namespace cuda_backend
 } // namespace znn
