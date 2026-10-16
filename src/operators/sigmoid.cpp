@@ -8,7 +8,7 @@ namespace znn {
 extern const Operator g_sigmoid_operator;
 
 static void sigmoid_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    unary_kernel(in, out, [](float x) { return 1.0f / (1.0f + expf(-x)); });
+    unary_kernel_fast(in, out, [](float x) { return 1.0f / (1.0f + expf(-x)); });
 }
 
 static void sigmoid_grad(BackwardContext& c) {

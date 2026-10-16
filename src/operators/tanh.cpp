@@ -8,7 +8,7 @@ namespace znn {
 extern const Operator g_tanh_operator;
 
 static void tanh_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    unary_kernel(in, out, [](float x) { return tanhf(x); });
+    unary_kernel_fast(in, out, [](float x) { return tanhf(x); });
 }
 
 static void tanh_grad(BackwardContext& c) {

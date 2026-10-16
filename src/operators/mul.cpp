@@ -16,7 +16,7 @@ static void mul_grad(BackwardContext& c) {
 }
 
 static void mul_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    binary_kernel(in, out, [](float a, float b) { return a * b; });
+    binary_kernel_fast(in, out, [](float a, float b) { return a * b; });
 }
 
 const Operator g_mul_operator = {

@@ -8,7 +8,7 @@ namespace znn {
 extern const Operator g_relu_operator;
 
 static void relu_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    unary_kernel(in, out, [](float x) { return x > 0 ? x : 0; });
+    unary_kernel_fast(in, out, [](float x) { return x > 0 ? x : 0; });
 }
 
 static void relu_grad(BackwardContext& c) {

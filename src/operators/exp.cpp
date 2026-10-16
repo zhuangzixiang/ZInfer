@@ -8,7 +8,7 @@ namespace znn {
 extern const Operator g_exp_operator;
 
 static void exp_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    unary_kernel(in, out, [](float x) { return expf(x); });
+    unary_kernel_fast(in, out, [](float x) { return expf(x); });
 }
 
 static void exp_grad(BackwardContext& c) {

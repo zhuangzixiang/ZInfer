@@ -92,6 +92,8 @@ set(ZNN_OPTIM
 
 if(ZNN_CUDA)
     enable_language(CUDA)
+    # dynlib 包含 cublasLt.h(CUDA 头文件), 必须用 nvcc 编译
+    set_source_files_properties(src/dynlib.cpp PROPERTIES LANGUAGE CUDA)
     set(ZNN_CUDA_SRC
         src/backends/cuda/cuda_device.cu
         src/backends/cuda/cuda_kernels.cu
@@ -105,6 +107,7 @@ endif()
 
 add_library(znn
     src/znn_internal.cpp
+    src/dynlib.cpp
     src/autograd.cpp
     src/op_dispatcher.cpp
     ${ZNN_OPERATORS}
@@ -113,6 +116,9 @@ add_library(znn
     ${ZNN_CUDA_SRC}
 )
 target_include_directories(znn PUBLIC include PRIVATE src third_party/eigen)
+if(ZNN_CUDA)
+    target_compile_definitions(znn PRIVATE ZNN_CUDA)
+endif()
 
 # Eigen 多线程 GEMM 走 OpenMP(MSVC /openmp; gcc/clang -fopenmp 由下方统一)
 if(MSVC AND NOT ZNN_CUDA)

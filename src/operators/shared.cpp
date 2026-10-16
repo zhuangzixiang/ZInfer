@@ -1,5 +1,6 @@
 // shared.cpp — 逐元素类算子的共用实现
 #include "shared.hpp"
+#include <Eigen/Dense>
 #include <cstring>
 
 namespace znn {
@@ -115,6 +116,47 @@ void unary_grad(BackwardContext& context, float (*d)(float, float)) {
     }
 }
 
+// ============================================================ Eigen 快速内核
+// 连续 + 无广播 → Eigen::Map(SIMD 自动分发 AVX2/AVX-512/NEON/标量)
+// 非连续或广播 → 内部回退朴素路径
+
+namespace {
+bool fast_binary_ok(const Tensor& a, const Tensor& b, const Tensor& y) {
+    return a.is_contiguous() && b.is_contiguous() && y.is_contiguous()
+        && a.shape() == b.shape() && a.shape() == y.shape();
+}
+bool fast_unary_ok(const Tensor& x, const Tensor& y) {
+    return x.is_contiguous() && y.is_contiguous() && x.shape() == y.shape();
+}
+} // namespace
+
+void unary_kernel_fast(Span<const Tensor*> in, Span<Tensor*> out, float (*fn)(float)) {
+    const Tensor& x = *in[0];
+    Tensor& y = *out[0];
+    if (!fast_unary_ok(x, y)) {
+        unary_kernel(in, out, fn);                       // 回退朴素
+        return;
+    }
+    const int64_t n = y.numel();
+    Eigen::Map<Eigen::VectorXf> xm(x.data<float>(), n);
+    Eigen::Map<Eigen::VectorXf> ym(y.data<float>(), n);
+    ym = xm.unaryExpr([fn](float v) { return fn(v); }); // Eigen SIMD
+}
+
+void binary_kernel_fast(Span<const Tensor*> in, Span<Tensor*> out, float (*fn)(float, float)) {
+    const Tensor& a = *in[0];
+    const Tensor& b = *in[1];
+    Tensor& y = *out[0];
+    if (!fast_binary_ok(a, b, y)) {
+        binary_kernel(in, out, fn);                      // 回退朴素
+        return;
+    }
+    const int64_t n = y.numel();
+    Eigen::Map<Eigen::VectorXf> am(a.data<float>(), n);
+    Eigen::Map<Eigen::VectorXf> bm(b.data<float>(), n);
+    Eigen::Map<Eigen::VectorXf> ym(y.data<float>(), n);
+    ym = am.binaryExpr(bm, [fn](float u, float v) { return fn(u, v); });
+}
 
 void sum_into(const Tensor& x, int64_t dim, bool keepdim, Tensor& out) {
     const float* xp = x.data<float>();

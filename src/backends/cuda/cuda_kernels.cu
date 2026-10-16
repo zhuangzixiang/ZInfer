@@ -4,6 +4,7 @@
 // ============================================================================
 #include "operator.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "dynlib.hpp"
 #include <cuda_runtime.h>
 #include <stdexcept>
 
@@ -150,6 +151,26 @@ void matmul_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     Tensor& y = *out[0];
     require_contiguous2(a, b, y);
     const int M = a.size(0), K = a.size(1), N = b.size(1);
+
+    // 快速路径: cuBLAS(DLL 可用时)
+    if (dynlib::available_cublas()) {
+        const float alpha = 1.0f, beta = 0.0f;
+        // 行主序 y[M,N] = a[M,K] × b[K,N]
+        // 列主序等价: y^T[N,M] = b^T[N,K] × a^T[K,M]
+        // sgemm(m=N, n=M, k=K, A=b_ptr(ld=N), B=a_ptr(ld=K), C=y_ptr(ld=N))
+        dynlib::cublas_sgemm(
+            dynlib::cublas_handle,
+            CUBLAS_OP_N, CUBLAS_OP_N,
+            N, M, K,
+            &alpha,
+            b.data<float>(), N,     // A = b 的列主序视角(即 b^T), N×K, ld=N
+            a.data<float>(), K,     // B = a 的列主序视角(即 a^T), K×M, ld=K
+            &beta,
+            y.data<float>(), N);    // C = y 的列主序视角(即 y^T), N×M, ld=N
+        return;
+    }
+
+    // 备选路径: 朴素内核(DLL 缺失时)
     dim3 block(16, 16);
     dim3 grid((N + 15) / 16, (M + 15) / 16);
     matmul_k<<<grid, block>>>(a.data<float>(), b.data<float>(),

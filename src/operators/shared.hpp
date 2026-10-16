@@ -21,6 +21,11 @@ void infer_same(Span<const TensorMeta*> inputs, const void*, std::vector<Shape>&
 void unary_kernel(Span<const Tensor*> in, Span<Tensor*> out, float (*fn)(float));
 void binary_kernel(Span<const Tensor*> in, Span<Tensor*> out, float (*fn)(float, float));
 
+// ---- CPU 快速内核(kernels[CPU] 槽位用): 连续+无广播走 Eigen SIMD,
+//      否则内部回退到朴素路径 ----
+void unary_kernel_fast(Span<const Tensor*> in, Span<Tensor*> out, float (*fn)(float));
+void binary_kernel_fast(Span<const Tensor*> in, Span<Tensor*> out, float (*fn)(float, float));
+
 // ---- 梯度规则帮手(输入连续假设, MNIST 路径成立; 非连续留待 contiguous 处理) ----
 // 二元逐元素: 两输入梯度 = grad_out 规约回各自形状
 void binary_grad(BackwardContext& context);

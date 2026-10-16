@@ -8,7 +8,7 @@ namespace znn {
 extern const Operator g_sqrt_operator;
 
 static void sqrt_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    unary_kernel(in, out, [](float x) { return sqrtf(x); });
+    unary_kernel_fast(in, out, [](float x) { return sqrtf(x); });
 }
 
 static void sqrt_grad(BackwardContext& c) {

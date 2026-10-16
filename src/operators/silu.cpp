@@ -8,7 +8,7 @@ namespace znn {
 extern const Operator g_silu_operator;
 
 static void silu_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    unary_kernel(in, out, [](float x) { return x / (1.0f + expf(-x)); });
+    unary_kernel_fast(in, out, [](float x) { return x / (1.0f + expf(-x)); });
 }
 
 static void silu_grad(BackwardContext& c) {

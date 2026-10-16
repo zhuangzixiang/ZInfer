@@ -21,7 +21,7 @@ static float gelu_deriv(float x) {
 }
 
 static void gelu_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    unary_kernel(in, out, gelu_fwd);
+    unary_kernel_fast(in, out, gelu_fwd);
 }
 
 static void gelu_grad(BackwardContext& c) {

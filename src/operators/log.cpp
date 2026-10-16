@@ -8,7 +8,7 @@ namespace znn {
 extern const Operator g_log_operator;
 
 static void log_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    unary_kernel(in, out, [](float x) { return logf(x); });
+    unary_kernel_fast(in, out, [](float x) { return logf(x); });
 }
 
 static void log_grad(BackwardContext& c) {
