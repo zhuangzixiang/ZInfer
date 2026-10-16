@@ -5,7 +5,6 @@
 // 编译条件: CMake ZNN_CUDA=ON 时替代 cuda_stub.cpp 进入构建。
 // 扩展路径(DESIGN §5.2): 新算子 = operators/foo.cu 填 kernels[CUDA] 槽位。
 // ============================================================================
-#include "backends/cuda/cuda_backend.hpp"
 #include <cuda_runtime.h>
 #include <stdexcept>
 
@@ -64,3 +63,4 @@ void memset0(void* p, size_t bytes) {
 
 } // namespace cuda_backend
 } // namespace znn
+#include "backends/cuda/cuda_backend.hpp"

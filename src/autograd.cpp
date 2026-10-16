@@ -74,7 +74,9 @@ void AutogradEngine::backward(const Tensor& loss) {
         ctx.grad_outputs  = Span<const Tensor*>(go.data(), go.size());
         ctx.grad_inputs   = Span<Tensor*>(gi.data(), gi.size());
         ctx.options       = n->options_copy.empty() ? nullptr : n->options_copy.data();
+        std::fprintf(stderr, "[bw:%s nin=%d] ", n->op->name, (int)nin);
         n->op->grad(ctx);
+        std::fprintf(stderr, "[done] ");
         // 3. 累加到各输入(叶子得到最终梯度; 中间量等待其生产节点读取)
         for (size_t i = 0; i < nin; ++i) {
             if (n->saved_inputs[i].requires_grad()) {

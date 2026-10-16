@@ -164,6 +164,7 @@ void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
     for (int64_t i = 0; i < out.numel(); ++i) {
         int64_t go = 0;
         for (int64_t d = 0; d < in_shape.rank; ++d) {
+            if (d == dim && !keepdim) continue;   // 被求和维不贡献梯度偏移
             const int64_t gd = keepdim ? d : (d > dim ? d - 1 : d);
             go += idx[d] * gs[gd];
         }

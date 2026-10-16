@@ -10,13 +10,11 @@
 #pragma once
 #include <cstddef>
 
+// 前置声明: .cu 文件必须先 include operator.hpp 再 include 本文件
 namespace znn {
-
 class Tensor;
 struct KernelContext;
 template <class T> struct Span;
-using KernelFnHost = void (*)(KernelContext&, Span<const Tensor*>,
-                              Span<Tensor*>, const void*);
 
 namespace cuda_backend {
 

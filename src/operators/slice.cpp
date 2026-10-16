@@ -30,11 +30,13 @@ static void slice_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const Tensor& x = *in[0];
     Tensor& y = *out[0];
     const int64_t dim = o->dim < 0 ? o->dim + x.dim_count() : o->dim;
-    const int64_t len = o->end - o->begin;
-    // 等价于对 x 的切片视图做紧凑拷贝
+    // 内核内禁用建图: 防止 x.slice() 在 requires_grad 输入上
+    // 递归调回 slice_for_autograd 造成无限循环
+    const bool was = Runtime::grad_enabled();
+    Runtime::set_grad_enabled(false);
     Tensor view = x.slice(dim, o->begin, o->end);
+    Runtime::set_grad_enabled(was);
     impl::copy_view_to(view, y);
-    (void)len;
 }
 
 static void slice_grad(BackwardContext& c) {

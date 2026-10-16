@@ -186,13 +186,10 @@ static void test_training_converges() {
     }
     Tensor X = Tensor::from_host(xs, {N, 1});
     Tensor Y = Tensor::from_host(ys, {N, 1});
-    std::fprintf(stderr, "setup1\n");
     std::vector<Layer*> net = {
         Layer::create(LayerType::Linear, LayerParam{1, 1}),
     };
-    std::fprintf(stderr, "setup2\n");
     Optimizer* opt = Optimizer::create(OptimType::Adam, net, OptimParam{0.05});
-    std::fprintf(stderr, "setup3\n");
     float first = 0.f, last = 0.f;
     for (int step = 0; step < 400; ++step) {
         Tensor h = X;
@@ -203,7 +200,6 @@ static void test_training_converges() {
         opt->clear();
         loss.backward();
         opt->step();
-        std::fprintf(stderr, "o\n");
     }
     Tensor h = X;
     for (Layer* l : net) h = l->forward(h);
@@ -227,11 +223,13 @@ static void test_conv2d() {
     check(y.data<float>()[0] == 12.f && y.data<float>()[1] == 16.f
           && y.data<float>()[2] == 24.f && y.data<float>()[3] == 28.f, "conv2d values");
 
-    // 有限差分校验卷积梯度
+    // 有限差分校验卷积梯度(与 loss=sum(全部输出) 一致)
     auto f = [&tx](float w0) {
         const float wk[4] = {w0, 1, 1, 1};
-        return Tensor::conv2d(tx, Tensor::from_host(wk, {1, 1, 2, 2}))
-                   .data<float>()[0];
+        Tensor y = Tensor::conv2d(tx, Tensor::from_host(wk, {1, 1, 2, 2}));
+        float s = 0.f;
+        for (int64_t i = 0; i < y.numel(); ++i) s += y.data<float>()[i];
+        return s;
     };
     Tensor W = Tensor::from_host(w, {1, 1, 2, 2});
     W.requires_grad(true);
@@ -246,15 +244,17 @@ static void test_conv2d() {
 static void test_pool_cat_stack() {
     const float x[8] = {1, 2, 3, 4, 5, 6, 7, 8};
     Tensor tx = Tensor::from_host(x, {1, 1, 2, 4});
-    Tensor mp = Tensor::max_pool2d(tx, {1, 2});
+    Pool2dOptions po;                                     // stride = kernel(非重叠池化)
+    po.stride = {1, 2};
+    Tensor mp = Tensor::max_pool2d(tx, {1, 2}, po);
     check(mp.size(3) == 2 && mp.data<float>()[0] == 2.f && mp.data<float>()[1] == 4.f, "max pool values");
-    Tensor ap = Tensor::avg_pool2d(tx, {1, 2});
+    Tensor ap = Tensor::avg_pool2d(tx, {1, 2}, po);
     check(ap.data<float>()[0] == 1.5f && ap.data<float>()[1] == 3.5f, "avg pool values");
 
     // max pool 梯度只给窗口最大位置
     Tensor T = Tensor::from_host(x, {1, 1, 2, 4});
     T.requires_grad(true);
-    Tensor l = Tensor::sum(Tensor::max_pool2d(T, {1, 2}).flatten(), -1);
+    Tensor l = Tensor::sum(Tensor::max_pool2d(T, {1, 2}, po).flatten(), -1);
     l.backward();
     check(T.grad().data<float>()[1] == 1.f && T.grad().data<float>()[0] == 0.f,
           "max pool grad routes to max");
@@ -277,7 +277,7 @@ static void test_pool_cat_stack() {
     rb.requires_grad(true);
     Tensor ls = Tensor::sum(Tensor::cat(ra, rb, 1).flatten(), -1);
     ls.backward();
-    check(ra.grad().data<float>()[3] == 4.f && rb.grad().data<float>()[0] == 5.f, "cat grad slices");
+    check(ra.grad().data<float>()[3] == 1.f && rb.grad().data<float>()[0] == 1.f, "cat grad slices");
 }
 
 static void test_embedding_reshape() {
@@ -311,13 +311,15 @@ static void test_norms_attention() {
     // layer_norm: 末维归一化, 输出每行均值≈偏置
     const float lx[4] = {1, 2, 3, 6};
     Tensor ln_x = Tensor::from_host(lx, {2, 2});
-    Layer* ln = Layer::create(LayerType::LayerNorm, LayerParam{2});
+    LayerParam lp;
+    lp.normalized_dim = 2;
+    Layer* ln = Layer::create(LayerType::LayerNorm, lp);
     Tensor ly = ln->forward(ln_x);
     const float m0 = (ly.data<float>()[0] + ly.data<float>()[1]) / 2.f;
     check(fabsf(m0) < 1e-5f, "layer norm zero mean");
     Layer::destroy(ln);
 
-    // batch_norm2d: 训练后输出每通道均值≈偏置
+    // batch_norm2d: 训练后输出每通道均值≈偏置(NCHW 布局正确索引)
     LayerParam bp;
     bp.channels = 2;
     Layer* bn = Layer::create(LayerType::BatchNorm2d, bp);
@@ -326,18 +328,23 @@ static void test_norms_attention() {
     Tensor bx_t = Tensor::from_host(bx, {2, 2, 2, 2});
     Tensor by = bn->forward(bx_t);
     float s0 = 0.f;
-    for (int64_t i = 0; i < 8; ++i) s0 += by.data<float>()[i * 2];
+    for (int64_t n = 0; n < 2; ++n)
+        for (int64_t hw = 0; hw < 4; ++hw)
+            s0 += by.data<float>()[n * 8 + hw];             // channel 0: n*8 + 0*4 + h*2 + w
     check(fabsf(s0 / 8.f) < 1e-4f, "batch norm per-channel mean");
     Layer::destroy(bn);
 
-    // attention: B=1,H=1,L=2,D=2 手算
+    // attention: Q=单位阵, S=I/√2(非 I), softmax 后 P≠I, O≈加权平均 V
     const float q[4] = {1, 0, 0, 1};
     const float v[4] = {1, 2, 3, 4};
     Tensor tq = Tensor::from_host(q, {1, 1, 2, 2});
     Tensor tv = Tensor::from_host(v, {1, 1, 2, 2});
     Tensor att = Tensor::attention(tq, tq, tv);
-    // S = I → P = I → O = V
-    check(att.data<float>()[0] == 1.f && att.data<float>()[3] == 4.f, "attention identity q");
+    // S=[[0.707,0],[0,0.707]], softmax→P=[[0.67,0.33],[0.33,0.67]]
+    // O = P@V → [0.67*1+0.33*3, 0.67*2+0.33*4, 0.33*1+0.67*3, 0.33*2+0.67*4]
+    //        ≈ [1.66, 2.66, 2.34, 3.34]
+    check(fabsf(att.data<float>()[0] - 1.66f) < 0.01f
+          && fabsf(att.data<float>()[3] - 3.34f) < 0.01f, "attention identity q");
 }
 static void test_eigen_vs_ref() {
     // matmul: 派发(Eigen) vs 朴素 ref 数值一致
@@ -405,7 +412,7 @@ static void test_restriction_lifts() {
     for (int64_t i = 0; i < 6; ++i) all1 = all1 && P.grad().data<float>()[i] == 1.f;
     check(all1, "permute training grad");
 
-    // slice 训练态: 取行 1, loss=sum → 只有该行有梯度
+    // slice 训练态
     Tensor S = Tensor::zeros({3, 2});
     S.requires_grad(true);
     Tensor sv = S.slice(0, 1, 2);
@@ -417,16 +424,16 @@ static void test_restriction_lifts() {
 
 static void test_grouped_conv_and_causal() {
     // 分组卷积: groups=2 等价于两个独立半通道卷积拼接
-    const float x[8] = {1, 2, 3, 4, 5, 6, 7, 8};           // 1x4x2x2? 用 1x4x1x2? 用 {1,4,1,1}
-    const float w[8] = {1, 1, 2, 2, 3, 3, 4, 4};           // 4x1x1x1, groups=2
+    const float x[4] = {1, 2, 3, 4};                      // 1x4x1x1
+    const float w[8] = {1, 1, 2, 2, 3, 3, 4, 4};           // 4x2x1x1, groups=2
     Tensor tx = Tensor::from_host(x, {1, 4, 1, 1});
-    Tensor tw = Tensor::from_host(w, {4, 1, 1, 1});
+    Tensor tw = Tensor::from_host(w, {4, 2, 1, 1});
     Conv2dOptions o;
     o.groups = 2;
     Tensor y = Tensor::conv2d(tx, tw, o);
-    // 每通道 = 权重·对应输入: [1,4,6,12]
-    check(y.data<float>()[0] == 1.f && y.data<float>()[1] == 4.f
-          && y.data<float>()[2] == 9.f && y.data<float>()[3] == 12.f, "grouped conv values");
+    // 组0(ch0-1): o0=1·1+1·2=3, o1=2·1+2·2=6; 组1(ch2-3): o2=3·3+3·4=21, o3=4·3+4·4=28
+    check(y.data<float>()[0] == 3.f && y.data<float>()[1] == 6.f
+          && y.data<float>()[2] == 21.f && y.data<float>()[3] == 28.f, "grouped conv values");
 
     // causal attention: L=2, 未来位置被屏蔽 → 第 0 行输出只依赖 v[0]
     const float q[4] = {1, 0, 1, 0};
@@ -525,7 +532,15 @@ int main() {
     std::fprintf(stderr, "t8\n"); test_matmul_reduce_loss();
     std::fprintf(stderr, "t9\n"); test_gradient_checks();
     std::fprintf(stderr, "t10\n"); test_training_converges();
-    std::fprintf(stderr, "done-tests\n");
+    std::fprintf(stderr, "t11\n"); test_conv2d();
+    std::fprintf(stderr, "t12\n"); test_pool_cat_stack();
+    std::fprintf(stderr, "t13\n"); test_embedding_reshape();
+    std::fprintf(stderr, "t14\n"); test_norms_attention();
+    std::fprintf(stderr, "t15\n"); test_eigen_vs_ref();
+    std::fprintf(stderr, "t16\n"); test_restriction_lifts();
+    std::fprintf(stderr, "t17\n"); test_grouped_conv_and_causal();
+    std::fprintf(stderr, "t18\n"); test_dropout_layer();
+    std::fprintf(stderr, "t19\n"); test_cuda_parity();
     if (failures == 0) {
         std::printf("ALL BASIC TESTS PASSED\n");
         return 0;

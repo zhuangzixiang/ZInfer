@@ -1,6 +1,6 @@
-// linear 的 CUDA 内核: 融合 GEMM + bias(朴素, 每线程一个输出元素)
-#include "backends/cuda/cuda_backend.hpp"
 #include "operator.hpp"
+#include "backends/cuda/cuda_backend.hpp"
+// linear 的 CUDA 内核: 融合 GEMM + bias(朴素, 每线程一个输出元素)
 #include <cuda_runtime.h>
 
 namespace znn {

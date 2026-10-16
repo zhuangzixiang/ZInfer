@@ -405,7 +405,9 @@ Tensor Tensor::reshape(Shape shape) const {
     if (Runtime::grad_enabled() && impl_->requires_grad) {
         return reshape_for_autograd(*this, shape);   // 训练态: 材料化+逆梯度
     }
-    require(impl_->is_contiguous(), "reshape of non-contiguous: clone() first (v1)");
+    if (!impl_->is_contiguous()) {
+        return clone().reshape(shape);              // 非连续: 紧凑化后重试
+    }
     const int64_t total = numel();
     int64_t got = 1;
     int64_t infer_at = -1;
@@ -627,7 +629,13 @@ Tensor Tensor::detach() const {
 // ============================================================ Runtime
 
 bool Runtime::device_available(Device device) {
-    return device == Device::CPU;
+    if (device == Device::CPU) {
+        return true;
+    }
+    if (device == Device::CUDA) {
+        return cuda_backend::available();
+    }
+    return false;                                          // Metal/Vulkan 未编入
 }
 
 void Runtime::set_grad_enabled(bool yes) {

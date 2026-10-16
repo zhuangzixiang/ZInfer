@@ -22,8 +22,11 @@ static void reshape_infer(Span<const TensorMeta*> in, const void* options,
 static void reshape_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                         const void*) {
     // 紧凑化(逻辑行主序)后按目标形状视图, 句柄赋值共享存储
+    const bool was = Runtime::grad_enabled();
+    Runtime::set_grad_enabled(false);                       // 防递归
     Tensor flat = in[0]->clone();
     *out[0] = flat.reshape(out[0]->shape());
+    Runtime::set_grad_enabled(was);
 }
 
 static void reshape_grad(BackwardContext& c) {

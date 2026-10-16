@@ -1,14 +1,19 @@
+#include "operator.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 // ============================================================================
 // cuda_kernels2.cu — 第二批 CUDA 内核: softmax / 规约 / 损失 / 卷积 / 池化
 // (逐元素与 GEMM 见 cuda_kernels.cu)
 // ============================================================================
-#include "backends/cuda/cuda_backend.hpp"
-#include "operator.hpp"
-#include "operators/shared.hpp"
 #include <cuda_runtime.h>
 #include <stdexcept>
 
 namespace znn {
+
+// 从 shared.hpp 精简(避免 nvcc include 链问题)
+struct PoolCallOptions {
+    Pool2dOptions pool;
+    Shape kernel;
+};
 namespace cuda_backend {
 
 namespace {

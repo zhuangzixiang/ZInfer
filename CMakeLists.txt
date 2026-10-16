@@ -5,8 +5,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# 源码为 UTF-8(含中文注释), MSVC 默认按本地代码页解析会破坏语法
-add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+# 源码为 UTF-8(含中文注释), MSVC 默认按本地代码页解析会破坏语法。
+# CXX 直接用 /utf-8; CUDA 经 nvcc 的 -Xcompiler 转发给主机编译器 cl.exe。
+add_compile_options("$<$<AND:$<CXX_COMPILER_ID:MSVC>,$<COMPILE_LANGUAGE:CXX>>:/utf-8>")
+if(MSVC AND ZNN_CUDA)
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=-utf-8")
+endif()
 
 # Debug 默认带 /RTC1, 与 Eigen 内核的 /O2 冲突; 本项目不依赖运行时检查
 if(MSVC)
@@ -112,7 +116,7 @@ target_include_directories(znn PUBLIC include PRIVATE src third_party/eigen)
 
 # Eigen 多线程 GEMM 走 OpenMP(MSVC /openmp; gcc/clang -fopenmp 由下方统一)
 if(MSVC)
-    target_compile_options(znn PRIVATE /openmp)
+    target_compile_options(znn PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:/openmp>")
 else()
     find_package(OpenMP REQUIRED)
     target_link_libraries(znn PRIVATE OpenMP::OpenMP_CXX)

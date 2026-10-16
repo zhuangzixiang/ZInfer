@@ -1,11 +1,10 @@
+#include "operator.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 // ============================================================================
 // cuda_kernels3.cu — 第三批 CUDA 内核: attention/LN/BN/embedding/
 // 视图族(reshape/transpose/permute/slice)/cat/stack/arange/randen
 // 填满全部算子的 kernels[CUDA] 槽位, CPU 兜底仅作为构建开关关闭时的底线。
 // ============================================================================
-#include "backends/cuda/cuda_backend.hpp"
-#include "operator.hpp"
-#include "operators/shared.hpp"
 #include <cuda_runtime.h>
 #include <cmath>
 #include <random>
