@@ -44,6 +44,7 @@ int main() {
         int n = (M >= 4096) ? 5 : (M >= 2048) ? 10 : (M >= 1024) ? 20 : 30;
         bench("FP32", Precision::FP32, M, n);
         bench("TF32", Precision::TF32, M, n);
+        bench("FP16", Precision::FP16, M, n);
     }
 
     fprintf(stderr, "=== GEMM-class ops (TF32, data-resident) ===\n");

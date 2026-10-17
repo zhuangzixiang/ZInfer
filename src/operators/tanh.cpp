@@ -12,7 +12,7 @@ static void tanh_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, 
 }
 
 static void tanh_grad(BackwardContext& c) {
-    unary_grad(c, [](float x, float y) { return 1.0f - y * y; });
+    unary_grad(c, UnaryBwd::Tanh);
 }
 
 const Operator g_tanh_operator = {

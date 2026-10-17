@@ -106,9 +106,28 @@ L==D 时两种布局巧合相同故从未暴露)。
   与 d2h 同步拷贝, 非分配问题;
 - conv2d 首次超过旧朴素内核(0.091ms); attention 端到端 2.9×。
 
+## 2026-10-16 · GPU FP16 混合精度(计算转半精度, 存储/累加仍 FP32)
+
+`Runtime::set_precision(FP16)`: gemm 原语入口把 A/B 转 FP16 scratch
+(带步长转换内核, 列切片/权重布局均覆盖), cublasGemmEx(16F, 16F, 32F,
+COMPUTE_32F); 输出仍写 FP32。训练配 GradScaler(动态损失缩放)防下溢。
+
+| matmul(端到端) | FP32 | TF32 | FP16 |
+|---|---:|---:|---:|
+| 1024³ | 16.5 | 20.5 | 23.8 TF/s |
+| 2048³ | 18.7 | 24.7 | 28.6 TF/s |
+| 4096³ | 19.8 | 24.8 | **30.9 TF/s** |
+
+FP16/TF32 = 1.25×(端到端含 2 个转换内核的读写与 scratch 分配;
+纯 GEMM 内核收益更高)。FP16 数值: matmul/linear 对拍 2% 相对容差通过;
+GPU FP16+GradScaler 训练 60 步: 损耗下降, 有限性达标。
+
 ## 已知瓶颈(后续优化目标)
 
-1. FP16/BF16 未接入(Ada Tensor Core 峰值再翻倍);
+1. FP16 已接入; **GPU 反向路径存量缺口(部分)**: pools/embedding/
+   permute/mean-sum 的梯度规则仍为宿主循环, GPU 训练触及即崩
+   (FP16 块已修 full/ones/mse/unary/matmul视图/优化器clear/conv2d 梯度
+   接线; 剩余待原生内核化——下块工作);
 2. h2d/d2h 仍用同步 cudaMemcpy(小张量无所谓, 流水线场景需
    异步拷贝 + pinned memory);
 3. conv2d im2col 有一次显式拷贝, 可用 stride-map 直接 GEMM 消除;

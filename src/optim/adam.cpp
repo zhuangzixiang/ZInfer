@@ -7,7 +7,8 @@
 namespace znn {
 
 AdamImpl::AdamImpl(std::vector<Tensor> params, const OptimParam& param)
-    : params_(std::move(params)), param_(param) {
+    : param_(param) {
+    params_ = std::move(params);   // 基类成员(GradScaler 共享)
     moments_.resize(params_.size());
 }
 
@@ -53,8 +54,13 @@ void AdamImpl::step() {
 void AdamImpl::clear() {
     for (Tensor& p : params_) {
         if (p.grad()) {
-            std::memset(p.grad().data<float>(), 0,
-                        static_cast<size_t>(p.numel()) * sizeof(float));
+            if (p.device() == Device::CUDA) {
+                cuda_backend::memset0_cuda(p.grad().data<float>(),
+                                           static_cast<size_t>(p.numel()) * sizeof(float));
+            } else {
+                std::memset(p.grad().data<float>(), 0,
+                            static_cast<size_t>(p.numel()) * sizeof(float));
+            }
         }
     }
 }

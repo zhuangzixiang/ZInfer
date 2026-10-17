@@ -103,6 +103,11 @@ void adam_step_cuda(float* p, const float* g, float* m, float* v, long long n,
                     float bias1, float bias2);
 void memset0_cuda(void* p, size_t bytes);
 
+// unary 反向内部算子(options = UnaryBwd 枚举一字节)
+void unary_bwd_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+// GradScaler: 梯度 ×inv, 发现 inf/nan 时 *bad = 1(调用方置零初始化)
+void grad_unscale_cuda(float* g, float* bad, long long n, float inv);
+
 
 } // namespace cuda_backend
 } // namespace znn

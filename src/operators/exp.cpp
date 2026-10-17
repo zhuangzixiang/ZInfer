@@ -12,7 +12,7 @@ static void exp_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, c
 }
 
 static void exp_grad(BackwardContext& c) {
-    unary_grad(c, [](float x, float y) { return y; });
+    unary_grad(c, UnaryBwd::Exp);
 }
 
 const Operator g_exp_operator = {

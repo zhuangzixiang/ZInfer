@@ -12,7 +12,7 @@ static void relu_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, 
 }
 
 static void relu_grad(BackwardContext& c) {
-    unary_grad(c, [](float x, float y) { return x > 0 ? 1.0f : 0.0f; });
+    unary_grad(c, UnaryBwd::ReLU);
 }
 
 const Operator g_relu_operator = {

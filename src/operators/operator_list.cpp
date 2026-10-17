@@ -21,6 +21,7 @@ extern const Operator g_cat_operator, g_stack_operator;
 extern const Operator g_conv2d_operator, g_max_pool2d_operator, g_avg_pool2d_operator;
 extern const Operator g_embedding_operator, g_attention_operator;
 extern const Operator g_cross_entropy_operator, g_mse_operator;
+extern const Operator g_unary_bwd_operator;   // 内部: 一元反向(unary_grad 用)
 extern const Operator g_transpose_operator;
 extern const Operator g_reshape_operator;
 extern const Operator g_permute_operator, g_slice_operator;
@@ -59,6 +60,7 @@ const Operator* g_operator_list[] = {
     &g_attention_operator,
     &g_cross_entropy_operator,
     &g_mse_operator,
+    &g_unary_bwd_operator,
     &g_transpose_operator,
     &g_reshape_operator,
     &g_permute_operator,

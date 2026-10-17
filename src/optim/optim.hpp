@@ -14,7 +14,6 @@ public:
     void step() override;
     void clear() override;
 private:
-    std::vector<Tensor> params_;
     std::vector<Tensor> velocity_;   // momentum > 0 时启用
     OptimParam param_;
 };
@@ -31,7 +30,6 @@ protected:
         Tensor m;      // 一阶动量
         Tensor v;      // 二阶动量
     };
-    std::vector<Tensor> params_;
     std::vector<Moment>  moments_;
     friend class AdamWImpl;          // 解耦衰减需访问私有成员
     OptimParam param_;

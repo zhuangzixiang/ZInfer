@@ -12,7 +12,7 @@ static void neg_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, c
 }
 
 static void neg_grad(BackwardContext& c) {
-    unary_grad(c, [](float x, float y) { return -1.0f; });
+    unary_grad(c, UnaryBwd::Neg);
 }
 
 const Operator g_neg_operator = {

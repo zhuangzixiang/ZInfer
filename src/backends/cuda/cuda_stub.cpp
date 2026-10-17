@@ -62,8 +62,10 @@ ZNN_CUDA_KERNEL_NULL(batch_norm2d_cuda)
 ZNN_CUDA_KERNEL_NULL(attention_cuda)
 
 void conv2d_grad_cuda(const float*, const float*, const float*,
-                      float*, float*, int, int, int, int, int,
-                      int, int, int, int, int, int, int, int, int, int) {
+                      float*, float*,
+                      int, int, int, int, int,              // N C H W O
+                      int, int, int, int,                   // KH KW HO WO
+                      int, int, int, int, int, int, int) {  // sh sw ph pw dh dw G
     unavailable();
 }
 
@@ -71,6 +73,8 @@ void sgd_step_cuda(float*, const float*, float*, long long, float, float, float)
 void adam_step_cuda(float*, const float*, float*, float*, long long,
                     float, float, float, float, float, float, float) { unavailable(); }
 void memset0_cuda(void*, size_t) { unavailable(); }
+void grad_unscale_cuda(float*, float*, long long, float) { unavailable(); }
+void unary_bwd_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*) { unavailable(); }
 
 } // namespace cuda_backend
 } // namespace znn

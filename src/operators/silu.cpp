@@ -12,7 +12,7 @@ static void silu_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, 
 }
 
 static void silu_grad(BackwardContext& c) {
-    unary_grad(c, [](float x, float y) { return (1.0f + expf(-x) != 0.f) ? (x / (1.0f + expf(-x)) + 1.0f / (1.0f + expf(-x)) * (1.0f - x / (1.0f + expf(-x)))) : 0.0f; });
+    unary_grad(c, UnaryBwd::Silu);
 }
 
 const Operator g_silu_operator = {

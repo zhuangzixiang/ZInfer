@@ -305,7 +305,8 @@ Tensor Tensor::zeros(Shape shape, DType dtype, Device device) {
 }
 
 Tensor Tensor::ones(Shape shape, DType dtype, Device device) {
-    Tensor t = Tensor::empty(shape, dtype, device);
+    // 宿主填充后按需上传(设备指针不可宿主直写)
+    Tensor t = Tensor::empty(shape, dtype, Device::CPU);
     if (dtype == DType::F32) {
         float* p = t.data<float>();
         for (int64_t i = 0; i < t.numel(); ++i) p[i] = 1.f;
@@ -315,17 +316,17 @@ Tensor Tensor::ones(Shape shape, DType dtype, Device device) {
     } else {
         throw std::runtime_error("znn: ones supports F32/I64 in v1");
     }
-    return t;
+    return device == Device::CPU ? t : t.to_device(device);
 }
 
 Tensor Tensor::full(Shape shape, double value, DType dtype, Device device) {
     require(dtype == DType::F32, "full supports F32 in v1");
-    Tensor t = Tensor::empty(shape, dtype, device);
+    Tensor t = Tensor::empty(shape, dtype, Device::CPU);
     float* p = t.data<float>();
     for (int64_t i = 0; i < t.numel(); ++i) {
         p[i] = static_cast<float>(value);
     }
-    return t;
+    return device == Device::CPU ? t : t.to_device(device);
 }
 
 Tensor Tensor::from_host(const void* data, Shape shape, DType dtype, Device device) {

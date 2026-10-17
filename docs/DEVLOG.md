@@ -507,3 +507,50 @@ cuda_device.cu 尾部遗留 include 垃圾于本块发现并清理。
 
 **反思**: 架构 9/10(机制选择符合项目委托哲学, 铁律零冲突) |
 克制 9/10(没有一上来就自研 200 行分配器)。
+
+---
+
+## [18] FP16 混合精度 + GradScaler(训练防下溢, 用户要求一并解决)
+
+**内容**
+1. Precision 加 FP16 档: gemm 原语入口 A/B → FP16 scratch(带步长
+   转换内核, 支持 ld 列切片与 NT 权重布局), cublasGemmEx
+   (A/B=16F, C=32F, COMPUTE_32F); 累加与张量存储全程 FP32;
+   conv2d/attention 经同一原语自动继承
+2. GradScaler(公共 API, PyTorch AMP 等价): scale 建图内 ×s(反传
+   自动放大梯度); unscale 原生内核 ×(1/s) + inf/nan 标志
+   (grad_unscale_cuda, 免原子); update 动态调整(失败 ÷2 下限 1,
+   每 interval 成功 ×2 上限 2^22)
+3. Optimizer 基类收编 params_(公共只读 params() + friend GradScaler)
+
+**FP16 端到端**(gpu_bench): 4096³ 19.8(FP32)→24.8(TF32)→**30.9 TF/s**
+(FP16); FP16/TF32=1.25×——转换内核读写与 scratch 分摊了理论收益,
+如实记录(纯内核更高)。
+
+**GPU 训练路径存量缺口修复(本块暴露并修复 6 处)**
+FP16 训练烟雾逐段暴露 GPU 反向从未真正跑通(此前仅单算子前向对拍):
+- Tensor::full/ones: 宿主循环直写设备指针 → CPU 构造 + to_device
+- mse_grad: 宿主解引用设备指针 → 算子组合(g×2/N×(p−t))
+- unary_grad(9 算子共用): 宿主循环 → 内部组合算子 unary_bwd
+  (枚举查表 + CPU 循环/CUDA 内核双端, 一次覆盖 relu/gelu/exp/
+  log/sqrt/neg/sigmoid/tanh/silu; DEVLOG[铁律执行]声称的"mul 组合"
+  此前并未落地——记录在案)
+- matmul_cuda: 转置视图直接 require 抛异常 → 材料化(OP_T 直连为
+  后续优化项)
+- 优化器 clear(): 宿主 memset 清 CUDA 梯度 → memset0_cuda
+- conv2d_grad_cuda 专用内核写好后从未接线(死注册) → 接线 +
+  修正 stub 签名不匹配(20 vs 16 int, 死代码从未链接故未暴露)
+
+**验证**: t19 扩充(FP16 matmul/linear 对拍 + GPU FP16+GradScaler
+训练 60 步: 损失下降/有限性/步进率); t20 GradScaler 单元(×s/恢复/
+inf 检测/动态调整); CUDA 与 CPU 双构建全绿; MNIST 97.16%。
+测试自身的三个 bug(f16 对拍 bias 不匹配/非标量 backward/毒化梯度
+未复位)也修复——fastfail(0xC0000409)掩盖异常信息曾误导排查方向。
+
+**遗留(下块)**: pools/embedding/permute/mean-sum 梯度仍为宿主循环,
+GPU 训练触及即崩, 需原生内核化或组合化(BENCH 瓶颈清单在案)。
+
+**反思**: 架构 8/10(unary_bwd 内部算子一次收编 9 算子, 无逐个内核
+膨胀; FP16 折进原语免新机制) | 实现纪律 6/10(FP16 scratch 首版
+有列切片越界, 自查发现; 测试代码三处低级错误) | 测试盲区教训再证:
+"GPU 前向对拍通过 ≠ GPU 训练可用", 端到端训练烟雾必须进回归。

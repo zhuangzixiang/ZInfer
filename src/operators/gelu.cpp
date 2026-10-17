@@ -13,19 +13,12 @@ static float gelu_fwd(float x) {
     return 0.5f * x * (1.0f + std::tanh(k));
 }
 
-static float gelu_deriv(float x) {
-    const float inner = 0.7978845608f * (x + 0.044715f * x * x * x);
-    const float t = std::tanh(inner);
-    const float dt = (1.0f - t * t) * 0.7978845608f * (1.0f + 3.0f * 0.044715f * x * x);
-    return 0.5f * (1.0f + t) + 0.5f * x * dt;
-}
-
 static void gelu_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
     unary_kernel_fast(in, out, gelu_fwd);
 }
 
 static void gelu_grad(BackwardContext& c) {
-    unary_grad(c, [](float x, float) { return gelu_deriv(x); });
+    unary_grad(c, UnaryBwd::GELU);
 }
 
 const Operator g_gelu_operator = {

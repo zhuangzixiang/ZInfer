@@ -12,7 +12,7 @@ static void log_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, c
 }
 
 static void log_grad(BackwardContext& c) {
-    unary_grad(c, [](float x, float y) { return 1.0f / x; });
+    unary_grad(c, UnaryBwd::Log);
 }
 
 const Operator g_log_operator = {

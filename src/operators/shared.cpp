@@ -1,5 +1,6 @@
 // shared.cpp — 逐元素类算子的共用实现
 #include "shared.hpp"
+#include "op_dispatcher.hpp"
 #include <Eigen/Dense>
 #include <cstring>
 
@@ -102,18 +103,67 @@ void binary_grad(BackwardContext& context) {
     *context.grad_inputs[1] = BackwardContext::reduce_to(g, context.saved_inputs[1]->shape());
 }
 
-void unary_grad(BackwardContext& context, float (*d)(float, float)) {
-    const Tensor& g = *context.grad_outputs[0];
-    const Tensor& x = *context.saved_inputs[0];
-    const Tensor& y = *context.saved_outputs[0];
-    Tensor& gi = *context.grad_inputs[0];
+// 一元导数表 d(x, y)。CUDA 端(unary_bwd_k)有同表——设备代码无法引用
+// 宿主函数, 改动须两侧同步
+float unary_deriv(UnaryBwd fn, float x, float y) {
+    switch (fn) {
+    case UnaryBwd::Neg:     return -1.f;
+    case UnaryBwd::Exp:     return y;
+    case UnaryBwd::Log:     return 1.f / x;
+    case UnaryBwd::Sqrt:    return 0.5f / y;
+    case UnaryBwd::ReLU:    return x > 0.f ? 1.f : 0.f;
+    case UnaryBwd::GELU: {
+        const float inner = 0.7978845608f * (x + 0.044715f * x * x * x);
+        const float t = std::tanh(inner);
+        const float dt = (1.f - t * t) * 0.7978845608f * (1.f + 3.f * 0.044715f * x * x);
+        return 0.5f * (1.f + t) + 0.5f * x * dt;
+    }
+    case UnaryBwd::Sigmoid: return y * (1.f - y);
+    case UnaryBwd::Tanh:    return 1.f - y * y;
+    case UnaryBwd::Silu: {
+        const float sg = 1.f / (1.f + std::exp(-x));
+        return sg + x * sg * (1.f - sg);
+    }
+    }
+    return 0.f;
+}
+
+static void unary_bwd_infer(Span<const TensorMeta*> in, const void*,
+                            std::vector<Shape>& outs) {
+    outs.push_back(*in[0]->shape);
+}
+
+static void unary_bwd_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                          const void* options) {
+    const UnaryBwd fn = *static_cast<const UnaryBwd*>(options);
+    const Tensor& g = *in[0];
+    const Tensor& x = *in[1];
+    const Tensor& y = *in[2];
+    Tensor& gi = *out[0];
     const float* gp = g.data<float>();
     const float* xp = x.data<float>();
     const float* yp = y.data<float>();
     float* ip = gi.data<float>();
     for (int64_t i = 0; i < gi.numel(); ++i) {
-        ip[i] = gp[i] * d(xp[i], yp[i]);
+        ip[i] = gp[i] * unary_deriv(fn, xp[i], yp[i]);
     }
+}
+
+const Operator g_unary_bwd_operator = {
+    "unary_bwd",
+    unary_bwd_infer,
+    nullptr,                                   // 内部算子, 无二次反向
+    unary_bwd_ref,
+    {nullptr, cuda_backend::unary_bwd_cuda, nullptr, nullptr},
+    sizeof(UnaryBwd),
+};
+
+void unary_grad(BackwardContext& context, UnaryBwd fn) {
+    // 经派发器原生执行(任意后端); 反向期间建图已全局关闭
+    const Tensor* ins[3] = {context.grad_outputs[0], context.saved_inputs[0],
+                            context.saved_outputs[0]};
+    *context.grad_inputs[0] = OpDispatcher::instance().run(
+        &g_unary_bwd_operator, Span<const Tensor*>(ins, 3), &fn);
 }
 
 // ============================================================ Eigen 快速内核

@@ -146,10 +146,11 @@ ZNN_UNARY_HOST(silu_cuda, silu_k)
 
 void matmul_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
                  const void*) {
-    const Tensor& a = *in[0];
-    const Tensor& b = *in[1];
+    // 非连续视图(如反向里的转置)先材料化(GPU 原生 d2d 拷贝;
+    // 后续可用步长识别直接映射 cuBLAS OP_T 免拷贝)
+    Tensor a = in[0]->is_contiguous() ? *in[0] : in[0]->clone();
+    Tensor b = in[1]->is_contiguous() ? *in[1] : in[1]->clone();
     Tensor& y = *out[0];
-    require_contiguous2(a, b, y);
     const int M = a.size(0), K = a.size(1), N = b.size(1);
 
     // 快速路径: 共享 GEMM 原语(cuBLAS, DLL 缺失时 false → 朴素内核)
@@ -177,6 +178,58 @@ void adam_step_cuda(float* p, const float* g, float* m, float* v, long long n,
                     float bias1, float bias2) {
     adam_k<<<blocks(n), kBlock>>>(p, g, m, v, n, lr, b1, b2, eps, wd,
                                   bias1, bias2);
+}
+
+// ---- unary 反向内部算子(9 算子导数表, 与 shared.cpp unary_deriv 同步) ----
+__device__ float unary_deriv_d(int fn, float x, float y) {
+    switch (fn) {
+    case 0: return -1.f;                                  // Neg
+    case 1: return y;                                     // Exp
+    case 2: return 1.f / x;                               // Log
+    case 3: return 0.5f / y;                              // Sqrt
+    case 4: return x > 0.f ? 1.f : 0.f;                   // ReLU
+    case 5: {                                             // GELU
+        const float inner = 0.7978845608f * (x + 0.044715f * x * x * x);
+        const float t = tanhf(inner);
+        const float dt = (1.f - t * t) * 0.7978845608f * (1.f + 3.f * 0.044715f * x * x);
+        return 0.5f * (1.f + t) + 0.5f * x * dt;
+    }
+    case 6: return y * (1.f - y);                         // Sigmoid
+    case 7: return 1.f - y * y;                           // Tanh
+    default: {                                            // Silu
+        const float sg = 1.f / (1.f + expf(-x));
+        return sg + x * sg * (1.f - sg);
+    }
+    }
+}
+
+__global__ void unary_bwd_k(const float* g, const float* x, const float* y,
+                            float* gi, long long n, int fn) {
+    const long long i = blockIdx.x * (long long)blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    gi[i] = g[i] * unary_deriv_d(fn, x[i], y[i]);
+}
+
+void unary_bwd_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                    const void* options) {
+    const int fn = static_cast<int>(*static_cast<const unsigned char*>(options));
+    const long long n = out[0]->numel();
+    unary_bwd_k<<<blocks(n), kBlock>>>(in[0]->data<float>(), in[1]->data<float>(),
+                                       in[2]->data<float>(), out[0]->data<float>(),
+                                       n, fn);
+}
+
+// ---- GradScaler: 梯度 ×(1/s) + inf/nan 检测 ----
+__global__ void grad_unscale_k(float* g, float* bad, long long n, float inv) {
+    const long long i = blockIdx.x * (long long)blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    const float v = g[i] * inv;
+    g[i] = v;
+    if (!isfinite(v)) *bad = 1.f;   // 各写者写同值, 免原子
+}
+
+void grad_unscale_cuda(float* g, float* bad, long long n, float inv) {
+    grad_unscale_k<<<blocks(n), kBlock>>>(g, bad, n, inv);
 }
 
 void memset0_cuda(void* p, size_t bytes) {

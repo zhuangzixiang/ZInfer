@@ -27,14 +27,11 @@ static void mse_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, c
 static void mse_grad(BackwardContext& c) {
     const Tensor& p = *c.saved_inputs[0];
     const Tensor& t = *c.saved_inputs[1];
-    Tensor& gi = *c.grad_inputs[0];
-    const float scale = 2.f * *c.grad_outputs[0]->data<float>() / static_cast<float>(p.numel());
-    const float* pp = p.data<float>();
-    const float* tp = t.data<float>();
-    float* ip = gi.data<float>();
-    for (int64_t i = 0; i < p.numel(); ++i) {
-        ip[i] = (pp[i] - tp[i]) * scale;
-    }
+    // 组合式: g_pred = (2/N) × g × (pred − target), 全部经算子派发(任意后端)
+    Tensor coef = Tensor::mul(*c.grad_outputs[0],
+                              Tensor::full(Shape{}, 2.0 / (double)p.numel(),
+                                           DType::F32, p.device()));
+    *c.grad_inputs[0] = Tensor::mul(Tensor::sub(p, t), coef);
 }
 
 const Operator g_mse_operator = {

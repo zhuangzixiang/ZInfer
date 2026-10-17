@@ -12,7 +12,7 @@ static void sqrt_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, 
 }
 
 static void sqrt_grad(BackwardContext& c) {
-    unary_grad(c, [](float x, float y) { return 0.5f / y; });
+    unary_grad(c, UnaryBwd::Sqrt);
 }
 
 const Operator g_sqrt_operator = {

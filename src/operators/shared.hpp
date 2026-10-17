@@ -26,11 +26,16 @@ void binary_kernel(Span<const Tensor*> in, Span<Tensor*> out, float (*fn)(float,
 void unary_kernel_fast(Span<const Tensor*> in, Span<Tensor*> out, float (*fn)(float));
 void binary_kernel_fast(Span<const Tensor*> in, Span<Tensor*> out, float (*fn)(float, float));
 
+// 一元反向内部算子: gi = g × d(x, y)。d 按枚举查表,
+// 经派发器原生执行于任意后端(CPU 循环 / CUDA 内核), 无公共 API
+enum class UnaryBwd : uint8_t { Neg, Exp, Log, Sqrt, ReLU, GELU, Sigmoid, Tanh, Silu };
+extern const Operator g_unary_bwd_operator;
+
 // ---- 梯度规则帮手(输入连续假设, MNIST 路径成立; 非连续留待 contiguous 处理) ----
 // 二元逐元素: 两输入梯度 = grad_out 规约回各自形状
 void binary_grad(BackwardContext& context);
 // 一元逐元素: 梯度 = grad_out * d(前向输入 x, 前向输出 y)
-void unary_grad(BackwardContext& context, float (*d)(float x, float y));
+void unary_grad(BackwardContext& context, UnaryBwd fn);
 
 // ---- 规约共用(sum/mean/autograd 复用) ----
 struct ReduceAttrs {                 // sum/mean 的调用选项

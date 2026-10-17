@@ -12,7 +12,7 @@ static void sigmoid_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> ou
 }
 
 static void sigmoid_grad(BackwardContext& c) {
-    unary_grad(c, [](float x, float y) { return y * (1.0f - y); });
+    unary_grad(c, UnaryBwd::Sigmoid);
 }
 
 const Operator g_sigmoid_operator = {

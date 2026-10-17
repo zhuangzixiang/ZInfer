@@ -568,7 +568,126 @@ static void test_cuda_parity() {
     Tensor sm = Activator::softmax(a.to_device(Device::CUDA));
     Tensor sm_cpu = sm.to_device(Device::CPU);
     check(sm_cpu.numel() == a.numel(), "cuda fallback softmax shape");
+
+    // FP16 对拍: 半精度尾数 10 位, 相对误差容忍 2%
+    Runtime::set_precision(Precision::FP16);
+    Tensor f16_mm = Tensor::matmul(m1.to_device(Device::CUDA), m2.to_device(Device::CUDA))
+                        .to_device(Device::CPU);
+    float fd = 0.f;
+    for (int64_t i = 0; i < cpu_mm.numel(); ++i) {
+        const float r = fabsf(cpu_mm.data<float>()[i]);
+        const float tol = 0.02f * (r > 1.f ? r : 1.f) + 1e-3f;
+        const float d = fabsf(cpu_mm.data<float>()[i] - f16_mm.data<float>()[i]);
+        fd = fd < d ? d : fd;
+        check(d <= tol, "cuda fp16 matmul parity");
+        if (d > tol) break;
+    }
+    Tensor cpu_lin_nb = Tensor::linear(lx, lw, nullptr);   // 同无 bias 参考
+    Tensor f16_lin = Tensor::linear(lx.to_device(Device::CUDA),
+                                    lw.to_device(Device::CUDA), nullptr)
+                         .to_device(Device::CPU);
+    for (int64_t i = 0; i < cpu_lin_nb.numel(); ++i) {
+        const float r = fabsf(cpu_lin_nb.data<float>()[i]);
+        const float tol = 0.02f * (r > 1.f ? r : 1.f) + 1e-3f;
+        check(fabsf(cpu_lin_nb.data<float>()[i] - f16_lin.data<float>()[i]) <= tol,
+              "cuda fp16 linear parity");
+        if (failures) break;
+    }
+    Runtime::set_precision(Precision::AUTO);
+
+    // GPU FP16 训练烟雾: 小 MLP + GradScaler, 损失须下降且全程有限
+    {
+        Runtime::set_precision(Precision::FP16);
+        Tensor x = Tensor::randn({32, 8}, 51).to_device(Device::CUDA);
+        Tensor t = Tensor::randn({32, 4}, 52).to_device(Device::CUDA);
+        // 权重 ×0.1 初始化 + lr 3e-2: 稳定收敛配置(lrn 默认 1e-3 会发散,
+        // 发散时 inf 跳步是 scaler 正常行为但无法验证"下降")
+        Tensor w1 = Tensor::mul(Tensor::randn({16, 8}, 53),
+                                Tensor::full(Shape{16, 8}, 0.1)).to_device(Device::CUDA);
+        Tensor w2 = Tensor::mul(Tensor::randn({4, 16}, 54),
+                                Tensor::full(Shape{4, 16}, 0.1)).to_device(Device::CUDA);
+        w1.requires_grad(true);
+        w2.requires_grad(true);
+        OptimParam op;
+        op.lr = 1e-1;
+        Optimizer* opt = Optimizer::create(OptimType::Sgd,
+                                           std::vector<Tensor>{w1, w2}, op);
+        GradScaler scaler(256.f, 1000);
+        float first = -1.f, last = -1.f;
+        int good_steps = 0, inf_skips = 0;
+        bool finite = true;
+        for (int it = 0; it < 60; ++it) {
+            Tensor y = Tensor::linear(
+                Activator::relu(Tensor::linear(x, w1)), w2);
+            Tensor loss = scaler.scale(Loss::mse(y, t));
+            loss.backward();
+            const bool ok = scaler.unscale(*opt);
+            if (ok) { ++good_steps; opt->step(); } else { ++inf_skips; }
+            scaler.update();
+            opt->clear();
+            const float lv = loss.to_device(Device::CPU).data<float>()[0];
+            finite = finite && std::isfinite(lv);
+            if (it == 0) first = lv;
+            last = lv;
+        }
+        Optimizer::destroy(opt);
+        check(finite && inf_skips < 30, "fp16 training finite (grad scaler)");
+        check(good_steps >= 25, "fp16 training mostly steps");
+        check(first - last > 0.03f, "fp16 training loss decreases");
+        Runtime::set_precision(Precision::AUTO);
+    }
     std::printf("CUDA parity tests passed\n");
+}
+
+// t20: GradScaler 动态损失缩放(机制单元, CPU 路径)
+static void test_grad_scaler() {
+    GradScaler scaler(1024.f, 2);
+    Tensor x = Tensor::randn({5, 4}, 62);
+    Tensor t = Tensor::randn({5, 3}, 63);
+    Tensor w = Tensor::randn({3, 4}, 61);
+    w.requires_grad(true);
+    Optimizer* opt = Optimizer::create(OptimType::Sgd,
+                                       std::vector<Tensor>{w}, OptimParam{});
+
+    // 参考梯度(无缩放; 标量损失才能 backward)
+    Loss::mse(Tensor::linear(x, w), t).backward();
+    Tensor ref_g = w.grad();
+    w.grad() = Tensor::zeros(w.shape());                    // 清梯度(直接覆盖)
+    // 缩放路径: 新前向建图, 反传后梯度 = 原梯度 × s
+    scaler.scale(Loss::mse(Tensor::linear(x, w), t)).backward();
+    float ratio_err = 0.f;
+    for (int64_t i = 0; i < w.numel(); ++i) {
+        const float g0 = ref_g.data<float>()[i];
+        const float g1 = w.grad().data<float>()[i];
+        if (fabsf(g0) > 1e-6f) {
+            ratio_err = fmaxf(ratio_err, fabsf(g1 / scaler.scale_factor() - g0) /
+                                           (fabsf(g0) + 1e-6f));
+        }
+    }
+    check(ratio_err < 1e-4f, "scaler scale multiplies grads");
+
+    // unscale: 有限梯度 → true 且梯度恢复原值
+    check(scaler.unscale(*opt), "unscale finite");
+    float back_err = 0.f;
+    for (int64_t i = 0; i < w.numel(); ++i) {
+        const float d = fabsf(w.grad().data<float>()[i] - ref_g.data<float>()[i]);
+        back_err = back_err < d ? d : back_err;
+    }
+    check(back_err < 1e-3f, "unscale restores grads");
+
+    // inf 梯度 → false; update 收缩 scale
+    w.grad().data<float>()[0] = INFINITY;
+    check(!scaler.unscale(*opt), "unscale detects inf");
+    scaler.update();
+    check(scaler.scale_factor() == 512.f, "update halves scale");
+    w.grad().data<float>()[0] = 1.f;         // 复位毒化值, 进入健康期
+    // 连续健康 → 每 growth_interval 步 ×2
+    scaler.unscale(*opt);
+    scaler.update();
+    scaler.unscale(*opt);
+    scaler.update();
+    check(scaler.scale_factor() == 1024.f, "update grows scale");
+    Optimizer::destroy(opt);
 }
 
 int main() {
@@ -591,6 +710,7 @@ int main() {
     std::fprintf(stderr, "t17\n"); test_grouped_conv_and_causal();
     std::fprintf(stderr, "t18\n"); test_dropout_layer();
     std::fprintf(stderr, "t19\n"); test_cuda_parity();
+    std::fprintf(stderr, "t20\n"); test_grad_scaler();
     if (failures == 0) {
         std::printf("ALL BASIC TESTS PASSED\n");
         return 0;

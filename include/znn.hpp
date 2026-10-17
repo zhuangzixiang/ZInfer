@@ -40,9 +40,11 @@ namespace znn {
 
 // 计算精度配置(仅影响 GEMM 类算子: matmul/linear/conv2d/attention)
 //   FP32: 纯 FP32(默认, 调试/对拍)
-//   TF32: Tensor Core 加速(与 FP32 范围相同, 尾数 19 位, 零精度风险, Ampere+)
+//   TF32: Tensor Core 加速(与 FP32 范围相同, 尾数 19 位, Ampere+)
+//   FP16: 半精度 Tensor Core(输入转 FP16 计算, 累加与存储仍 FP32;
+//         尾数 10 位, 推理可直接用, 训练必须配 GradScaler 防梯度下溢)
 //   AUTO: 最优可用(TF32 → FP32 兜底)
-enum class Precision : uint8_t { FP32 = 0, TF32, AUTO };
+enum class Precision : uint8_t { FP32 = 0, TF32, FP16, AUTO };
 
 class Runtime {
 public:
@@ -211,8 +213,41 @@ public:
     virtual void step() = 0;      // 按 .grad() 更新参数
     virtual void clear() = 0;     // 全部参数梯度清零
 
+    const std::vector<Tensor>& params() const { return params_; }  // 只读检视
+
 protected:
+    friend class GradScaler;    // unscale 需直接遍历并修改参数梯度
     Optimizer() = default;
+    std::vector<Tensor> params_;  // 句柄共享(各实现共用, 见 optim.hpp)
+};
+
+// ---------------------------------------------------------------- GradScaler
+// FP16 混合精度训练的动态损失缩放(PyTorch AMP 等价物)
+// 动机: FP16 尾数 10 位, 反传梯度绝对值小(典型 1e-3~1e-6)时在
+// GEMM 入口的 FP16 转换处下溢丢失 → loss 先乘 scale 放大梯度,
+// 优化器步进前再除回; 梯度出现 inf/nan 时跳过该步并收缩 scale。
+// 用法:
+//   GradScaler scaler;
+//   for (...) {
+//       Tensor loss = scaler.scale(model_loss);   // 建图内 ×s
+//       loss.backward();
+//       if (scaler.unscale(*opt)) opt->step();    // false = 梯度含 inf/nan, 跳步
+//       scaler.update();                          // 动态调整 s(成功渐增/失败减半)
+//   }
+class GradScaler {
+public:
+    explicit GradScaler(float init_scale = 65536.f, int growth_interval = 2000);
+
+    Tensor scale(const Tensor& loss) const;   // 返回 loss × s(已建图)
+    bool   unscale(Optimizer& opt);           // 各参数梯度 ×(1/s) 并查有限性
+    void   update();                          // 依据上次 unscale 结果调整 s
+    float  scale_factor() const { return scale_; }
+
+private:
+    float scale_;
+    const int growth_interval_;
+    int  good_steps_ = 0;
+    bool last_finite_ = true;
 };
 
 } // namespace znn

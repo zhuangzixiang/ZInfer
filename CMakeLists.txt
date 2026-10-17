@@ -108,6 +108,7 @@ endif()
 
 add_library(znn
     src/znn_internal.cpp
+    src/grad_scaler.cpp
     src/dynlib.cpp
     src/autograd.cpp
     src/op_dispatcher.cpp
