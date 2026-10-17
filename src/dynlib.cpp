@@ -26,6 +26,8 @@ decltype(&cublasDestroy)   cublas_destroy    = nullptr;
 decltype(&cublasSgemm)     cublas_sgemm      = nullptr;
 decltype(&cublasSetStream) cublas_set_stream = nullptr;
 CublasGemmExFn cublas_gemm_ex    = nullptr;
+decltype(&cublasSgemmStridedBatched) cublas_sgemm_batched = nullptr;
+CublasGemmStridedBatchedExFn cublas_gemm_batched_ex = nullptr;
 
 bool available_cublas() {
     static bool done = false;
@@ -51,6 +53,12 @@ bool available_cublas() {
                 ZNN_DLSYM(h, "cublasSetStream_v2"));
             cublas_gemm_ex = reinterpret_cast<CublasGemmExFn>(
                 ZNN_DLSYM(h, "cublasGemmEx"));
+            cublas_sgemm_batched =
+                reinterpret_cast<decltype(cublas_sgemm_batched)>(
+                    ZNN_DLSYM(h, "cublasSgemmStridedBatched"));
+            cublas_gemm_batched_ex =
+                reinterpret_cast<CublasGemmStridedBatchedExFn>(
+                    ZNN_DLSYM(h, "cublasGemmStridedBatchedEx"));
             if (cublas_create && cublas_sgemm) {
                 if (cublas_create(&cublas_handle) == CUBLAS_STATUS_SUCCESS) {
                     ok = true;

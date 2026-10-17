@@ -515,6 +515,55 @@ static void test_cuda_parity() {
     }
     check(md < 1e-4f, "cuda matmul parity");
 
+    // GEMM 类算子对拍(FP32): linear / conv2d / attention
+    // (防"快而错": 曾有 ×w^T 朝向错误未被对拍覆盖)
+    Tensor lx = Tensor::randn({16, 32}, 21);
+    Tensor lw = Tensor::randn({24, 32}, 22);
+    Tensor lb = Tensor::randn({24}, 23);
+    Tensor cpu_lin = Tensor::linear(lx, lw, &lb);
+    Tensor lb_g = lb.to_device(Device::CUDA);
+    Tensor gpu_lin = Tensor::linear(lx.to_device(Device::CUDA),
+                                    lw.to_device(Device::CUDA), &lb_g)
+                         .to_device(Device::CPU);
+    float ld = 0.f;
+    for (int64_t i = 0; i < cpu_lin.numel(); ++i) {
+        const float d = fabsf(cpu_lin.data<float>()[i] - gpu_lin.data<float>()[i]);
+        ld = ld < d ? d : ld;
+    }
+    check(ld < 1e-4f, "cuda linear parity");
+
+    Tensor cx = Tensor::randn({2, 6, 9, 9}, 31);
+    Tensor cw = Tensor::randn({8, 6, 3, 3}, 32);
+    Conv2dOptions co;
+    co.pad = {1, 1};
+    Tensor cpu_conv = Tensor::conv2d(cx, cw, co);
+    Tensor gpu_conv = Tensor::conv2d(cx.to_device(Device::CUDA),
+                                     cw.to_device(Device::CUDA), co)
+                          .to_device(Device::CPU);
+    float cd = 0.f;
+    for (int64_t i = 0; i < cpu_conv.numel(); ++i) {
+        const float d = fabsf(cpu_conv.data<float>()[i] - gpu_conv.data<float>()[i]);
+        cd = cd < d ? d : cd;
+    }
+    check(cd < 1e-4f, "cuda conv2d parity");
+
+    // attention: L/D 均 > 32(锁死旧内核越界 bug 的回归)
+    Tensor q = Tensor::randn({2, 3, 48, 40}, 41);
+    Tensor kk = Tensor::randn({2, 3, 48, 40}, 42);
+    Tensor vv = Tensor::randn({2, 3, 48, 40}, 43);
+    Tensor cpu_attn = Tensor::attention(q, kk, vv);
+    Tensor gpu_attn = Tensor::attention(q.to_device(Device::CUDA),
+                                        kk.to_device(Device::CUDA),
+                                        vv.to_device(Device::CUDA))
+                          .to_device(Device::CPU);
+    float ad = 0.f;
+    for (int64_t i = 0; i < cpu_attn.numel(); ++i) {
+        const float d = fabsf(cpu_attn.data<float>()[i] - gpu_attn.data<float>()[i]);
+        ad = ad < d ? d : ad;
+    }
+    check(ad < 1e-3f, "cuda attention parity");
+    Runtime::set_precision(Precision::AUTO);
+
     // 兜底链: softmax 无 CUDA 内核 → GPU 输入自动落 CPU 计算再拷回
     Tensor sm = Activator::softmax(a.to_device(Device::CUDA));
     Tensor sm_cpu = sm.to_device(Device::CPU);

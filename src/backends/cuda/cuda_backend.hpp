@@ -9,12 +9,14 @@
 // ============================================================================
 #pragma once
 #include <cstddef>
+#include <cstdint>
 
 // 前置声明: .cu 文件必须先 include operator.hpp 再 include 本文件
 namespace znn {
 class Tensor;
 struct KernelContext;
 template <class T> struct Span;
+enum class Precision : std::uint8_t;   // 定义在公共头 znn.hpp
 
 namespace cuda_backend {
 
@@ -76,6 +78,22 @@ void conv2d_grad_cuda(const float* x, const float* w, const float* g,
                       int N, int C, int H, int W, int O,
                       int KH, int KW, int HO, int WO,
                       int sh, int sw, int ph, int pw, int dh, int dw_, int G);
+
+// ---- 共享 GEMM 原语(cuBLAS 委托, 实现: cuda_gemm.cu) ----
+// 行主序 C[M,N] = A[M,K] × op(B); ld 为行距(列切片时传母矩阵整宽);
+// b_transposed=true 时 B 按 [N,K] 行主序传入(× w^T, 权重布局免转置拷贝)
+// 返回 false = cuBLAS 不可用, 调用方走朴素内核兜底
+// (仅 CUDA 内核内部使用, 无 stub 版本)
+#if defined(ZNN_CUDA)
+bool gemm_cuda(const float* A, int lda, const float* B, int ldb,
+               float* C, int ldc, int M, int N, int K,
+               bool b_transposed, Precision p);
+bool gemm_batched_cuda(const float* A, int lda, long long sa,
+                       const float* B, int ldb, long long sb,
+                       float* C, int ldc, long long sc,
+                       int M, int N, int K, int batch,
+                       bool b_transposed, Precision p);
+#endif
 
 // ---- 优化器 CUDA 入口(审计修复2) ----
 void sgd_step_cuda(float* p, const float* g, float* vel, long long n,

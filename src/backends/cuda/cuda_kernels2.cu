@@ -211,19 +211,90 @@ __global__ void conv2d_k(const float* x, const float* w, float* y,
     y[i] = acc;
 }
 
-void conv2d_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+// ---- conv2d 快速路径: im2col + 逐组 GEMM + NCHW 回转 ----
+// 每线程填 (输出位置, 输入通道) 的整条 KH×KW 窗口(越界补零)
+__global__ void im2col_k(const float* x, float* col,
+                         int N, int C, int H, int W, int HO, int WO,
+                         int KH, int KW,
+                         int sh, int sw, int ph, int pw, int dh, int dw) {
+    const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
+    const int64_t total = (int64_t)N * HO * WO * C;
+    if (i >= total) return;
+    const int c = i % C;
+    const int64_t t = i / C;
+    const int wo = t % WO;
+    const int64_t t2 = t / WO;
+    const int ho = t2 % HO;
+    const int n = t2 / HO;
+    const int64_t CK = (int64_t)C * KH * KW;
+    float* dst = col + (((int64_t)n * HO + ho) * WO + wo) * CK
+               + (int64_t)c * KH * KW;
+    const float* xn = x + ((int64_t)n * C + c) * H * W;
+    for (int ki = 0; ki < KH; ++ki) {
+        const int ii = ho * sh + ki * dh - ph;
+        for (int kj = 0; kj < KW; ++kj) {
+            const int jj = wo * sw + kj * dw - pw;
+            dst[ki * KW + kj] =
+                (ii < 0 || ii >= H || jj < 0 || jj >= W) ? 0.f : xn[ii * W + jj];
+        }
+    }
+}
+
+// 行主序 y2[M, O] → NCHW y(一次转置写回)
+__global__ void rowmajor_to_nchw_k(const float* y2, float* y,
+                                   int O, int HO, int WO, int64_t total) {
+    const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
+    if (i >= total) return;
+    const int wo = i % WO;
+    const int64_t t = i / WO;
+    const int ho = t % HO;
+    const int64_t t2 = t / HO;
+    const int o = t2 % O;
+    const int n = t2 / O;
+    y[i] = y2[(((int64_t)n * HO + ho) * WO + wo) * O + o];
+}
+
+void conv2d_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
                  const void* options) {
     require_contiguous2c(*in[0], *in[1], *out[0]);
     const Conv2dOptions* o = static_cast<const Conv2dOptions*>(options);
     const Tensor& x = *in[0];
     const Tensor& w = *in[1];
     Tensor& y = *out[0];
+    const int N = x.size(0), C = x.size(1), H = x.size(2), W = x.size(3);
+    const int O = w.size(0), KH = w.size(2), KW = w.size(3);
+    const int HO = y.size(2), WO = y.size(3);
+    const int G = o->groups, Cg = C / G, Og = O / G;
+    const int64_t M = (int64_t)N * HO * WO;
+    const int CK = C * KH * KW, CKg = Cg * KH * KW;
+
+    // 快速路径: im2col → 逐组 GEMM(列切片靠 ld 表达, 免拷贝) → NCHW 回转
+    Tensor col = Tensor::empty(Shape{M, CK}, DType::F32, Device::CUDA);
+    im2col_k<<<(unsigned)((M * C + kBlock - 1) / kBlock), kBlock>>>(
+        x.data<float>(), col.data<float>(), N, C, H, W, HO, WO, KH, KW,
+        o->stride[0], o->stride[1], o->pad[0], o->pad[1],
+        o->dilation[0], o->dilation[1]);
+    Tensor y2 = Tensor::empty(Shape{M, O}, DType::F32, Device::CUDA);
+    bool ok = true;
+    for (int g = 0; g < G && ok; ++g) {
+        ok = gemm_cuda(col.data<float>() + (int64_t)g * CKg, CK,   // A 列切片, ld=CK
+                       w.data<float>() + (int64_t)g * Og * CK, CK, // B=w^T 布局
+                       y2.data<float>() + (int64_t)g * Og, O,      // C 列切片, ld=O
+                       (int)M, Og, CKg,
+                       /*b_transposed=*/true, ctx.precision);
+    }
+    if (ok) {
+        rowmajor_to_nchw_k<<<(unsigned)((y.numel() + kBlock - 1) / kBlock), kBlock>>>(
+            y2.data<float>(), y.data<float>(), O, HO, WO, y.numel());
+        return;
+    }
+
+    // 兜底: 朴素卷积(cuBLAS 缺失或 GEMM 失败)
     conv2d_k<<<static_cast<unsigned>((y.numel() + kBlock - 1) / kBlock), kBlock>>>(
         x.data<float>(), w.data<float>(), y.data<float>(),
-        x.size(0), x.size(1), x.size(2), x.size(3),
-        w.size(0), w.size(2), w.size(3), y.size(2), y.size(3),
+        N, C, H, W, O, KH, KW, HO, WO,
         o->stride[0], o->stride[1], o->pad[0], o->pad[1],
-        o->dilation[0], o->dilation[1], o->groups);
+        o->dilation[0], o->dilation[1], G);
 }
 
 // ---- max/avg pool(每线程一个输出元素) ----

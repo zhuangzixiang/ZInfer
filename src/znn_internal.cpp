@@ -641,8 +641,6 @@ Tensor Tensor::detach() const {
 
 // ============================================================ Runtime
 
-namespace dynlib { void set_cublas_precision(bool tf32); }  // 实现在 dynlib.cpp
-
 namespace {
 thread_local bool grad_enabled_flag = true;
 }

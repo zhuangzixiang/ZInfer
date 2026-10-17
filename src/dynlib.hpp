@@ -31,16 +31,31 @@ extern decltype(&cublasDestroy)      cublas_destroy;
 extern decltype(&cublasSgemm)        cublas_sgemm;
 extern decltype(&cublasSetStream)    cublas_set_stream;
 // cublasGemmEx 的显式签名(decltype 不可用: CUDA 生成了重载)
+// 签名必须与 cublas_api.h 的 C 声明逐参一致(19 参, 无 D 矩阵;
+// 多传 C/D 重复参数会错位 computeType → INVALID_VALUE)
 using CublasGemmExFn = cublasStatus_t (*)(
     cublasHandle_t, cublasOperation_t, cublasOperation_t,
     int, int, int,
-    const void*, const void*, cudaDataType, int,
+    const void*,
+    const void*, cudaDataType, int,
     const void*, cudaDataType, int,
     const void*,
     void*, cudaDataType, int,
-    void*, cudaDataType, int,
     cublasComputeType_t, cublasGemmAlgo_t);
 extern CublasGemmExFn cublas_gemm_ex;
+
+// 批量 GEMM(attention 按头并行): SgemmStridedBatched 无重载, 用 decltype
+extern decltype(&cublasSgemmStridedBatched) cublas_sgemm_batched;
+// GemmStridedBatchedEx 同样有重载, 显式签名(注意: 无 D 矩阵, 与 GemmEx 不同)
+using CublasGemmStridedBatchedExFn = cublasStatus_t (*)(
+    cublasHandle_t, cublasOperation_t, cublasOperation_t,
+    int, int, int,
+    const void*, const void*, cudaDataType, int, long long,
+    const void*, cudaDataType, int, long long,
+    const void*,
+    void*, cudaDataType, int, long long,
+    int, cublasComputeType_t, cublasGemmAlgo_t);
+extern CublasGemmStridedBatchedExFn cublas_gemm_batched_ex;
 #endif
 
 // ---- 后续新库在此添加 ----

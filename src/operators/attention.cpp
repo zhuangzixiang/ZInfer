@@ -25,13 +25,15 @@ static void attention_infer(Span<const TensorMeta*> in, const void*,
 }
 
 // ---- CPU 参考内核(朴素) ----
+// C = scale · A × op(B): at=true 转 A, bt=true 转 B(attention 需要 × K^T)
 static void gemm(const float* a, const float* b, float* c,
-                 int64_t M, int64_t K, int64_t N, float scale, bool at) {
+                 int64_t M, int64_t K, int64_t N, float scale, bool at, bool bt) {
     for (int64_t m = 0; m < M; ++m) {
         for (int64_t n = 0; n < N; ++n) {
             float acc = 0.f;
             for (int64_t k = 0; k < K; ++k) {
-                acc += at ? a[k * M + m] * b[k * N + n] : a[m * K + k] * b[k * N + n];
+                acc += (at ? a[k * M + m] : a[m * K + k])
+                     * (bt ? b[n * K + k] : b[k * N + n]);
             }
             c[m * N + n] = acc * scale;
         }
@@ -55,7 +57,7 @@ static void attention_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> 
             const float* kp = k.data<float>() + ((b * H + h) * L) * D;
             const float* vp = v.data<float>() + ((b * H + h) * L) * D;
             float* op = y.data<float>() + ((b * H + h) * L) * D;
-            gemm(qp, kp, s.data(), L, D, L, scale, false);       // S = Q @ K^T
+            gemm(qp, kp, s.data(), L, D, L, scale, false, true);   // S = Q @ K^T
             if (oc->causal) {
                 for (int64_t i = 0; i < L; ++i)
                     for (int64_t j = i + 1; j < L; ++j)
@@ -71,7 +73,7 @@ static void attention_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> 
                 }
                 for (int64_t j = 0; j < L; ++j) p[i * L + j] /= z;
             }
-            gemm(p.data(), vp, op, L, L, D, 1.f, false);         // O = P @ V
+            gemm(p.data(), vp, op, L, L, D, 1.f, false, false);     // O = P @ V
         }
     }
 }

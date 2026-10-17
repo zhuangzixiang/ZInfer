@@ -429,3 +429,51 @@ kernels[CUDA] 槽位, 派发器按输入设备自动选择——无需改机制�
 (方案切换随意 + 中途引入违规实现, 用户两次点名) |
 收益确认 10/10(公平 A/B: 同一二进制, 数据常驻, 正确同步)。
 cuda_device.cu 尾部遗留 include 垃圾于本块发现并清理。
+
+---
+
+## [16] GEMM 四算子统一 + TF32 勘误(重大: 撤回 1.93× 声明)
+
+**内容**
+1. cuda_gemm.cu: 共享 GEMM 原语 gemm_cuda / gemm_batched_cuda,
+   全部 GEMM 类算子(matmul/linear/conv2d/attention)唯一 cuBLAS 入口
+   - 行主序接口 + 显式 ld(列切片靠 ld 表达, conv2d 分组免拷贝)
+   - b_transposed=true → cuBLAS OP_T(× w^T 权重布局免转置)
+   - TF32/AUTO 且 GemmEx 可用 → FAST_TF32; 失败自动回落朴素内核
+2. dynlib: +cublasSgemmStridedBatched / cublasGemmStridedBatchedEx
+3. linear: 朴素融合内核 → GEMM + bias 行加内核
+4. conv2d: im2col + 逐组 GEMM + NCHW 回转内核(朴素兜底保留)
+5. attention: 批量 GEMM(S=QK^T → 行 softmax → O=PV, 每批一个头);
+   旧内核删除——其 threadIdx.x≤32 扫列设计在 L/D>32 时
+   静默丢列(latent bug), 新朴素兜底任意 L/D 正确
+6. 对拍补盲: linear/conv2d/attention 此前无 CUDA↔CPU 对拍,
+   新增(L=48/D=40 非方阵); 顺带暴露 CPU attention_ref 存量 bug
+
+**修复的 bug(本块引入 2 + 存量 3)**
+- 引入: im2col dst 偏移丢 +wo 项(wo>0 列踩写/未初始化);
+  attention 快速路径漏乘 1/√D(scale 折入 softmax 内核指数修复)
+- 存量: **CublasGemmExFn typedef 22 参 vs 真实 19 参(无 D 矩阵)**,
+  gemmEx 从未真正执行过, 返回值被忽略掩盖; CPU attention_ref
+  gemm 辅助 at 标志只转 A 不转 B, L≠D 时 K 误按 [D,L] 读
+  (L==D 巧合正确故测试从未暴露); cuda_device 尾部死 include
+- 排查方法记录: 独立探针二分(22/19 参对照 → OP_T 数值验证 →
+  流水线分段 → 手工参考对拍), 每步以可复现最小实验收敛
+
+**勘误(撤回提交 2562ff6 的 1.93× 声明)**
+- 真实内核级: sgemm FP32 32.2 TF/s → gemmEx TF32 42.4 TF/s
+  = **1.32×**; gemmEx 仍是最优路径(略胜 MathMode 41.1 且免句柄态)
+- 旧数字来源: 陈旧二进制(sgemm+残留 SetMathMode) + app 级基准
+  被每次调用的 64MB cudaMalloc/cudaFree 稀释(4096³ 端到端 8.6ms
+  中 5.9ms 是分配, 内核仅 2.7ms)
+- **新发现最优先瓶颈: GPU 缓存分配器缺位**(机制变更, 待用户审核)
+
+**数据**: linear 0.34→16.13 TF/s(48×); conv2d/attention 计算路径
+已通但小负载被分配开销掩盖; matmul TF32 1.32×(内核级)。
+19 测试 + 扩充的 CUDA 对拍(linear/conv2d/attention)全绿。
+
+**反思**: 架构 9/10(单入口双原语, ld+OP_T 表达全部布局,
+失败回落保正确) | 实现纪律 5/10(本块自引入 2 bug, 其中
+"转置被 ld 吸收"的推断未经数值验证即铺开, 又违反了
+先验证机制再写代码的教训) | 测试盲区意识 4/10(三个 GEMM 算子
+无 CUDA 对拍一个月, "快而错"与存量 CPU bug 均因此存活;
+对拍必须覆盖非方阵) | 测量诚实 10/10(主动勘误并保留方法记录)。

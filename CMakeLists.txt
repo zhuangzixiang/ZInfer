@@ -96,6 +96,7 @@ if(ZNN_CUDA)
     set_source_files_properties(src/dynlib.cpp PROPERTIES LANGUAGE CUDA)
     set(ZNN_CUDA_SRC
         src/backends/cuda/cuda_device.cu
+        src/backends/cuda/cuda_gemm.cu
         src/backends/cuda/cuda_kernels.cu
         src/backends/cuda/cuda_kernels2.cu
         src/backends/cuda/cuda_kernels3.cu

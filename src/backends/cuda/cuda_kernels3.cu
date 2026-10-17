@@ -310,52 +310,46 @@ void batch_norm2d_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out
         opts[0], opts[1], static_cast<int>(opts[2]));
 }
 
-// ---- attention: 两遍(先 S=QK^T/√d + softmax → P, 再 O=PV) ----
+// ---- attention: 快速路径 = 批量 GEMM(QK^T → 行 softmax → PV, 每批一个头);
+// 兜底内核任意 L/D 均正确(每线程一个输出元素 + 单线程行 softmax) ----
 __global__ void attn_scores_k(const float* q, const float* k, float* p,
-                              int B, int H, int L, int D, float scale) {
-    // 每线程算一个 S[i,j](b,h,i,j), 然后块内 softmax(每行一个 warp)
-    const int64_t bh = blockIdx.y;                          // b*H+h
-    const int i = blockIdx.x * blockDim.y + threadIdx.y;    // 行
-    const int j = threadIdx.x;                              // 列(threadIdx.x 扫一行)
-    if (i >= L) return;
-    const float* qp = q + (bh * L + i) * D;
-    const float* kp = k + bh * L * D;
-
-    extern __shared__ float red[];
-    float* srow = red + threadIdx.y * L;                    // 每行的 S 值
-
-    // 1) S[i,j] = dot(Q[i], K[j]) * scale
+                              int64_t total, int L, int D, float scale) {
+    const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
+    if (i >= total) return;                        // total = bh*L*L
+    const int64_t bh = i / ((int64_t)L * L);
+    const int64_t r = i % ((int64_t)L * L);
+    const float* qp = q + (bh * L + r / L) * D;
+    const float* kp = k + (bh * L + r % L) * D;
     float dot = 0.f;
-    for (int d = 0; d < D; ++d) {
-        dot += qp[d] * kp[j * D + d];
-    }
-    srow[j] = dot * scale;
-    __syncthreads();
+    for (int d = 0; d < D; ++d) dot += qp[d] * kp[d];
+    p[i] = dot * scale;
+}
 
-    // 2) 行 softmax(仅 warp 首线程驱动, 全 warp 参与归约)
-    // 简化: 每行由 blockDim.x 个线程直接做
-    float m = srow[0];
-    for (int jj = 1; jj < L; ++jj) m = m < srow[jj] ? srow[jj] : m;
+__global__ void attn_softmax_k(float* p, int64_t rows, int L, float scale) {
+    const int64_t r = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
+    if (r >= rows) return;                         // 每线程一行, 原地 softmax
+    float* row = p + r * L;                        // scale 折入指数(快速路径的
+    float m = row[0];                              // 分数未缩放, naive 路径传 1)
+    for (int j = 1; j < L; ++j) m = m < row[j] ? row[j] : m;
     float s = 0.f;
-    for (int jj = 0; jj < L; ++jj) { srow[jj] = expf(srow[jj] - m); s += srow[jj]; }
-    for (int jj = 0; jj < L; ++jj) srow[jj] /= s;
-    p[(bh * L + i) * L + j] = srow[j];
+    for (int j = 0; j < L; ++j) { row[j] = expf(scale * (row[j] - m)); s += row[j]; }
+    for (int j = 0; j < L; ++j) row[j] /= s;
 }
 
 __global__ void attn_output_k(const float* p, const float* v, float* o,
-                              int B, int H, int L, int D) {
-    const int64_t bh = blockIdx.y;
-    const int i = blockIdx.x * blockDim.y + threadIdx.y;
-    const int d = threadIdx.x;
-    if (i >= L || d >= D) return;
+                              int64_t total, int L, int D) {
+    const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
+    if (i >= total) return;                        // total = bh*L*D
+    const int64_t bh = i / ((int64_t)L * D);
+    const int64_t r = i % ((int64_t)L * D);
+    const float* pp = p + (bh * L + r / D) * L;
+    const float* vp = v + bh * L * D + r % D;
     float acc = 0.f;
-    for (int j = 0; j < L; ++j) {
-        acc += p[(bh * L + i) * L + j] * v[(bh * L + j) * D + d];
-    }
-    o[(bh * L + i) * D + d] = acc;
+    for (int j = 0; j < L; ++j) acc += pp[j] * vp[(int64_t)j * D];
+    o[i] = acc;
 }
 
-void attention_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+void attention_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
                     const void*) {
     const Tensor& q = *in[0];
     const Tensor& k = *in[1];
@@ -363,19 +357,36 @@ void attention_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     Tensor& y = *out[0];
     const int B = q.size(0), H = q.size(1), L = q.size(2), D = q.size(3);
     const float scale = 1.f / std::sqrt(static_cast<float>(D));
+    const int64_t bh = (int64_t)B * H;
 
-    // scratch: P[B*H*L*L]
-    Tensor p = Tensor::empty(Shape{B * H * L, L}, DType::F32, Device::CUDA);
+    // scratch: P[bh, L, L](先存原始分数, softmax 原地覆盖)
+    Tensor p = Tensor::empty(Shape{bh * L, L}, DType::F32, Device::CUDA);
 
-    dim3 blk(L < 32 ? L : 32, 4);                           // 32列扫一行, 4行/块
-    dim3 grd((L + 3) / 4, static_cast<unsigned>(B * H));
-    attn_scores_k<<<grd, blk, 4 * L * sizeof(float)>>>(
-        q.data<float>(), k.data<float>(), p.data<float>(), B, H, L, D, scale);
+    // 快速路径: S=Q×K^T(批量, K 原布局 b_transposed 即 × K^T) → softmax → O=P×V
+    if (gemm_batched_cuda(q.data<float>(), D, L * D,
+                          k.data<float>(), D, L * D,
+                          p.data<float>(), L, (int64_t)L * L,
+                          L, L, D, (int)bh,
+                          /*b_transposed=*/true, ctx.precision)) {
+        attn_softmax_k<<<(unsigned)((bh * L + kBlk3 - 1) / kBlk3), kBlk3>>>(
+            p.data<float>(), bh * L, L, scale);
+        if (gemm_batched_cuda(p.data<float>(), L, (int64_t)L * L,
+                              v.data<float>(), D, (int64_t)L * D,
+                              y.data<float>(), D, (int64_t)L * D,
+                              L, D, L, (int)bh,
+                              /*b_transposed=*/false, ctx.precision)) {
+            return;
+        }
+    }
 
-    dim3 blk2(D < 32 ? D : 32, 4);
-    dim3 grd2((L + 3) / 4, static_cast<unsigned>(B * H));
-    attn_output_k<<<grd2, blk2>>>(
-        p.data<float>(), v.data<float>(), y.data<float>(), B, H, L, D);
+    // 兜底: 朴素内核(cuBLAS 缺失或 GEMM 失败)
+    const int64_t ns = bh * L * L, no = bh * L * D;
+    attn_scores_k<<<(unsigned)((ns + kBlk3 - 1) / kBlk3), kBlk3>>>(
+        q.data<float>(), k.data<float>(), p.data<float>(), ns, L, D, scale);
+    attn_softmax_k<<<(unsigned)((bh * L + kBlk3 - 1) / kBlk3), kBlk3>>>(
+        p.data<float>(), bh * L, L, 1.f);   // naive 分数已缩放
+    attn_output_k<<<(unsigned)((no + kBlk3 - 1) / kBlk3), kBlk3>>>(
+        p.data<float>(), v.data<float>(), y.data<float>(), no, L, D);
 }
 
 } // namespace cuda_backend

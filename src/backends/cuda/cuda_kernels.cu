@@ -151,38 +151,11 @@ void matmul_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
     Tensor& y = *out[0];
     require_contiguous2(a, b, y);
     const int M = a.size(0), K = a.size(1), N = b.size(1);
-    const float alpha = 1.0f, beta = 0.0f;
 
-    // 快速路径: cuBLAS(DLL 可用时)
-    if (dynlib::available_cublas()) {
-        // 行主序 y[M,N] = a[M,K] × b[K,N]
-        // 列主序等价: y^T[N,M] = b^T[N,K] × a^T[K,M]
-        // gemm(m=N, n=M, k=K, A=b_ptr(ld=N), B=a_ptr(ld=K), C=y_ptr(ld=N))
-        if (ctx.precision != Precision::FP32 && dynlib::cublas_gemm_ex) {
-            // TF32: cublasGemmEx + FAST_TF32(Tensor Core 加速, ~2×)
-            dynlib::cublas_gemm_ex(
-                dynlib::cublas_handle,
-                CUBLAS_OP_N, CUBLAS_OP_N,
-                N, M, K,
-                &alpha,
-                b.data<float>(), CUDA_R_32F, N,
-                a.data<float>(), CUDA_R_32F, K,
-                &beta,
-                y.data<float>(), CUDA_R_32F, N,
-                y.data<float>(), CUDA_R_32F, N,
-                CUBLAS_COMPUTE_32F_FAST_TF32, CUBLAS_GEMM_DEFAULT);
-        } else {
-            // FP32 或 GemmEx 不可用: cublasSgemm(纯 FP32)
-            dynlib::cublas_sgemm(
-                dynlib::cublas_handle,
-                CUBLAS_OP_N, CUBLAS_OP_N,
-                N, M, K,
-                &alpha,
-                b.data<float>(), N,
-                a.data<float>(), K,
-                &beta,
-                y.data<float>(), N);
-        }
+    // 快速路径: 共享 GEMM 原语(cuBLAS, DLL 缺失时 false → 朴素内核)
+    if (gemm_cuda(a.data<float>(), K, b.data<float>(), N,
+                  y.data<float>(), N, M, N, K,
+                  /*b_transposed=*/false, ctx.precision)) {
         return;
     }
 
