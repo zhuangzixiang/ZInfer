@@ -122,6 +122,23 @@ FP16/TF32 = 1.25×(端到端含 2 个转换内核的读写与 scratch 分配;
 纯 GEMM 内核收益更高)。FP16 数值: matmul/linear 对拍 2% 相对容差通过;
 GPU FP16+GradScaler 训练 60 步: 损耗下降, 有限性达标。
 
+## 2026-10-16 · oneDNN 探针(委托决策数据, 未实施)
+
+环境: oneDNN v3.13.4 源码构建(CPU-only, OpenMP/VCOMP140),
+i5-14600KF; 探针含数值抽查(c[0]/y[0] 与手算一致)。
+GitHub 现行版本不再发 Windows 预编译包(仅 v1.7/2021 太旧),
+pip 的 onednn 轮子是空壳(仅文档)——部署需源码构建或随包分发 DLL。
+
+| 负载 | znn 现状(Eigen+OMP) | oneDNN | 加速比 |
+|---|---:|---:|---:|
+| matmul 512³ | 184.7 GF/s | 494.3 GF/s | **2.7×** |
+| matmul 1024³ | 195.4 GF/s | 753.5 GF/s | **3.9×** |
+| matmul 2048³ | — | 902.3 GF/s | — |
+| conv2d 8×16×32×32→32×3×3 | 17.7 GF/s | 357.0 GF/s | **20×** |
+
+实施路径(已批准方向): dynlib 加载 dnnl.dll(缺失回落 Eigen) +
+matmul/linear 走 dnnl_sgemm(一期) + conv2d 走 primitive API(二期)。
+
 ## 已知瓶颈(后续优化目标)
 
 1. FP16 已接入; **GPU 反向路径存量缺口(部分)**: pools/embedding/
