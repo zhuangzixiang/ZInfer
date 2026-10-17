@@ -554,3 +554,43 @@ GPU 训练触及即崩, 需原生内核化或组合化(BENCH 瓶颈清单在案)
 膨胀; FP16 折进原语免新机制) | 实现纪律 6/10(FP16 scratch 首版
 有列切片越界, 自查发现; 测试代码三处低级错误) | 测试盲区教训再证:
 "GPU 前向对拍通过 ≠ GPU 训练可用", 端到端训练烟雾必须进回归。
+
+---
+
+## [19] GPU 反向全算子补全 + 全线存量 bug 清剿(用户硬性要求: 全算子覆盖)
+
+**内容**
+1. 原生梯度内核: grad_bcast(通用步长广播, sum/mean/permute 反向 +
+   copy_view_to 共用)、max/avg_pool_grad(重找窗口+原子散射)、
+   embedding_grad(行散射原子累加)
+2. 广播二元内核 binary_bcast_k(步长 0 表达广播, 4 算子共用, 替换
+   旧同形内核——旧内核标量×矩阵越界读)
+3. 任意维规约内核 reduce_any_k(替换只支持末维的 sum_lastdim_k——
+   旧内核无视 dim 选项, dim0 求和直接算错)
+4. strided_copy_k 改结构体按值传步长(数组形参衰退为宿主指针,
+   设备端解引用即越界——6 处调用点全部带病)
+5. t21 全算子 GPU 反向对拍(binary/unary/reduce/matmul/linear/conv/
+   pool/embedding/softmax/LN/attention/losses/views): 每个可训练算子
+   CPU/GPU 双建图反传逐输入比梯度 —— 本块所有 bug 的探测器
+
+**顺带清剿的存量 bug(CPU 与 GPU 两侧)**
+- GPU: copy_elements 对非连续视图扁平 memcpy(转置 clone 静默拷错);
+  reduce_to 依赖的引擎内 sum_along 宿主循环(所有广播二元反传崩);
+  slice/permute/transpose CUDA 映射错(permute 忽略 order, slice 丢
+  begin 偏移); embedding 内核无界检(越界静默写)
+- CPU: sum_into 的 keepdim 中间维映射错(3D sum/mean keepdim 一直
+  算错); sum_grad_into 缺 size-1 广播步长保护(越界读); copy_view_to
+  目标按线性写(散射进切片视图位置错); LN 梯度 2D 假设 + inv 常数
+  近似(var 算而不用) → 统一 2D 化 + 精确公式
+- 层 API: 权重固定 CPU, GPU 输入混合设备进内核(illegal access)
+  → 六层权重随输入设备一次性迁移(migrate_to_device)
+
+**验证**: CUDA/CPU 双构建全绿(19+20+21 项测试); MNIST 97.16%;
+GPU FP16 训练烟雾照常。排查利器: compute-sanitizer 定位越界内核
+(0xC0000409 fastfail 掩盖异常信息, try/catch + sanitizer 双管齐下)。
+
+**反思**: 架构 8/10(grad_bcast/CopyMap 结构体按值传参模式统一了
+5 处内核) | 教训: "GPU 前向对拍过 ≠ 训练可用"二次应验——本轮又挖出
+12 处存量缺陷, 全算子反向对拍(t21)从此为强制回归 | 实现纪律 5/10
+(本块自引入 3 处内核映射错误, 靠 t21 当场暴露; 测试数据自身又错
+3 处——I64 语义与索引界)。

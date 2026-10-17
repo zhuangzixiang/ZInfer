@@ -7,6 +7,7 @@ extern const Operator g_matmul_operator;    // 对拍: 直接调用朴素 ref
 extern const Operator g_conv2d_operator;
 }
 #include <cmath>
+#include <string>
 #include <cstdio>
 
 using namespace znn;
@@ -639,6 +640,116 @@ static void test_cuda_parity() {
     std::printf("CUDA parity tests passed\n");
 }
 
+// t21: GPU 反向全算子对拍 —— 同输入 CPU/GPU 双建图反传, 逐输入比梯度
+// (铁律回归: 任何梯度规则的宿主循环/设备误用在此当场暴露)
+static Tensor sum_all(const Tensor& t) {
+    Tensor s = t;
+    for (int64_t d = t.dim_count() - 1; d >= 0; --d) {
+        s = Tensor::sum(s, d);
+    }
+    return s;
+}
+
+static void grad_parity(const char* name, std::vector<Tensor> inputs,
+                        Tensor (*fwd)(const std::vector<Tensor>&),
+                        float tol = 2e-3f) {
+    std::vector<Tensor> xi = inputs, gi;
+    for (Tensor& t : xi) {
+        gi.push_back(t.to_device(Device::CUDA));
+    }
+    for (size_t i = 0; i < xi.size(); ++i) {
+        xi[i].requires_grad(true);
+        gi[i].requires_grad(true);
+    }
+    sum_all(fwd(xi)).backward();
+    sum_all(fwd(gi)).backward();
+    for (size_t i = 0; i < xi.size(); ++i) {
+        if (xi[i].dtype() != DType::F32) continue;   // I64 等不可训练输入无梯度语义
+        Tensor gc = xi[i].grad().to_device(Device::CPU);
+        Tensor gg = gi[i].grad().to_device(Device::CPU);
+        float md = 0.f;
+        for (int64_t k = 0; k < gc.numel(); ++k) {
+            const float d = fabsf(gc.data<float>()[k] - gg.data<float>()[k]);
+            md = md < d ? d : md;
+        }
+        check(md < tol, name);   // 失败时按算子名定位, maxerr 见断言消息
+    }
+}
+
+static Tensor fwd_binary(const std::vector<Tensor>& v) { return Tensor::mul(Tensor::add(v[0], v[1]), Tensor::sub(v[0], v[1])); }
+static Tensor fwd_unary(const std::vector<Tensor>& v) { return Activator::gelu(Activator::sigmoid(v[0])); }
+static Tensor fwd_reduce(const std::vector<Tensor>& v) { return Tensor::sum(Tensor::mean(v[0], 1, true), 0); }
+static Tensor fwd_matmul(const std::vector<Tensor>& v) { return Tensor::matmul(v[0], v[1]); }
+static Tensor fwd_linear(const std::vector<Tensor>& v) { return Tensor::linear(v[0], v[1], &v[2]); }
+static Tensor fwd_conv(const std::vector<Tensor>& v) { return Tensor::conv2d(v[0], v[1]); }
+static Tensor fwd_pool(const std::vector<Tensor>& v) {
+    return Tensor::max_pool2d(Tensor::avg_pool2d(v[0], {2, 2}), {2, 2});
+}
+static Tensor fwd_embed(const std::vector<Tensor>& v) { return Tensor::embedding(v[0], v[1]); }
+static Tensor fwd_softmax(const std::vector<Tensor>& v) { return Activator::softmax(v[0]); }
+static Tensor fwd_attn(const std::vector<Tensor>& v) { return Tensor::attention(v[0], v[1], v[2]); }
+static Tensor fwd_loss(const std::vector<Tensor>& v) { return Tensor::mul(Loss::cross_entropy(v[0], v[1]), Loss::mse(v[2], v[3])); }
+static Tensor fwd_views(const std::vector<Tensor>& v) {
+    Tensor c = Tensor::cat(v[0], v[1], 1);                       // [2,8]
+    Tensor p = c.permute({1, 0});                                // [8,2]
+    return Tensor::matmul(p, v[0].slice(1, 0, 1));               // [8,1]
+}
+
+static void test_gpu_backward_parity() {
+    if (!Runtime::device_available(Device::CUDA)) {
+        std::printf("CUDA not available, skipping GPU backward parity\n");
+        return;
+    }
+    Runtime::set_precision(Precision::FP32);    // 对拍用位精确 FP32
+    grad_parity("binary", {Tensor::randn({6, 5}, 71), Tensor::randn({6, 5}, 72)}, fwd_binary);
+    grad_parity("unary", {Tensor::randn({6, 5}, 73)}, fwd_unary);
+    grad_parity("reduce", {Tensor::randn({4, 6, 5}, 74)}, fwd_reduce);
+    grad_parity("matmul", {Tensor::randn({5, 7}, 75), Tensor::randn({7, 4}, 76)}, fwd_matmul);
+    grad_parity("linear", {Tensor::randn({5, 7}, 77), Tensor::randn({3, 7}, 78), Tensor::randn({3}, 79)}, fwd_linear);
+    grad_parity("conv2d", {Tensor::randn({2, 3, 7, 7}, 80), Tensor::randn({4, 3, 3, 3}, 81)}, fwd_conv);
+    grad_parity("pool", {Tensor::randn({2, 3, 8, 8}, 82)}, fwd_pool);
+    float wdata[10] = {0.f, 1.f, 0.f, 1.f, 0.f, 1.f, 0.f, 1.f, 0.f, 1.f};
+    int64_t idata[6] = {0, 2, 4, 1, 3, 0};      // indices 为 I64 且须在词表界内
+    grad_parity("embedding", {Tensor::from_host(wdata, {5, 2}),
+                              Tensor::from_host(idata, {2, 3}, DType::I64)},
+                fwd_embed, 1e-4f);
+    grad_parity("softmax", {Tensor::randn({4, 6}, 83)}, fwd_softmax);
+    // LN/BN 经 Layer API 端到端对拍(前向输出 + 输入梯度, CPU/GPU)
+    {
+        LayerParam lp;
+        lp.normalized_dim = 8;   // 末维大小(PyTorch LayerNorm(N) 语义)
+        Layer* ln = Layer::create(LayerType::LayerNorm, lp);
+        Tensor xc = Tensor::randn({3, 4, 8}, 84);
+        Tensor xg = xc.to_device(Device::CUDA);
+        xc.requires_grad(true);
+        xg.requires_grad(true);
+        Tensor yc = ln->forward(xc);
+        Tensor yg = ln->forward(xg);
+        sum_all(yc).backward();
+        sum_all(yg).backward();
+        float od = 0.f, gd = 0.f;
+        Tensor ygc = yg.to_device(Device::CPU);
+        Tensor ggc = xg.grad().to_device(Device::CPU);
+        for (int64_t k = 0; k < yc.numel(); ++k) {
+            od = fmaxf(od, fabsf(yc.data<float>()[k] - ygc.data<float>()[k]));
+            gd = fmaxf(gd, fabsf(xc.grad().data<float>()[k] - ggc.data<float>()[k]));
+        }
+        Layer::destroy(ln);
+        check(od < 1e-4f && gd < 1e-3f, "gpu bwd[layer_norm]");
+    }
+    grad_parity("attention", {Tensor::randn({1, 2, 6, 4}, 86),
+                              Tensor::randn({1, 2, 6, 4}, 87),
+                              Tensor::randn({1, 2, 6, 4}, 88)}, fwd_attn, 5e-3f);
+    Tensor lg = Tensor::randn({5, 4}, 89);
+    int64_t tg[5] = {0, 1, 2, 3, 0};           // CE 标签须为 I64
+    grad_parity("losses", {lg, Tensor::from_host(tg, {5}, DType::I64),
+                           Tensor::randn({5, 3}, 90),
+                           Tensor::randn({5, 3}, 91)}, fwd_loss);
+    grad_parity("views", {Tensor::randn({2, 4}, 92), Tensor::randn({2, 4}, 93)}, fwd_views);
+    Runtime::set_precision(Precision::AUTO);
+    std::printf("GPU backward parity tests passed\n");
+}
+
 // t20: GradScaler 动态损失缩放(机制单元, CPU 路径)
 static void test_grad_scaler() {
     GradScaler scaler(1024.f, 2);
@@ -711,6 +822,7 @@ int main() {
     std::fprintf(stderr, "t18\n"); test_dropout_layer();
     std::fprintf(stderr, "t19\n"); test_cuda_parity();
     std::fprintf(stderr, "t20\n"); test_grad_scaler();
+    std::fprintf(stderr, "t21\n"); test_gpu_backward_parity();
     if (failures == 0) {
         std::printf("ALL BASIC TESTS PASSED\n");
         return 0;

@@ -105,6 +105,22 @@ void memset0_cuda(void* p, size_t bytes);
 
 // unary 反向内部算子(options = UnaryBwd 枚举一字节)
 void unary_bwd_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+// 梯度专用内核(反向路径, 铁律: 原生无桥接)
+// 通用广播/置换: out[i] = scale × g[Σ idx[d]·eff[d]](sum/mean/permute 反向)
+void grad_bcast_cuda(const float* g, float* out, long long total, int rank,
+                     const long long* dims, const long long* eff, float scale);
+void max_pool_grad_cuda(const float* x, const float* g, float* dx, long long total,
+                        int H, int W, int HO, int WO,
+                        int kh, int kw, int sh, int sw, int ph, int pw);
+void avg_pool_grad_cuda(const float* g, float* dx, long long total,
+                        int H, int W, int HO, int WO,
+                        int kh, int kw, int sh, int sw, int ph, int pw);
+void embedding_grad_cuda(const float* g, const long long* idx, float* dw,
+                         long long total, int D);
+// 通用双步长拷贝(源/目标各自步长, 视图散射写入共用)
+void strided_copy_cuda(const float* src, float* dst, int rank,
+                       const long long* ss, const long long* ds,
+                       const long long* sh, long long total);
 // GradScaler: 梯度 ×inv, 发现 inf/nan 时 *bad = 1(调用方置零初始化)
 void grad_unscale_cuda(float* g, float* bad, long long n, float inv);
 

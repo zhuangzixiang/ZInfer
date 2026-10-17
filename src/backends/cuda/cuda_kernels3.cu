@@ -31,12 +31,12 @@ int blocks3(long long n) {
 
 // ---- embedding: 每线程一个输出元素 ----
 __global__ void embedding_k(const float* w, const int64_t* idx, float* y,
-                            int64_t n_idx, int64_t D) {
+                            int64_t n_idx, int64_t D, int64_t rows) {
     const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
     if (i >= n_idx * D) return;
-    const int64_t e = i / D;
-    const int64_t d = i % D;
-    y[i] = w[idx[e] * D + d];
+    const int64_t v = idx[i / D];
+    // 越界索引写 0(内核不可抛; 与 CPU ref 的 throw 语义在此分歧, 已知项)
+    y[i] = (v >= 0 && v < rows) ? w[v * D + i % D] : 0.f;
 }
 
 void embedding_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
@@ -45,28 +45,49 @@ void embedding_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const Tensor& w = *in[0];
     const Tensor& idx = *in[1];
     const int64_t D = w.size(1);
-    embedding_k<<<blocks3(idx.numel() * D), kBlk3>>>(
-        w.data<float>(), idx.data<int64_t>(), out[0]->data<float>(),
-        idx.numel(), D);
+    embedding_k<<<blocks3(idx.numel() * D), kBlk3>>>(w.data<float>(), idx.data<int64_t>(), out[0]->data<float>(),
+        idx.numel(), D, w.numel() / D);
 }
 
-// ---- 视图族: 材料化拷贝(每线程一个元素, 按 stride 算源偏移) ----
+// ---- 视图族: 材料化拷贝(每线程一个元素, 按 stride 算偏移) ----
+// 步长经结构体按值传入: 数组形参会衰退为指针(宿主栈地址), 设备端
+// 解引用即越界 —— 存量内核缺陷, 本块修复
+struct CopyMap {
+    int rank;
+    long long dims[8];
+    long long se[8];
+    long long de[8];
+};
+
 __global__ void strided_copy_k(const float* src, float* dst,
-                               int64_t s_strides[8], int64_t d_strides[8],
-                               int64_t shape[8], int64_t rank, int64_t total) {
+                               long long total, CopyMap m) {
     const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
     if (i >= total) return;
     // 行主序下标分解
     int64_t remain = i;
     int64_t s_off = 0, d_off = 0;
-    for (int64_t d = rank - 1; d >= 0; --d) {
-        const int64_t idx_d = remain % shape[d];
-        remain /= shape[d];
-        s_off += idx_d * s_strides[d];
-        d_off += idx_d * d_strides[d];
+    for (int d = m.rank - 1; d >= 0; --d) {
+        const int64_t idx_d = remain % m.dims[d];
+        remain /= m.dims[d];
+        s_off += idx_d * m.se[d];
+        d_off += idx_d * m.de[d];
     }
     dst[d_off] = src[s_off];
 }
+
+namespace {
+// 通用映射填充: dims/se 取自 x, de 取 y 同位维(stack 的错位由调用方修正)
+CopyMap make_copy_map(const Tensor& x, const Tensor& y) {
+    CopyMap m;
+    m.rank = (int)x.dim_count();
+    for (int64_t d = 0; d < m.rank; ++d) {
+        m.dims[d] = x.size(d);
+        m.se[d] = x.strides()[d];
+        m.de[d] = y.strides()[d];
+    }
+    return m;
+}
+} // namespace
 
 void reshape_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                   const void*) {
@@ -78,49 +99,84 @@ void reshape_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
 
 void transpose_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
                     const void* options) {
-    // options 是 TransposeOptions, 但 kernel 不需要——直接按 stride 拷贝
-    (void)options;
+    // options: TransposeOptions{d0,d1} —— 轴交换映射: x 轴 d 落在 y 的对侧轴
+    struct TOptions { int64_t d0, d1; };
+    const TOptions* o = static_cast<const TOptions*>(options);
     req1c(*in[0], *out[0]);
     const Tensor& x = *in[0];
     Tensor& y = *out[0];
-    int64_t ss[8], ds[8], sh[8];
-    for (int64_t d = 0; d < x.dim_count(); ++d) {
-        ss[d] = x.strides()[d];
-        ds[d] = y.strides()[d];
-        sh[d] = x.size(d);
+    const int64_t d0 = o->d0 < 0 ? o->d0 + x.dim_count() : o->d0;
+    const int64_t d1 = o->d1 < 0 ? o->d1 + x.dim_count() : o->d1;
+    CopyMap m;
+    m.rank = (int)x.dim_count();
+    for (int64_t d = 0; d < m.rank; ++d) {
+        m.dims[d] = x.size(d);
+        m.se[d] = x.strides()[d];
+        m.de[d] = (d == d0) ? y.strides()[d1]
+                            : (d == d1 ? y.strides()[d0] : y.strides()[d]);
     }
     strided_copy_k<<<blocks3(x.numel()), kBlk3>>>(
-        x.data<float>(), y.data<float>(), ss, ds, sh, x.dim_count(), x.numel());
+        x.data<float>(), y.data<float>(), x.numel(), m);
+}
+
+// 通用双步长拷贝 host 入口(copy_view_to 的 CUDA 路径共用)
+void strided_copy_cuda(const float* src, float* dst, int rank,
+                       const long long* ss, const long long* ds,
+                       const long long* sh, long long total) {
+    CopyMap m;
+    m.rank = rank;
+    for (int d = 0; d < rank; ++d) {
+        m.dims[d] = sh[d];
+        m.se[d] = ss[d];
+        m.de[d] = ds[d];
+    }
+    strided_copy_k<<<blocks3(total), kBlk3>>>(src, dst, total, m);
 }
 
 void permute_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
-                  const void*) {
+                  const void* options) {
+    // options: PermuteOptions{order[8], rank} —— y 轴 k = x 轴 order[k],
+    // 故 x 轴 d 的目标步长 = y.strides()[order^{-1}(d)]
+    struct POptions { int64_t order[8]; int64_t rank; };
+    const POptions* o = static_cast<const POptions*>(options);
     req1c(*in[0], *out[0]);
     const Tensor& x = *in[0];
     Tensor& y = *out[0];
-    int64_t ss[8], ds[8], sh[8];
-    for (int64_t d = 0; d < x.dim_count(); ++d) {
-        ss[d] = x.strides()[d];
-        ds[d] = y.strides()[d];
-        sh[d] = x.size(d);
+    int64_t inv[8];
+    for (int64_t k = 0; k < o->rank; ++k) {
+        inv[o->order[k]] = k;
+    }
+    CopyMap m;
+    m.rank = (int)x.dim_count();
+    for (int64_t d = 0; d < m.rank; ++d) {
+        m.dims[d] = x.size(d);
+        m.se[d] = x.strides()[d];
+        m.de[d] = y.strides()[inv[d]];
     }
     strided_copy_k<<<blocks3(x.numel()), kBlk3>>>(
-        x.data<float>(), y.data<float>(), ss, ds, sh, x.dim_count(), x.numel());
+        x.data<float>(), y.data<float>(), x.numel(), m);
 }
 
 void slice_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
-                const void*) {
+                const void* options) {
+    // options: SliceOptions{dim, begin, end} —— 源指针按 begin 偏移,
+    // 遍历 y 网格(被切维长度已缩短)
+    struct SOptions { int64_t dim; int64_t begin; int64_t end; };
+    const SOptions* o = static_cast<const SOptions*>(options);
     req1c(*in[0], *out[0]);
     const Tensor& x = *in[0];
     Tensor& y = *out[0];
-    int64_t ss[8], ds[8], sh[8];
-    for (int64_t d = 0; d < y.dim_count(); ++d) {
-        ss[d] = x.strides()[d];
-        ds[d] = y.strides()[d];
-        sh[d] = y.size(d);
+    const int64_t dim = o->dim < 0 ? o->dim + x.dim_count() : o->dim;
+    CopyMap m;
+    m.rank = (int)y.dim_count();
+    for (int64_t d = 0; d < m.rank; ++d) {
+        m.dims[d] = y.size(d);
+        m.se[d] = x.strides()[d];
+        m.de[d] = y.strides()[d];
     }
     strided_copy_k<<<blocks3(y.numel()), kBlk3>>>(
-        x.data<float>(), y.data<float>(), ss, ds, sh, y.dim_count(), y.numel());
+        x.data<float>() + o->begin * x.strides()[dim],
+        y.data<float>(), y.numel(), m);
 }
 
 // ---- cat / stack: 每输入一次 strided copy(逐输入启动) ----
@@ -133,18 +189,10 @@ void cat_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     for (size_t i = 0; i < in.size(); ++i) {
         const Tensor& x = *in[i];
         req1c(x, y);
-        // 该输入在输出中的切片区: 偏移 = offset 沿 dim
-        // 简化: 按 y 的 stride 直接映射
-        int64_t ss[8], ds[8], sh[8];
-        for (int64_t d = 0; d < x.dim_count(); ++d) {
-            ss[d] = x.strides()[d];
-            ds[d] = y.strides()[d];
-            sh[d] = x.size(d);
-        }
         // 沿 dim 的偏移体现在 base pointer
         strided_copy_k<<<blocks3(x.numel()), kBlk3>>>(
             x.data<float>(), y.data<float>() + offset * y.strides()[dim],
-            ss, ds, sh, x.dim_count(), x.numel());
+            x.numel(), make_copy_map(x, y));
         offset += x.size(dim);
     }
 }
@@ -156,15 +204,17 @@ void stack_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     for (size_t i = 0; i < in.size(); ++i) {
         const Tensor& x = *in[i];
         req1c(x, y);
-        int64_t ss[8], ds[8], sh[8];
-        for (int64_t d = 0; d < x.dim_count(); ++d) {
-            ss[d] = x.strides()[d];
-            ds[d] = y.strides()[d < dim ? d : d + 1];      // 输出多一维
-            sh[d] = x.size(d);
+        CopyMap m;
+        m.rank = (int)x.dim_count();
+        for (int64_t d = 0; d < m.rank; ++d) {
+            m.dims[d] = x.size(d);
+            m.se[d] = x.strides()[d];
+            m.de[d] = y.strides()[d < dim ? d : d + 1];      // 输出多一维
         }
         strided_copy_k<<<blocks3(x.numel()), kBlk3>>>(
-            x.data<float>(), y.data<float>() + static_cast<int64_t>(i) * y.strides()[dim],
-            ss, ds, sh, x.dim_count(), x.numel());
+            x.data<float>(),
+            y.data<float>() + static_cast<int64_t>(i) * y.strides()[dim],
+            x.numel(), m);
     }
 }
 
@@ -347,6 +397,19 @@ __global__ void attn_output_k(const float* p, const float* v, float* o,
     float acc = 0.f;
     for (int j = 0; j < L; ++j) acc += pp[j] * vp[(int64_t)j * D];
     o[i] = acc;
+}
+
+// ---- embedding 反向: 梯度行散射累加(重复索引原子加) ----
+__global__ void embedding_grad_k(const float* g, const long long* idx, float* dw,
+                                 long long total, int D) {
+    const long long i = blockIdx.x * (long long)blockDim.x + threadIdx.x;
+    if (i >= total) return;
+    atomicAdd(dw + idx[i / D] * D + i % D, g[i]);
+}
+
+void embedding_grad_cuda(const float* g, const long long* idx, float* dw,
+                         long long total, int D) {
+    embedding_grad_k<<<blocks3(total), kBlk3>>>(g, idx, dw, total, D);
 }
 
 void attention_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,

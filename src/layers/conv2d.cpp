@@ -20,6 +20,8 @@ Conv2dLayer::Conv2dLayer(int64_t in_ch, int64_t out_ch, Shape kernel,
 }
 
 Tensor Conv2dLayer::forward(const Tensor& x) {
+    migrate_to_device(w_, x.device());
+    migrate_to_device(b_, x.device());
     Tensor y = Tensor::conv2d(x, w_, options_);
     return has_bias_ ? Tensor::add(y, b_) : y;            // b 按通道广播
 }

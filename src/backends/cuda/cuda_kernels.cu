@@ -34,18 +34,6 @@ void require_contiguous1(const Tensor& x, const Tensor& y) {
 } // namespace
 
 // ---- 逐元素设备内核 ----
-#define ZNN_BINARY_KERNEL(fname, op)                                          \
-    __global__ void fname(const float* a, const float* b, float* y,           \
-                          long long n) {                                      \
-        const long long i = blockIdx.x * (long long)blockDim.x + threadIdx.x; \
-        if (i < n) y[i] = a[i] op b[i];                                       \
-    }
-
-ZNN_BINARY_KERNEL(add_k, +)
-ZNN_BINARY_KERNEL(sub_k, -)
-ZNN_BINARY_KERNEL(mul_k, *)
-ZNN_BINARY_KERNEL(div_k, /)
-
 #define ZNN_UNARY_KERNEL(fname, expr)                                         \
     __global__ void fname(const float* x, float* y, long long n) {            \
         const long long i = blockIdx.x * (long long)blockDim.x + threadIdx.x; \
@@ -109,21 +97,73 @@ __global__ void adam_k(float* p, const float* g, float* m, float* v,
     p[i] -= lr * mh / (sqrtf(vh) + eps);
 }
 
-// ---- host 包装 ----
-#define ZNN_BINARY_HOST(fname, kname)                                         \
-    void fname(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,     \
-               const void*) {                                                 \
-        require_contiguous2(*in[0], *in[1], *out[0]);                         \
-        const long long n = out[0]->numel();                                  \
-        kname<<<blocks(n), kBlock>>>(in[0]->data<float>(),                    \
-                                     in[1]->data<float>(),                    \
-                                     out[0]->data<float>(), n);               \
-    }
+// ---- 二元逐元素: 广播内核(广播维步长 0; op: 0+ 1- 2* 3/) ----
+// 旧同形内核不支持广播, 标量×矩阵越界读 —— 存量缺口, 本块修复
+struct BinMap {
+    int rank;
+    long long dims[8];
+    long long sa[8];
+    long long sb[8];
+    int op;
+};
 
-ZNN_BINARY_HOST(add_cuda, add_k)
-ZNN_BINARY_HOST(sub_cuda, sub_k)
-ZNN_BINARY_HOST(mul_cuda, mul_k)
-ZNN_BINARY_HOST(div_cuda, div_k)
+__global__ void binary_bcast_k(const float* a, const float* b, float* y,
+                               long long total, BinMap m) {
+    const long long i = blockIdx.x * (long long)blockDim.x + threadIdx.x;
+    if (i >= total) return;
+    long long t = i, oa = 0, ob = 0;
+    for (int d = m.rank - 1; d >= 0; --d) {
+        const long long idx = t % m.dims[d];
+        t /= m.dims[d];
+        oa += idx * m.sa[d];
+        ob += idx * m.sb[d];
+    }
+    const float va = a[oa], vb = b[ob];
+    y[i] = m.op == 0 ? va + vb : m.op == 1 ? va - vb
+         : m.op == 2 ? va * vb : va / vb;
+}
+
+namespace {
+// 右对齐广播步长(维长 1 → 步长 0); 不可广播返回 false
+bool bcast_map(const Tensor& a, const Tensor& b, const Shape& out, BinMap& m) {
+    m.rank = (int)out.rank;
+    long long ca = 1, cb = 1;                     // a/b 连续步长(右起累积)
+    for (int d = m.rank - 1; d >= 0; --d) {
+        const int64_t ad = d - (int64_t)(out.rank - a.dim_count());
+        const int64_t bd = d - (int64_t)(out.rank - b.dim_count());
+        const int64_t av = ad < 0 ? 1 : a.size(ad);
+        const int64_t bv = bd < 0 ? 1 : b.size(bd);
+        if ((av != out.dims[d] && av != 1) || (bv != out.dims[d] && bv != 1)) {
+            return false;
+        }
+        m.dims[d] = out.dims[d];
+        m.sa[d] = av == 1 ? 0 : ca;
+        m.sb[d] = bv == 1 ? 0 : cb;
+        ca *= av;
+        cb *= bv;
+    }
+    return true;
+}
+
+void binary_bcast_host(Span<const Tensor*> in, Span<Tensor*> out, int op) {
+    Tensor a = in[0]->is_contiguous() ? *in[0] : in[0]->clone();   // 视图材料化
+    Tensor b = in[1]->is_contiguous() ? *in[1] : in[1]->clone();
+    Tensor& y = *out[0];
+    BinMap m;
+    m.op = op;
+    if (!bcast_map(a, b, y.shape(), m)) {
+        throw std::runtime_error("znn: shapes not broadcastable");
+    }
+    const long long n = y.numel();
+    binary_bcast_k<<<blocks(n), kBlock>>>(a.data<float>(), b.data<float>(),
+                                          y.data<float>(), n, m);
+}
+} // namespace
+
+void add_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) { binary_bcast_host(in, out, 0); }
+void sub_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) { binary_bcast_host(in, out, 1); }
+void mul_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) { binary_bcast_host(in, out, 2); }
+void div_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) { binary_bcast_host(in, out, 3); }
 
 #define ZNN_UNARY_HOST(fname, kname)                                          \
     void fname(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,     \
@@ -217,6 +257,40 @@ void unary_bwd_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     unary_bwd_k<<<blocks(n), kBlock>>>(in[0]->data<float>(), in[1]->data<float>(),
                                        in[2]->data<float>(), out[0]->data<float>(),
                                        n, fn);
+}
+
+// ---- 通用梯度广播/置换拷贝(sum/mean/permute 反向共用) ----
+// out[i] = scale × g[Σ idx[d]·eff[d]]: eff 由宿主按语义预计算
+// (sum: 被求和维 eff=0 即广播; mean: 再乘 1/n; permute: 逆置换步长)
+struct GradMap {
+    int rank;
+    long long dims[8];
+    long long eff[8];
+    float scale;
+};
+
+__global__ void grad_bcast_k(const float* g, float* out, long long total,
+                             GradMap m) {
+    const long long i = blockIdx.x * (long long)blockDim.x + threadIdx.x;
+    if (i >= total) return;
+    long long go = 0, t = i;
+    for (int d = m.rank - 1; d >= 0; --d) {
+        go += (t % m.dims[d]) * m.eff[d];
+        t /= m.dims[d];
+    }
+    out[i] = m.scale * g[go];
+}
+
+void grad_bcast_cuda(const float* g, float* out, long long total, int rank,
+                     const long long* dims, const long long* eff, float scale) {
+    GradMap m;
+    m.rank = rank;
+    m.scale = scale;
+    for (int d = 0; d < rank; ++d) {
+        m.dims[d] = dims[d];
+        m.eff[d] = eff[d];
+    }
+    grad_bcast_k<<<blocks(total), kBlock>>>(g, out, total, m);
 }
 
 // ---- GradScaler: 梯度 ×(1/s) + inf/nan 检测 ----

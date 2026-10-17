@@ -14,6 +14,7 @@ EmbeddingLayer::EmbeddingLayer(int64_t num_embeddings, int64_t embed_dim)
 }
 
 Tensor EmbeddingLayer::forward(const Tensor& indices) {
+    migrate_to_device(w_, indices.device());
     return Tensor::embedding(w_, indices);
 }
 

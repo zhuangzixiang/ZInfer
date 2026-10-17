@@ -16,17 +16,31 @@ namespace impl {
 
 // 视图(src 任意 strided) → dst(连续)逐元素紧凑拷贝, 只经公共访问器
 void copy_view_to(const Tensor& src, Tensor& dst) {
+    if (dst.device() == Device::CUDA) {   // 原生: 双步长拷贝(dst 可为非连续视图)
+        long long ss[8], ds[8], sh[8];
+        const int rank = (int)dst.dim_count();
+        for (int d = 0; d < rank; ++d) {
+            ss[d] = src.strides()[d];
+            ds[d] = dst.strides()[d];
+            sh[d] = dst.size(d);
+        }
+        cuda_backend::strided_copy_cuda(src.data<float>(), dst.data<float>(),
+                                        rank, ss, ds, sh, dst.numel());
+        return;
+    }
     const int64_t rank = dst.dim_count();
     const float* sp = src.data<float>();
     float* dp = dst.data<float>();
     const int64_t* ss = src.strides();
+    const int64_t* ds = dst.strides();
     int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     for (int64_t i = 0; i < dst.numel(); ++i) {
-        int64_t so = 0;
+        int64_t so = 0, doff = 0;              // 双步长: dst 可为非连续视图(散射)
         for (int64_t d = 0; d < rank; ++d) {
             so += idx[d] * ss[d];
+            doff += idx[d] * ds[d];
         }
-        dp[i] = sp[so];
+        dp[doff] = sp[so];
         for (int64_t d = rank - 1; d >= 0; --d) {
             if (++idx[d] < dst.size(d)) break;
             idx[d] = 0;
@@ -62,8 +76,26 @@ void Tensor::Impl::copy_elements(const Tensor::Impl* src, Tensor::Impl* dst) {
         if (src->device != dst->device) {
             throw std::runtime_error("znn: cross-device copy must go through to_device");
         }
-        cuda_backend::copy_device_to_device(dst->storage->data(), src->storage->data(),
-                                            dst->nbytes());
+        if (src->is_contiguous()) {
+            cuda_backend::copy_device_to_device(dst->storage->data(), src->storage->data(),
+                                                dst->nbytes());
+            return;
+        }
+        // 非连续视图(转置/切片): 按步长收集(此前扁平 memcpy 静默拷错 —— 存量 bug)
+        if (src->dtype != DType::F32) {
+            throw std::runtime_error("znn: cuda clone of non-contiguous non-F32");
+        }
+        long long ss[8], ds[8], sh[8], total = 1;
+        const int rank = (int)dst->shape.rank;
+        for (int d = 0; d < rank; ++d) {
+            ss[d] = src->strides[d];
+            ds[d] = dst->strides[d];
+            sh[d] = dst->shape.dims[d];
+            total *= dst->shape.dims[d];
+        }
+        cuda_backend::strided_copy_cuda(
+            static_cast<const float*>(src->storage->data()) + src->offset,
+            static_cast<float*>(dst->storage->data()), rank, ss, ds, sh, total);
         return;
     }
     const int64_t total = static_cast<int64_t>(dst->nbytes() / dtype_size(dst->dtype));

@@ -78,8 +78,10 @@ void AutogradEngine::backward(const Tensor& loss) {
         n->op->grad(ctx);
         std::fprintf(stderr, "[done] ");
         // 3. 累加到各输入(叶子得到最终梯度; 中间量等待其生产节点读取)
+        //    非 F32 输入(如 embedding 的 I64 indices)不可训练, 跳过
         for (size_t i = 0; i < nin; ++i) {
-            if (n->saved_inputs[i].requires_grad()) {
+            if (n->saved_inputs[i].requires_grad()
+                && n->saved_inputs[i].dtype() == DType::F32) {
                 Tensor& acc = n->saved_inputs[i].grad();
                 acc = Tensor::add(acc, in_grads[i]);
             }
@@ -97,35 +99,10 @@ void AutogradEngine::backward(const Tensor& loss) {
 
 namespace {
 
-// 沿 dim 求和(keepdim 控制保留长度 1 的维), CPU 直写
+// 沿 dim 求和(keepdim 控制保留长度 1 的维) —— 经算子派发, 任意后端原生
+// (原为引擎内宿主循环, GPU 广播反传触及即崩 —— 存量缺口, 本块修复)
 Tensor sum_along(const Tensor& x, int64_t dim, bool keepdim) {
-    Shape out;
-    for (int64_t d = 0; d < x.dim_count(); ++d) {
-        if (d != dim) {
-            out.dims[out.rank++] = x.size(d);
-        }
-    }
-    Tensor r = Tensor::zeros(out, x.dtype(), x.device());
-    const float* xp = x.data<float>();
-    float* rp = r.data<float>();
-    const int64_t* xs = x.strides();
-    const int64_t* rs = r.strides();
-    int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-    for (int64_t i = 0; i < x.numel(); ++i) {
-        int64_t ro = 0;
-        for (int64_t d = 0; d < x.dim_count(); ++d) {
-            if (d != dim) {
-                const int64_t rd = d > dim ? d - 1 : d;
-                ro += idx[d] * rs[rd];
-            }
-        }
-        rp[ro] += xp[i];
-        for (int64_t d = x.dim_count() - 1; d >= 0; --d) {
-            if (++idx[d] < x.size(d)) break;
-            idx[d] = 0;
-        }
-    }
-    return keepdim ? r.unsqueeze(dim) : r;
+    return Tensor::sum(x, dim, keepdim);
 }
 
 } // namespace

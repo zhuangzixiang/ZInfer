@@ -56,10 +56,20 @@ static void permute_grad(BackwardContext& c) {
     }
     const Tensor& g = *c.grad_outputs[0];
     Tensor& dx = *c.grad_inputs[0];
-    const float* gp = g.data<float>();
-    float* dp = dx.data<float>();
     const int64_t* gs = g.strides();
     const Shape& ds = dx.shape();
+    if (g.device() == Device::CUDA) {       // 原生: 逆置换步长收集
+        long long dims[8], eff[8];
+        for (int64_t d = 0; d < ds.rank; ++d) {
+            dims[d] = ds.dims[d];
+            eff[d] = gs[o->order[d]];       // idx[p] 的步长 = g 第 order[p] 维步长
+        }
+        cuda_backend::grad_bcast_cuda(g.data<float>(), dx.data<float>(),
+                                      dx.numel(), (int)ds.rank, dims, eff, 1.f);
+        return;
+    }
+    const float* gp = g.data<float>();
+    float* dp = dx.data<float>();
     // 遍历输出(=输入形状)多下标, 按逆排列算梯度源偏移
     int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     for (int64_t i = 0; i < dx.numel(); ++i) {

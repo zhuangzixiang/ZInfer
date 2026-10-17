@@ -17,6 +17,8 @@ LinearLayer::LinearLayer(int64_t in, int64_t out, bool bias)
 }
 
 Tensor LinearLayer::forward(const Tensor& x) {
+    migrate_to_device(w_, x.device());
+    migrate_to_device(b_, x.device());
     return Tensor::linear(x, w_, has_bias_ ? &b_ : nullptr);
 }
 

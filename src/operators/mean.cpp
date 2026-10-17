@@ -26,6 +26,22 @@ static void mean_grad(BackwardContext& c) {
     const Tensor& g = *c.grad_outputs[0];
     const Tensor& x = *c.saved_inputs[0];
     const int64_t dim = a->dim < 0 ? a->dim + x.dim_count() : a->dim;
+    if (g.device() == Device::CUDA) {       // 原生: 广播 × 1/n 一次完成
+        const float inv = 1.f / static_cast<float>(x.size(dim));
+        long long dims[8], eff[8];
+        const int64_t* gs = g.strides();
+        const int rank = (int)x.dim_count();
+        for (int d = 0; d < rank; ++d) {
+            dims[d] = x.size(d);
+            const int64_t gd = (d == dim && !a->keepdim) ? -1
+                                     : (a->keepdim ? d : (d > dim ? d - 1 : d));
+            eff[d] = (gd < 0 || g.size(gd) == 1) ? 0 : gs[gd];
+        }
+        cuda_backend::grad_bcast_cuda(g.data<float>(),
+                                      c.grad_inputs[0]->data<float>(),
+                                      c.grad_inputs[0]->numel(), rank, dims, eff, inv);
+        return;
+    }
     const float inv = 1.f / static_cast<float>(x.size(dim));
     sum_grad_into(g, dim, a->keepdim, x.shape(), *c.grad_inputs[0]);
     float* p = c.grad_inputs[0]->data<float>();

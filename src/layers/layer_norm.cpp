@@ -13,6 +13,8 @@ LayerNormLayer::LayerNormLayer(int64_t normalized_dim, double eps)
 }
 
 Tensor LayerNormLayer::forward(const Tensor& x) {
+    migrate_to_device(w_, x.device());
+    migrate_to_device(b_, x.device());
     return layer_norm_apply(x, w_, b_, eps_);
 }
 

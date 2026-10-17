@@ -88,39 +88,67 @@ void softmax_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
         x.data<float>(), out[0]->data<float>(), n, d);
 }
 
-// ---- sum / mean(末维; 每块一行) ----
-__global__ void sum_lastdim_k(const float* x, float* y, int64_t n, int64_t d, float inv) {
-    if (blockIdx.x >= n) return;
-    extern __shared__ float acc[];
-    const float* xr = x + blockIdx.x * d;
-    float l = 0.f;
-    for (int64_t i = threadIdx.x; i < d; i += blockDim.x) l += xr[i];
-    acc[threadIdx.x] = l;
-    __syncthreads();
-    if (threadIdx.x == 0) {
-        float s = 0.f;
-        for (int i = 0; i < blockDim.x; ++i) s += acc[i];
-        y[blockIdx.x] = s * inv;
+// ---- sum / mean 任意维规约: 每线程沿 dim 求和(与 CPU 语义一致;
+// 此前内核只支持末维, 无视 dim 选项 —— 存量缺口, 本块修复) ----
+// options 布局与 shared.hpp 的 ReduceAttrs 保持一致(规避 nvcc 包含链)
+struct ReduceCallOptions {
+    int64_t dim;
+    bool keepdim;
+};
+
+struct ReduceIn {
+    int rank;                  // 去掉被规约维后的维数
+    long long odims[8];
+    long long xstr[8];
+    long long n_dim;
+    long long s_dim;
+    float scale;               // sum 传 1, mean 传 1/n
+};
+
+__global__ void reduce_any_k(const float* x, float* y, long long total,
+                             ReduceIn m) {
+    const long long o = blockIdx.x * (long long)blockDim.x + threadIdx.x;
+    if (o >= total) return;
+    long long t = o, base = 0;
+    for (int d = m.rank - 1; d >= 0; --d) {
+        base += (t % m.odims[d]) * m.xstr[d];
+        t /= m.odims[d];
     }
+    float acc = 0.f;
+    for (long long j = 0; j < m.n_dim; ++j) acc += x[base + j * m.s_dim];
+    y[o] = acc * m.scale;
 }
 
-void sum_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
+static void reduce_host(Span<const Tensor*> in, Span<Tensor*> out,
+                        const void* options, bool is_mean) {
     require_contiguous1c(*in[0], *out[0]);
+    const ReduceCallOptions* a = static_cast<const ReduceCallOptions*>(options);
     const Tensor& x = *in[0];
-    const int64_t d = x.size(-1);
-    const int64_t n = x.numel() / d;
-    sum_lastdim_k<<<static_cast<unsigned>(n), kBlock, kBlock * sizeof(float)>>>(
-        x.data<float>(), out[0]->data<float>(), n, d, 1.f);
+    const int64_t dim = a->dim < 0 ? a->dim + x.dim_count() : a->dim;
+    ReduceIn m;
+    m.n_dim = x.size(dim);
+    m.s_dim = x.strides()[dim];
+    m.scale = is_mean ? 1.f / (float)m.n_dim : 1.f;
+    m.rank = 0;
+    for (int64_t d = 0; d < x.dim_count(); ++d) {   // keepdim 的 1 长维贡献 0, 可跳过
+        if (d == dim) continue;
+        m.odims[m.rank] = x.size(d);
+        m.xstr[m.rank] = x.strides()[d];
+        ++m.rank;
+    }
+    const long long total = out[0]->numel();
+    reduce_any_k<<<(unsigned)((total + kBlock - 1) / kBlock), kBlock>>>(
+        x.data<float>(), out[0]->data<float>(), total, m);
 }
 
-void mean_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    require_contiguous1c(*in[0], *out[0]);
-    const Tensor& x = *in[0];
-    const int64_t d = x.size(-1);
-    const int64_t n = x.numel() / d;
-    sum_lastdim_k<<<static_cast<unsigned>(n), kBlock, kBlock * sizeof(float)>>>(
-        x.data<float>(), out[0]->data<float>(), n, d,
-        1.f / static_cast<float>(d));
+void sum_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+              const void* options) {
+    reduce_host(in, out, options, /*is_mean=*/false);
+}
+
+void mean_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+               const void* options) {
+    reduce_host(in, out, options, /*is_mean=*/true);
 }
 
 // ---- cross_entropy(logits[N,C] + targets[N] → 标量, 单块两遍) ----
@@ -252,6 +280,81 @@ __global__ void rowmajor_to_nchw_k(const float* y2, float* y,
     const int o = t2 % O;
     const int n = t2 / O;
     y[i] = y2[(((int64_t)n * HO + ho) * WO + wo) * O + o];
+}
+
+// ---- 池化反向(每线程一个输出元素, 重算窗口后原子散射) ----
+__global__ void max_pool_grad_k(const float* x, const float* g, float* dx,
+                                long long total, int H, int W, int HO, int WO,
+                                int kh, int kw, int sh, int sw, int ph, int pw) {
+    const long long i = blockIdx.x * (long long)blockDim.x + threadIdx.x;
+    if (i >= total) return;
+    const int wo = i % WO;
+    const long long t = i / WO;
+    const int ho = t % HO;
+    const long long nc = t / HO;
+    const float* xc = x + nc * (long long)H * W;
+    long long bmax = -1;
+    float m = -3.4e38f;
+    for (int ki = 0; ki < kh; ++ki) {
+        const int ii = ho * sh + ki - ph;
+        if (ii < 0 || ii >= H) continue;
+        for (int kj = 0; kj < kw; ++kj) {
+            const int jj = wo * sw + kj - pw;
+            if (jj < 0 || jj >= W) continue;
+            if (xc[(long long)ii * W + jj] > m) {
+                m = xc[(long long)ii * W + jj];
+                bmax = (long long)ii * W + jj;
+            }
+        }
+    }
+    if (bmax >= 0) {
+        atomicAdd(dx + nc * (long long)H * W + bmax, g[i]);
+    }
+}
+
+__global__ void avg_pool_grad_k(const float* g, float* dx, long long total,
+                                int H, int W, int HO, int WO,
+                                int kh, int kw, int sh, int sw, int ph, int pw) {
+    const long long i = blockIdx.x * (long long)blockDim.x + threadIdx.x;
+    if (i >= total) return;
+    const int wo = i % WO;
+    const long long t = i / WO;
+    const int ho = t % HO;
+    const long long nc = t / HO;
+    int cnt = 0;
+    for (int ki = 0; ki < kh; ++ki) {
+        const int ii = ho * sh + ki - ph;
+        if (ii < 0 || ii >= H) continue;
+        for (int kj = 0; kj < kw; ++kj) {
+            const int jj = wo * sw + kj - pw;
+            if (jj < 0 || jj >= W) continue;
+            ++cnt;
+        }
+    }
+    const float share = g[i] / (float)cnt;
+    for (int ki = 0; ki < kh; ++ki) {
+        const int ii = ho * sh + ki - ph;
+        if (ii < 0 || ii >= H) continue;
+        for (int kj = 0; kj < kw; ++kj) {
+            const int jj = wo * sw + kj - pw;
+            if (jj < 0 || jj >= W) continue;
+            atomicAdd(dx + nc * (long long)H * W + ii * W + jj, share);
+        }
+    }
+}
+
+void max_pool_grad_cuda(const float* x, const float* g, float* dx, long long total,
+                        int H, int W, int HO, int WO,
+                        int kh, int kw, int sh, int sw, int ph, int pw) {
+    max_pool_grad_k<<<(unsigned)((total + kBlock - 1) / kBlock), kBlock>>>(x, g, dx, total, H, W, HO, WO,
+                                               kh, kw, sh, sw, ph, pw);
+}
+
+void avg_pool_grad_cuda(const float* g, float* dx, long long total,
+                        int H, int W, int HO, int WO,
+                        int kh, int kw, int sh, int sw, int ph, int pw) {
+    avg_pool_grad_k<<<(unsigned)((total + kBlock - 1) / kBlock), kBlock>>>(g, dx, total, H, W, HO, WO,
+                                               kh, kw, sh, sw, ph, pw);
 }
 
 void conv2d_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,

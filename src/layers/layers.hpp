@@ -11,6 +11,14 @@
 
 namespace znn {
 
+// 权重随输入设备一次性迁移(GPU 训练必需, 否则混合设备进内核);
+// 已在同设备时零开销。句柄更新后 params()/Optimizer 随之指向同设备
+inline void migrate_to_device(Tensor& t, Device dev) {
+    if (t && t.device() != dev) {
+        t = t.to_device(dev);
+    }
+}
+
 class LinearLayer final : public Layer {
 public:
     LinearLayer(int64_t in, int64_t out, bool bias);

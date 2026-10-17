@@ -17,6 +17,10 @@ BatchNorm2dLayer::BatchNorm2dLayer(int64_t channels, double eps, double momentum
 }
 
 Tensor BatchNorm2dLayer::forward(const Tensor& x) {
+    migrate_to_device(w_, x.device());
+    migrate_to_device(b_, x.device());
+    migrate_to_device(mean_, x.device());
+    migrate_to_device(var_, x.device());
     return batch_norm2d_apply(x, w_, b_, mean_, var_, eps_, momentum_, training_);
 }
 

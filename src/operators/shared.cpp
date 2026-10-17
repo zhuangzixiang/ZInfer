@@ -1,6 +1,7 @@
 // shared.cpp — 逐元素类算子的共用实现
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
+#include "backends/cuda/cuda_backend.hpp"
 #include <Eigen/Dense>
 #include <cstring>
 
@@ -218,7 +219,9 @@ void sum_into(const Tensor& x, int64_t dim, bool keepdim, Tensor& out) {
         int64_t ro = 0;
         for (int64_t d = 0; d < x.dim_count(); ++d) {
             if (d != dim) {
-                const int64_t rd = d > dim ? d - 1 : d;
+                // keepdim 时输出仍含被规约维(长 1), 映射保持 d;
+                // 此前恒按 d-1 映射 —— 3D 中间维 keepdim 一直算错(存量 bug)
+                const int64_t rd = keepdim ? d : (d > dim ? d - 1 : d);
                 ro += idx[d] * os[rd];
             }
         }
@@ -249,6 +252,20 @@ Tensor sum_along(const Tensor& x, int64_t dim, bool keepdim) {
 
 void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
                    const Shape& in_shape, Tensor& out) {
+    if (g.device() == Device::CUDA) {       // 原生: 广播维(g 尺寸 1)步长置 0
+        long long dims[8], eff[8];
+        const int64_t* gs = g.strides();
+        const int rank = (int)in_shape.rank;
+        for (int d = 0; d < rank; ++d) {
+            dims[d] = in_shape.dims[d];
+            const int64_t gd = (d == dim && !keepdim) ? -1
+                                    : (keepdim ? d : (d > dim ? d - 1 : d));
+            eff[d] = (gd < 0 || g.size(gd) == 1) ? 0 : gs[gd];
+        }
+        cuda_backend::grad_bcast_cuda(g.data<float>(), out.data<float>(),
+                                      out.numel(), rank, dims, eff, 1.f);
+        return;
+    }
     const float* gp = g.data<float>();
     float* op = out.data<float>();
     const int64_t* gs = g.strides();
@@ -258,7 +275,8 @@ void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
         for (int64_t d = 0; d < in_shape.rank; ++d) {
             if (d == dim && !keepdim) continue;   // 被求和维不贡献梯度偏移
             const int64_t gd = keepdim ? d : (d > dim ? d - 1 : d);
-            go += idx[d] * gs[gd];
+            // keepdim 的 g 被规约维长 1: 广播步长取 0(否则越界读)
+            go += (g.size(gd) == 1) ? 0 : idx[d] * gs[gd];
         }
         op[i] = gp[go];
         for (int64_t d = in_shape.rank - 1; d >= 0; --d) {

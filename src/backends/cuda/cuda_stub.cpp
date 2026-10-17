@@ -75,6 +75,16 @@ void adam_step_cuda(float*, const float*, float*, float*, long long,
 void memset0_cuda(void*, size_t) { unavailable(); }
 void grad_unscale_cuda(float*, float*, long long, float) { unavailable(); }
 void unary_bwd_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*) { unavailable(); }
+void strided_copy_cuda(const float*, float*, int,
+                       const long long*, const long long*, const long long*,
+                       long long) { unavailable(); }
+void grad_bcast_cuda(const float*, float*, long long, int,
+                     const long long*, const long long*, float) { unavailable(); }
+void max_pool_grad_cuda(const float*, const float*, float*, long long,
+                        int, int, int, int, int, int, int, int, int, int) { unavailable(); }
+void avg_pool_grad_cuda(const float*, float*, long long,
+                        int, int, int, int, int, int, int, int, int, int) { unavailable(); }
+void embedding_grad_cuda(const float*, const long long*, float*, long long, int) { unavailable(); }
 
 } // namespace cuda_backend
 } // namespace znn
