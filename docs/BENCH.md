@@ -82,13 +82,34 @@ im2col/P 张量分配(cudaMalloc+cudaFree 含隐式同步)占主导——
 存量 bug(gemm 辅助 at 标志只转置 A, L≠D 时 K 按 [D,L] 误读,
 L==D 时两种布局巧合相同故从未暴露)。
 
+## 2026-10-16 · GPU 异步分配器: cudaMallocAsync 消除分配开销
+
+改动: cuda_device.cu 中 alloc/free 改为 cudaMallocAsync/cudaFreeAsync
+(默认流, 流有序免隐式同步), available() 一次设置默认池释放阈值上限
+(空闲块留池复用)。约 15 行, 零新增全局状态。
+
+**端到端 gpu_bench 对比(改前 → 改后, 同一基准)**:
+
+| 基准 | 改前 | 改后 | 提升 |
+|---|---:|---:|---:|
+| matmul 1024³ TF32 | 5.88 TF/s | 21.90 TF/s | 3.7× |
+| matmul 2048³ TF32 | 13.11 TF/s | 24.97 TF/s | 1.9× |
+| matmul 4096³ TF32 | 18.80 TF/s | 24.74 TF/s | 1.3× |
+| matmul 4096³ FP32 | 15.99 TF/s | 20.13 TF/s | 1.3× |
+| linear 4096×2048×2048+bias | 16.13 TF/s | **31.58 TF/s** | 2.0× |
+| conv2d 8×16×32×32→32×3×3 | 0.447 ms | **0.051 ms** | 8.8× |
+| attention 4×8×256×64 | 0.770 ms | **0.270 ms** | 2.9× |
+
+- 端到端 TF32/FP32 比恢复到 ~1.3×, 与内核级探针(42.4/32.2)一致,
+  证实此前差距确为分配稀释;
+- 4096³ 端到端(24.7)仍低于纯内核(42.4): 余量为基准间时钟状态
+  与 d2h 同步拷贝, 非分配问题;
+- conv2d 首次超过旧朴素内核(0.091ms); attention 端到端 2.9×。
+
 ## 已知瓶颈(后续优化目标)
 
-1. **GPU 缓存分配器**(最优先): 每次算子调用 cudaMalloc/cudaFree
-   输出/scratch 张量, 大张量 ~ms 级且 cudaFree 隐式同步——
-   matmul 4096³ 端到端 8.6ms 中 5.9ms 是分配开销(内核 2.7ms);
-   PyTorch 同场景用 caching allocator(机制变更, 待审核);
-2. TF32 已覆盖 matmul/linear/conv2d/attention 全部 GEMM 点
-   (gemmEx 单入口); FP16/BF16 未接入(Ada Tensor Core 再翻倍);
+1. FP16/BF16 未接入(Ada Tensor Core 峰值再翻倍);
+2. h2d/d2h 仍用同步 cudaMemcpy(小张量无所谓, 流水线场景需
+   异步拷贝 + pinned memory);
 3. conv2d im2col 有一次显式拷贝, 可用 stride-map 直接 GEMM 消除;
 4. autograd 节点为裸 new, 未引入节点池(DESIGN §13.3 规划项)。

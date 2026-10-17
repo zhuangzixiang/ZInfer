@@ -38,17 +38,26 @@ bool available() {
     }
     cudaSetDevice(0);               // 显式初始化 CUDA 上下文(静态库必需)
     cudaFree(nullptr);             // 触发惰性上下文创建
+    // 默认内存池释放阈值设为最大: 空闲块留在池内复用, 免去每次
+    // 分配的驱动级开销与 cudaFree 的隐式同步(与 kernel 同流, 有序即安全)
+    cudaMemPool_t pool = nullptr;
+    if (cudaDeviceGetDefaultMemPool(&pool, 0) == cudaSuccess) {
+        unsigned long long keep = ~0ull;
+        cudaMemPoolSetAttribute(pool, cudaMemPoolAttrReleaseThreshold, &keep);
+    }
     return true;
 }
 
 void* alloc(size_t bytes) {
     void* p = nullptr;
-    check(cudaMalloc(&p, bytes), "cudaMalloc");
+    check(cudaMallocAsync(&p, bytes, /*stream=*/nullptr), "cudaMallocAsync");
     return p;
 }
 
 void free(void* p) {
-    cudaFree(p);                       // 析构路径不抛异常
+    if (p) {
+        cudaFreeAsync(p, /*stream=*/nullptr);   // 析构路径不抛异常
+    }
 }
 
 void copy_host_to_device(void* dst, const void* src, size_t bytes) {
