@@ -20,6 +20,12 @@ static void matmul_eigen(KernelContext&, Span<const Tensor*> in,
         matmul_naive(KernelContext{Device::CPU, nullptr}, in, out, nullptr);
         return;
     }
+    if (onednn::gemm(a.data<float>(), (int)a.size(1), b.data<float>(),
+                     (int)b.size(1), y.data<float>(), (int)y.size(1),
+                     (int)a.size(0), (int)y.size(1), (int)a.size(1),
+                     /*trans_b=*/false)) {
+        return;   // oneDNN(缺失/失败自动落到 Eigen)
+    }
     using Mat = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
     Eigen::Map<const Mat> ma(a.data<float>(), a.size(0), a.size(1));
     Eigen::Map<const Mat> mb(b.data<float>(), b.size(0), b.size(1));

@@ -6,6 +6,7 @@
 // ============================================================================
 #pragma once
 #include "operator.hpp"
+#include "backends/onednn/onednn.hpp"   // kernels[CPU] 槽位: oneDNN 优先
 #include "znn_internal.hpp"
 
 namespace znn {

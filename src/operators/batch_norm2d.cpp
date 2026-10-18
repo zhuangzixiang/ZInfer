@@ -9,6 +9,24 @@ namespace znn {
 
 extern const Operator g_batch_norm2d_operator;
 
+static void batch_norm2d_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void* options);
+
+static void batch_norm2d_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                                const void* o) {
+    const float* opts = static_cast<const float*>(o);   // {eps, momentum, training}
+    // 训练态统计更新走组合路径(ref), 推理统计量走 oneDNN
+    if (opts[2] == 0.f
+        && !onednn::batch_norm(*in[0], *in[1], *in[2], *in[3], *in[4],
+                               *out[0], opts[0])) {
+        batch_norm2d_ref(c, in, out, o);
+        return;
+    }
+    if (opts[2] != 0.f) {
+        batch_norm2d_ref(c, in, out, o);
+    }
+}
+
+
 struct BatchNormOptions {
     double eps;
     double momentum;
@@ -108,7 +126,7 @@ const Operator g_batch_norm2d_operator = {
     batch_norm2d_infer,
     batch_norm2d_grad,
     batch_norm2d_ref,
-    {nullptr, cuda_backend::batch_norm2d_cuda, nullptr, nullptr},
+    {batch_norm2d_cpu, nullptr, nullptr},
     sizeof(BatchNormOptions),
 };
 

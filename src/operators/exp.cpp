@@ -7,6 +7,16 @@ namespace znn {
 
 extern const Operator g_exp_operator;
 
+static void exp_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*);
+
+static void exp_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                        const void* o) {
+    if (!onednn::eltwise(in, out, (int)dnnl_eltwise_exp, 0.f, 0.f)) {
+        exp_ref(c, in, out, o);   // 缺 DLL 回落(Eigen 快速路径)
+    }
+}
+
+
 static void exp_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
     unary_kernel_fast(in, out, [](float x) { return expf(x); });
 }
@@ -20,7 +30,7 @@ const Operator g_exp_operator = {
     infer_same,
     exp_grad,
     exp_ref,
-    {nullptr, cuda_backend::exp_cuda, nullptr, nullptr},
+    {exp_cpu, nullptr, nullptr},
 };
 
 Tensor Tensor::exp(const Tensor& x) {

@@ -7,6 +7,18 @@ namespace znn {
 
 extern const Operator g_max_pool2d_operator;
 
+static void max_pool2d_ref(KernelContext&, Span<const Tensor*> in,
+                           Span<Tensor*> out, const void* options);
+
+static void max_pool2d_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                             const void* o) {
+    const PoolCallOptions* a = static_cast<const PoolCallOptions*>(o);
+    if (!onednn::pool2d(*in[0], *out[0], a->kernel, a->pool, /*max_pool=*/true)) {
+        max_pool2d_ref(c, in, out, o);
+    }
+}
+
+
 static void max_pool2d_infer(Span<const TensorMeta*> in, const void* options,
                              std::vector<Shape>& outs) {
     const PoolCallOptions* o = static_cast<const PoolCallOptions*>(options);
@@ -105,7 +117,7 @@ const Operator g_max_pool2d_operator = {
     max_pool2d_infer,
     max_pool2d_grad,
     max_pool2d_ref,
-    {nullptr, cuda_backend::max_pool2d_cuda, nullptr, nullptr},
+    {max_pool2d_cpu, nullptr, nullptr},
     sizeof(PoolCallOptions),
 };
 

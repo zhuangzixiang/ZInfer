@@ -7,9 +7,22 @@ namespace znn {
 
 extern const Operator g_softmax_operator;
 
+static void softmax_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void* options);
+
+
 struct SoftmaxOptions {
     int64_t dim;
 };
+
+static void softmax_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                           const void* o) {
+    const int64_t dim = static_cast<const SoftmaxOptions*>(o)->dim;
+    if (!onednn::softmax(in, out, dim)) {
+        softmax_ref(c, in, out, o);
+    }
+}
+
+
 
 static void softmax_infer(Span<const TensorMeta*> in, const void*, std::vector<Shape>& outs) {
     outs.push_back(*in[0]->shape);
@@ -70,7 +83,7 @@ const Operator g_softmax_operator = {
     softmax_infer,
     softmax_grad,
     softmax_ref,
-    {nullptr, cuda_backend::softmax_cuda, nullptr, nullptr},
+    {softmax_cpu, nullptr, nullptr},
     sizeof(SoftmaxOptions),
 };
 

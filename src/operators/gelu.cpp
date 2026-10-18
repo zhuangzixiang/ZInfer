@@ -8,6 +8,16 @@ namespace znn {
 
 extern const Operator g_gelu_operator;
 
+static void gelu_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*);
+
+static void gelu_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                        const void* o) {
+    if (!onednn::eltwise(in, out, (int)dnnl_eltwise_gelu_tanh, 0.f, 0.f)) {
+        gelu_ref(c, in, out, o);   // 缺 DLL 回落(Eigen 快速路径)
+    }
+}
+
+
 static float gelu_fwd(float x) {
     const float k = 0.7978845608f * (x + 0.044715f * x * x * x);
     return 0.5f * x * (1.0f + std::tanh(k));
@@ -26,7 +36,7 @@ const Operator g_gelu_operator = {
     infer_same,
     gelu_grad,
     gelu_ref,
-    {nullptr, cuda_backend::gelu_cuda, nullptr, nullptr},
+    {gelu_cpu, nullptr, nullptr},
 };
 
 Tensor Activator::gelu(const Tensor& x) {

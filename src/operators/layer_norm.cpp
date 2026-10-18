@@ -8,9 +8,22 @@ namespace znn {
 
 extern const Operator g_layer_norm_operator;
 
+static void layer_norm_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void* options);
+
+
 struct LayerNormOptions {
     double eps;
 };
+
+static void layer_norm_cpu(KernelContext& c, Span<const Tensor*> in,
+                           Span<Tensor*> out, const void* o) {
+    const LayerNormOptions* a = static_cast<const LayerNormOptions*>(o);
+    if (!onednn::layer_norm(*in[0], *in[1], *in[2], *out[0], a->eps)) {
+        layer_norm_ref(c, in, out, o);
+    }
+}
+
+
 
 static void layer_norm_infer(Span<const TensorMeta*> in, const void*,
                              std::vector<Shape>& outs) {
@@ -89,7 +102,7 @@ const Operator g_layer_norm_operator = {
     layer_norm_infer,
     layer_norm_grad,
     layer_norm_ref,
-    {nullptr, cuda_backend::layer_norm_cuda, nullptr, nullptr},
+    {layer_norm_cpu, nullptr, nullptr},
     sizeof(LayerNormOptions),
 };
 

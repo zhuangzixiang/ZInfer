@@ -7,6 +7,16 @@ namespace znn {
 
 extern const Operator g_sub_operator;
 
+static void sub_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*);
+
+static void sub_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                        const void* o) {
+    if (!onednn::binary(in, out, (int)dnnl_binary_sub)) {
+        sub_ref(c, in, out, o);
+    }
+}
+
+
 static void sub_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
     binary_kernel_fast(in, out, [](float a, float b) { return a - b; });
 }
@@ -16,7 +26,7 @@ const Operator g_sub_operator = {
     infer_broadcast,
     binary_grad,
     sub_ref,
-    {nullptr, cuda_backend::sub_cuda, nullptr, nullptr},
+    {sub_cpu, nullptr, nullptr},
 };
 
 Tensor Tensor::sub(const Tensor& a, const Tensor& b) {

@@ -7,6 +7,16 @@ namespace znn {
 
 extern const Operator g_relu_operator;
 
+static void relu_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*);
+
+static void relu_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                        const void* o) {
+    if (!onednn::eltwise(in, out, (int)dnnl_eltwise_relu, 0.f, 0.f)) {
+        relu_ref(c, in, out, o);   // 缺 DLL 回落(Eigen 快速路径)
+    }
+}
+
+
 static void relu_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
     unary_kernel_fast(in, out, [](float x) { return x > 0 ? x : 0; });
 }
@@ -20,7 +30,7 @@ const Operator g_relu_operator = {
     infer_same,
     relu_grad,
     relu_ref,
-    {nullptr, cuda_backend::relu_cuda, nullptr, nullptr},
+    {relu_cpu, nullptr, nullptr},
 };
 
 Tensor Activator::relu(const Tensor& x) {

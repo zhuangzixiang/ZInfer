@@ -8,6 +8,17 @@ namespace znn {
 
 extern const Operator g_mean_operator;
 
+static void mean_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void* options);
+
+static void mean_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                         const void* o) {
+    const ReduceAttrs* a = static_cast<const ReduceAttrs*>(o);
+    if (!onednn::reduce(in, out, a->dim, /*mean=*/true)) {
+        mean_ref(c, in, out, o);
+    }
+}
+
+
 static void mean_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                      const void* options) {
     const ReduceAttrs* a = static_cast<const ReduceAttrs*>(options);
@@ -53,7 +64,7 @@ const Operator g_mean_operator = {
     infer_reduce,
     mean_grad,
     mean_ref,
-    {nullptr, cuda_backend::mean_cuda, nullptr, nullptr},
+    {mean_cpu, nullptr, nullptr},
     sizeof(ReduceAttrs),
 };
 

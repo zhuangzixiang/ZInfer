@@ -7,6 +7,16 @@ namespace znn {
 
 extern const Operator g_neg_operator;
 
+static void neg_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*);
+
+static void neg_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                        const void* o) {
+    if (!onednn::eltwise(in, out, (int)dnnl_eltwise_linear, -1.f, 0.f)) {
+        neg_ref(c, in, out, o);   // 缺 DLL 回落(Eigen 快速路径)
+    }
+}
+
+
 static void neg_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
     unary_kernel_fast(in, out, [](float x) { return -x; });
 }
@@ -20,7 +30,7 @@ const Operator g_neg_operator = {
     infer_same,
     neg_grad,
     neg_ref,
-    {nullptr, cuda_backend::neg_cuda, nullptr, nullptr},
+    {neg_cpu, nullptr, nullptr},
 };
 
 Tensor Tensor::neg(const Tensor& x) {

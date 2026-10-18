@@ -7,6 +7,16 @@ namespace znn {
 
 extern const Operator g_log_operator;
 
+static void log_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*);
+
+static void log_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                        const void* o) {
+    if (!onednn::eltwise(in, out, (int)dnnl_eltwise_log, 0.f, 0.f)) {
+        log_ref(c, in, out, o);   // 缺 DLL 回落(Eigen 快速路径)
+    }
+}
+
+
 static void log_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
     unary_kernel_fast(in, out, [](float x) { return logf(x); });
 }
@@ -20,7 +30,7 @@ const Operator g_log_operator = {
     infer_same,
     log_grad,
     log_ref,
-    {nullptr, cuda_backend::log_cuda, nullptr, nullptr},
+    {log_cpu, nullptr, nullptr},
 };
 
 Tensor Tensor::log(const Tensor& x) {

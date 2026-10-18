@@ -210,6 +210,37 @@ void binary_kernel_fast(Span<const Tensor*> in, Span<Tensor*> out, float (*fn)(f
 }
 
 void sum_into(const Tensor& x, int64_t dim, bool keepdim, Tensor& out) {
+    // 连续末维快速路径: 行主序内层连续累加(通用路径每元素做步长算术, 慢 20 倍)
+    if (x.is_contiguous() && out.is_contiguous()
+        && dim == x.dim_count() - 1 && x.dim_count() >= 1) {
+        const int64_t rows = out.numel();
+        const int64_t d = x.size(dim);
+        const float* xp = x.data<float>();
+        float* op = out.data<float>();
+        for (int64_t r = 0; r < rows; ++r) {
+            float acc = 0.f;
+            const float* xr = xp + r * d;
+            for (int64_t k = 0; k < d; ++k) {
+                acc += xr[k];
+            }
+            op[r] = acc;
+        }
+        return;
+    }
+    // 连续首维快速路径: 内层连续累加(与末维路径同理)
+    if (x.is_contiguous() && out.is_contiguous() && dim == 0) {
+        const int64_t outer = x.size(0);
+        const int64_t inner = out.numel();
+        const float* xp2 = x.data<float>();
+        float* op2 = out.data<float>();
+        for (int64_t o = 0; o < outer; ++o) {
+            const float* xr = xp2 + o * inner;
+            for (int64_t k = 0; k < inner; ++k) {
+                op2[k] += xr[k];
+            }
+        }
+        return;
+    }
     const float* xp = x.data<float>();
     float* op = out.data<float>();
     const int64_t* xs = x.strides();

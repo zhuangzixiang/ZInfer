@@ -17,6 +17,10 @@ static void conv2d_eigen(KernelContext&, Span<const Tensor*> in,
     const Tensor& w = *in[1];
     Tensor& y = *out[0];
     const bool fast = x.is_contiguous() && w.is_contiguous() && y.is_contiguous();
+    if (fast && onednn::conv2d(x, w, y,
+                               *static_cast<const Conv2dOptions*>(options))) {
+        return;   // oneDNN 直接卷积(缺失/分组/膨胀回落 im2col+Eigen)
+    }
     if (!fast) {
         conv2d_naive(KernelContext{Device::CPU, nullptr}, in, out, options);
         return;

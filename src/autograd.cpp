@@ -1,11 +1,16 @@
 // autograd.cpp — 自动求导引擎实现
 // 铁律: 梯度规则经算子组合自动走当前后端, 无 CPU 桥接
 #include "autograd.hpp"
+#include <cstdlib>
 #include "znn_internal.hpp"
 #include <stdexcept>
 #include <vector>
 
 namespace znn {
+
+namespace {
+const bool trace_bw = std::getenv("ZNN_TRACE_BW") != nullptr;   // 反向轨迹开关
+} // namespace
 
 AutogradEngine& AutogradEngine::instance() {
     static AutogradEngine engine;
@@ -74,9 +79,13 @@ void AutogradEngine::backward(const Tensor& loss) {
         ctx.grad_outputs  = Span<const Tensor*>(go.data(), go.size());
         ctx.grad_inputs   = Span<Tensor*>(gi.data(), gi.size());
         ctx.options       = n->options_copy.empty() ? nullptr : n->options_copy.data();
-        std::fprintf(stderr, "[bw:%s nin=%d] ", n->op->name, (int)nin);
+        if (trace_bw) {   // ZNN_TRACE_BW=1: 反向节点轨迹(排查用, 默认静默)
+            std::fprintf(stderr, "[bw:%s nin=%d] ", n->op->name, (int)nin);
+        }
         n->op->grad(ctx);
-        std::fprintf(stderr, "[done] ");
+        if (trace_bw) {
+            std::fprintf(stderr, "[done] ");
+        }
         // 3. 累加到各输入(叶子得到最终梯度; 中间量等待其生产节点读取)
         //    非 F32 输入(如 embedding 的 I64 indices)不可训练, 跳过
         for (size_t i = 0; i < nin; ++i) {

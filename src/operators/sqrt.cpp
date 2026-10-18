@@ -7,6 +7,16 @@ namespace znn {
 
 extern const Operator g_sqrt_operator;
 
+static void sqrt_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*);
+
+static void sqrt_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                        const void* o) {
+    if (!onednn::eltwise(in, out, (int)dnnl_eltwise_sqrt, 0.f, 0.f)) {
+        sqrt_ref(c, in, out, o);   // 缺 DLL 回落(Eigen 快速路径)
+    }
+}
+
+
 static void sqrt_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
     unary_kernel_fast(in, out, [](float x) { return sqrtf(x); });
 }
@@ -20,7 +30,7 @@ const Operator g_sqrt_operator = {
     infer_same,
     sqrt_grad,
     sqrt_ref,
-    {nullptr, cuda_backend::sqrt_cuda, nullptr, nullptr},
+    {sqrt_cpu, nullptr, nullptr},
 };
 
 Tensor Tensor::sqrt(const Tensor& x) {

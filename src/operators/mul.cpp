@@ -7,6 +7,16 @@ namespace znn {
 
 extern const Operator g_mul_operator;
 
+static void mul_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*);
+
+static void mul_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                        const void* o) {
+    if (!onednn::binary(in, out, (int)dnnl_binary_mul)) {
+        mul_ref(c, in, out, o);
+    }
+}
+
+
 static void mul_grad(BackwardContext& c) {
     const Tensor& g = *c.grad_outputs[0];
     Tensor ga = Tensor::mul(g, *c.saved_inputs[1]);
@@ -24,7 +34,7 @@ const Operator g_mul_operator = {
     infer_broadcast,
     mul_grad,
     mul_ref,
-    {nullptr, cuda_backend::mul_cuda, nullptr, nullptr},
+    {mul_cpu, nullptr, nullptr},
 };
 
 Tensor Tensor::mul(const Tensor& a, const Tensor& b) {

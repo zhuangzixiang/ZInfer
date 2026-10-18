@@ -8,6 +8,17 @@ namespace znn {
 
 extern const Operator g_sum_operator;
 
+static void sum_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void* options);
+
+static void sum_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                         const void* o) {
+    const ReduceAttrs* a = static_cast<const ReduceAttrs*>(o);
+    if (!onednn::reduce(in, out, a->dim, /*mean=*/false)) {
+        sum_ref(c, in, out, o);
+    }
+}
+
+
 static void sum_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                     const void* options) {
     const ReduceAttrs* a = static_cast<const ReduceAttrs*>(options);
@@ -30,7 +41,7 @@ const Operator g_sum_operator = {
     infer_reduce,
     sum_grad,
     sum_ref,
-    {nullptr, cuda_backend::sum_cuda, nullptr, nullptr},
+    {sum_cpu, nullptr, nullptr},
     sizeof(ReduceAttrs),
 };
 

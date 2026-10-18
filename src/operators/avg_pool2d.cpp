@@ -7,6 +7,18 @@ namespace znn {
 
 extern const Operator g_avg_pool2d_operator;
 
+static void avg_pool2d_ref(KernelContext&, Span<const Tensor*> in,
+                           Span<Tensor*> out, const void* options);
+
+static void avg_pool2d_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                             const void* o) {
+    const PoolCallOptions* a = static_cast<const PoolCallOptions*>(o);
+    if (!onednn::pool2d(*in[0], *out[0], a->kernel, a->pool, /*max_pool=*/false)) {
+        avg_pool2d_ref(c, in, out, o);
+    }
+}
+
+
 static void avg_pool2d_infer(Span<const TensorMeta*> in, const void* options,
                              std::vector<Shape>& outs) {
     const PoolCallOptions* o = static_cast<const PoolCallOptions*>(options);
@@ -106,7 +118,7 @@ const Operator g_avg_pool2d_operator = {
     avg_pool2d_infer,
     avg_pool2d_grad,
     avg_pool2d_ref,
-    {nullptr, cuda_backend::avg_pool2d_cuda, nullptr, nullptr},
+    {avg_pool2d_cpu, nullptr, nullptr},
     sizeof(PoolCallOptions),
 };
 

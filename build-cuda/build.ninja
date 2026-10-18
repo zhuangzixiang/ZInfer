@@ -53,9 +53,29 @@ build CMakeFiles\znn.dir\src\znn_internal.cpp.obj: CXX_COMPILER__znn_unscanned_R
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src
+  TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
+  TARGET_PDB = znn.pdb
+
+build CMakeFiles\znn.dir\src\grad_scaler.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\grad_scaler.cpp || cmake_object_order_depends_target_znn
+  CONFIG = Release
+  DEFINES = -DZNN_CUDA
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
+  OBJECT_DIR = CMakeFiles\znn.dir
+  OBJECT_FILE_DIR = CMakeFiles\znn.dir\src
+  TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
+  TARGET_PDB = znn.pdb
+
+build CMakeFiles\znn.dir\src\backends\onednn\onednn.cpp.obj: CXX_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\backends\onednn\onednn.cpp || cmake_object_order_depends_target_znn
+  CONFIG = Release
+  DEFINES = -DZNN_CUDA
+  FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
+  OBJECT_DIR = CMakeFiles\znn.dir
+  OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\backends\onednn
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
   TARGET_PDB = znn.pdb
 
@@ -64,7 +84,7 @@ build CMakeFiles\znn.dir\src\dynlib.cpp.obj: CUDA_COMPILER__znn_unscanned_Releas
   DEFINES = -DZNN_CUDA
   DEP_FILE = CMakeFiles\znn.dir\src\dynlib.cpp.obj.d
   FLAGS = -D_WINDOWS -Xcompiler=" /GR /EHsc" -Xcompiler=-utf-8 -Xcompiler="-O2 -Ob2" -DNDEBUG -std=c++17 "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MD
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -74,7 +94,7 @@ build CMakeFiles\znn.dir\src\autograd.cpp.obj: CXX_COMPILER__znn_unscanned_Relea
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -84,7 +104,7 @@ build CMakeFiles\znn.dir\src\op_dispatcher.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -94,7 +114,7 @@ build CMakeFiles\znn.dir\src\operators\shared.cpp.obj: CXX_COMPILER__znn_unscann
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -104,7 +124,7 @@ build CMakeFiles\znn.dir\src\operators\arange.cpp.obj: CXX_COMPILER__znn_unscann
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -114,7 +134,7 @@ build CMakeFiles\znn.dir\src\operators\randn.cpp.obj: CXX_COMPILER__znn_unscanne
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -124,7 +144,7 @@ build CMakeFiles\znn.dir\src\operators\add.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -134,7 +154,7 @@ build CMakeFiles\znn.dir\src\operators\sub.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -144,7 +164,7 @@ build CMakeFiles\znn.dir\src\operators\mul.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -154,7 +174,7 @@ build CMakeFiles\znn.dir\src\operators\div.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -164,7 +184,7 @@ build CMakeFiles\znn.dir\src\operators\neg.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -174,7 +194,7 @@ build CMakeFiles\znn.dir\src\operators\exp.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -184,7 +204,7 @@ build CMakeFiles\znn.dir\src\operators\log.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -194,7 +214,7 @@ build CMakeFiles\znn.dir\src\operators\sqrt.cpp.obj: CXX_COMPILER__znn_unscanned
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -204,7 +224,7 @@ build CMakeFiles\znn.dir\src\operators\relu.cpp.obj: CXX_COMPILER__znn_unscanned
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -214,7 +234,7 @@ build CMakeFiles\znn.dir\src\operators\gelu.cpp.obj: CXX_COMPILER__znn_unscanned
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -224,7 +244,7 @@ build CMakeFiles\znn.dir\src\operators\sigmoid.cpp.obj: CXX_COMPILER__znn_unscan
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -234,7 +254,7 @@ build CMakeFiles\znn.dir\src\operators\tanh.cpp.obj: CXX_COMPILER__znn_unscanned
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -244,7 +264,7 @@ build CMakeFiles\znn.dir\src\operators\silu.cpp.obj: CXX_COMPILER__znn_unscanned
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -254,7 +274,7 @@ build CMakeFiles\znn.dir\src\operators\softmax.cpp.obj: CXX_COMPILER__znn_unscan
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -264,7 +284,7 @@ build CMakeFiles\znn.dir\src\operators\sum.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -274,7 +294,7 @@ build CMakeFiles\znn.dir\src\operators\mean.cpp.obj: CXX_COMPILER__znn_unscanned
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -284,7 +304,7 @@ build CMakeFiles\znn.dir\src\operators\matmul.cpp.obj: CXX_COMPILER__znn_unscann
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -294,7 +314,7 @@ build CMakeFiles\znn.dir\src\operators\matmul_eigen.cpp.obj: CXX_COMPILER__znn_u
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -304,7 +324,7 @@ build CMakeFiles\znn.dir\src\operators\linear_eigen.cpp.obj: CXX_COMPILER__znn_u
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -314,7 +334,7 @@ build CMakeFiles\znn.dir\src\operators\conv2d_eigen.cpp.obj: CXX_COMPILER__znn_u
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -324,7 +344,7 @@ build CMakeFiles\znn.dir\src\operators\linear.cpp.obj: CXX_COMPILER__znn_unscann
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -334,7 +354,7 @@ build CMakeFiles\znn.dir\src\operators\cat.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -344,7 +364,7 @@ build CMakeFiles\znn.dir\src\operators\stack.cpp.obj: CXX_COMPILER__znn_unscanne
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -354,7 +374,7 @@ build CMakeFiles\znn.dir\src\operators\conv2d.cpp.obj: CXX_COMPILER__znn_unscann
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -364,7 +384,7 @@ build CMakeFiles\znn.dir\src\operators\max_pool2d.cpp.obj: CXX_COMPILER__znn_uns
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -374,7 +394,7 @@ build CMakeFiles\znn.dir\src\operators\avg_pool2d.cpp.obj: CXX_COMPILER__znn_uns
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -384,7 +404,7 @@ build CMakeFiles\znn.dir\src\operators\layer_norm.cpp.obj: CXX_COMPILER__znn_uns
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -394,7 +414,7 @@ build CMakeFiles\znn.dir\src\operators\batch_norm2d.cpp.obj: CXX_COMPILER__znn_u
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -404,7 +424,7 @@ build CMakeFiles\znn.dir\src\operators\attention.cpp.obj: CXX_COMPILER__znn_unsc
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -414,7 +434,7 @@ build CMakeFiles\znn.dir\src\operators\embedding.cpp.obj: CXX_COMPILER__znn_unsc
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -424,7 +444,7 @@ build CMakeFiles\znn.dir\src\operators\cross_entropy.cpp.obj: CXX_COMPILER__znn_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -434,7 +454,7 @@ build CMakeFiles\znn.dir\src\operators\mse.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -444,7 +464,7 @@ build CMakeFiles\znn.dir\src\operators\transpose.cpp.obj: CXX_COMPILER__znn_unsc
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -454,7 +474,7 @@ build CMakeFiles\znn.dir\src\operators\reshape.cpp.obj: CXX_COMPILER__znn_unscan
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -464,7 +484,7 @@ build CMakeFiles\znn.dir\src\operators\permute.cpp.obj: CXX_COMPILER__znn_unscan
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -474,7 +494,7 @@ build CMakeFiles\znn.dir\src\operators\slice.cpp.obj: CXX_COMPILER__znn_unscanne
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -484,7 +504,7 @@ build CMakeFiles\znn.dir\src\operators\operator_list.cpp.obj: CXX_COMPILER__znn_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\operators
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -494,7 +514,7 @@ build CMakeFiles\znn.dir\src\layers\layer_factory.cpp.obj: CXX_COMPILER__znn_uns
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -504,7 +524,7 @@ build CMakeFiles\znn.dir\src\layers\linear.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -514,7 +534,7 @@ build CMakeFiles\znn.dir\src\layers\conv2d.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -524,7 +544,7 @@ build CMakeFiles\znn.dir\src\layers\batch_norm2d.cpp.obj: CXX_COMPILER__znn_unsc
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -534,7 +554,7 @@ build CMakeFiles\znn.dir\src\layers\layer_norm.cpp.obj: CXX_COMPILER__znn_unscan
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -544,7 +564,7 @@ build CMakeFiles\znn.dir\src\layers\embedding.cpp.obj: CXX_COMPILER__znn_unscann
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -554,7 +574,7 @@ build CMakeFiles\znn.dir\src\layers\dropout.cpp.obj: CXX_COMPILER__znn_unscanned
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -564,7 +584,7 @@ build CMakeFiles\znn.dir\src\layers\activation.cpp.obj: CXX_COMPILER__znn_unscan
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -574,7 +594,7 @@ build CMakeFiles\znn.dir\src\layers\flatten.cpp.obj: CXX_COMPILER__znn_unscanned
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -584,7 +604,7 @@ build CMakeFiles\znn.dir\src\layers\pool2d.cpp.obj: CXX_COMPILER__znn_unscanned_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\layers
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -594,7 +614,7 @@ build CMakeFiles\znn.dir\src\optim\optimizer_factory.cpp.obj: CXX_COMPILER__znn_
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\optim
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -604,7 +624,7 @@ build CMakeFiles\znn.dir\src\optim\sgd.cpp.obj: CXX_COMPILER__znn_unscanned_Rele
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\optim
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -614,7 +634,7 @@ build CMakeFiles\znn.dir\src\optim\adam.cpp.obj: CXX_COMPILER__znn_unscanned_Rel
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\optim
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -624,7 +644,7 @@ build CMakeFiles\znn.dir\src\optim\adamw.cpp.obj: CXX_COMPILER__znn_unscanned_Re
   CONFIG = Release
   DEFINES = -DZNN_CUDA
   FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -std:c++17 -MD /utf-8 -openmp
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\optim
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -635,7 +655,18 @@ build CMakeFiles\znn.dir\src\backends\cuda\cuda_device.cu.obj: CUDA_COMPILER__zn
   DEFINES = -DZNN_CUDA
   DEP_FILE = CMakeFiles\znn.dir\src\backends\cuda\cuda_device.cu.obj.d
   FLAGS = -D_WINDOWS -Xcompiler=" /GR /EHsc" -Xcompiler=-utf-8 -Xcompiler="-O2 -Ob2" -DNDEBUG -std=c++17 "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MD
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
+  OBJECT_DIR = CMakeFiles\znn.dir
+  OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\backends\cuda
+  TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
+  TARGET_PDB = znn.pdb
+
+build CMakeFiles\znn.dir\src\backends\cuda\cuda_gemm.cu.obj: CUDA_COMPILER__znn_unscanned_Release E$:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src\backends\cuda\cuda_gemm.cu || cmake_object_order_depends_target_znn
+  CONFIG = Release
+  DEFINES = -DZNN_CUDA
+  DEP_FILE = CMakeFiles\znn.dir\src\backends\cuda\cuda_gemm.cu.obj.d
+  FLAGS = -D_WINDOWS -Xcompiler=" /GR /EHsc" -Xcompiler=-utf-8 -Xcompiler="-O2 -Ob2" -DNDEBUG -std=c++17 "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MD
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\backends\cuda
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -646,7 +677,7 @@ build CMakeFiles\znn.dir\src\backends\cuda\cuda_kernels.cu.obj: CUDA_COMPILER__z
   DEFINES = -DZNN_CUDA
   DEP_FILE = CMakeFiles\znn.dir\src\backends\cuda\cuda_kernels.cu.obj.d
   FLAGS = -D_WINDOWS -Xcompiler=" /GR /EHsc" -Xcompiler=-utf-8 -Xcompiler="-O2 -Ob2" -DNDEBUG -std=c++17 "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MD
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\backends\cuda
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -657,7 +688,7 @@ build CMakeFiles\znn.dir\src\backends\cuda\cuda_kernels2.cu.obj: CUDA_COMPILER__
   DEFINES = -DZNN_CUDA
   DEP_FILE = CMakeFiles\znn.dir\src\backends\cuda\cuda_kernels2.cu.obj.d
   FLAGS = -D_WINDOWS -Xcompiler=" /GR /EHsc" -Xcompiler=-utf-8 -Xcompiler="-O2 -Ob2" -DNDEBUG -std=c++17 "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MD
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\backends\cuda
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -668,7 +699,7 @@ build CMakeFiles\znn.dir\src\backends\cuda\cuda_kernels3.cu.obj: CUDA_COMPILER__
   DEFINES = -DZNN_CUDA
   DEP_FILE = CMakeFiles\znn.dir\src\backends\cuda\cuda_kernels3.cu.obj.d
   FLAGS = -D_WINDOWS -Xcompiler=" /GR /EHsc" -Xcompiler=-utf-8 -Xcompiler="-O2 -Ob2" -DNDEBUG -std=c++17 "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MD
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\backends\cuda
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -679,7 +710,7 @@ build CMakeFiles\znn.dir\src\backends\cuda\linear_cuda.cu.obj: CUDA_COMPILER__zn
   DEFINES = -DZNN_CUDA
   DEP_FILE = CMakeFiles\znn.dir\src\backends\cuda\linear_cuda.cu.obj.d
   FLAGS = -D_WINDOWS -Xcompiler=" /GR /EHsc" -Xcompiler=-utf-8 -Xcompiler="-O2 -Ob2" -DNDEBUG -std=c++17 "--generate-code=arch=compute_89,code=[compute_89,sm_89]" -Xcompiler=-MD
-  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen
+  INCLUDES = -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\include -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\src -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\eigen -IE:\Documents\ZShared\ZProjs\ZSpeedAI\ZInfer\third_party\onednn\include
   OBJECT_DIR = CMakeFiles\znn.dir
   OBJECT_FILE_DIR = CMakeFiles\znn.dir\src\backends\cuda
   TARGET_COMPILE_PDB = CMakeFiles\znn.dir\znn.pdb
@@ -693,7 +724,7 @@ build CMakeFiles\znn.dir\src\backends\cuda\linear_cuda.cu.obj: CUDA_COMPILER__zn
 #############################################
 # Link the static library znn.lib
 
-build znn.lib: CXX_STATIC_LIBRARY_LINKER__znn_Release CMakeFiles\znn.dir\src\znn_internal.cpp.obj CMakeFiles\znn.dir\src\dynlib.cpp.obj CMakeFiles\znn.dir\src\autograd.cpp.obj CMakeFiles\znn.dir\src\op_dispatcher.cpp.obj CMakeFiles\znn.dir\src\operators\shared.cpp.obj CMakeFiles\znn.dir\src\operators\arange.cpp.obj CMakeFiles\znn.dir\src\operators\randn.cpp.obj CMakeFiles\znn.dir\src\operators\add.cpp.obj CMakeFiles\znn.dir\src\operators\sub.cpp.obj CMakeFiles\znn.dir\src\operators\mul.cpp.obj CMakeFiles\znn.dir\src\operators\div.cpp.obj CMakeFiles\znn.dir\src\operators\neg.cpp.obj CMakeFiles\znn.dir\src\operators\exp.cpp.obj CMakeFiles\znn.dir\src\operators\log.cpp.obj CMakeFiles\znn.dir\src\operators\sqrt.cpp.obj CMakeFiles\znn.dir\src\operators\relu.cpp.obj CMakeFiles\znn.dir\src\operators\gelu.cpp.obj CMakeFiles\znn.dir\src\operators\sigmoid.cpp.obj CMakeFiles\znn.dir\src\operators\tanh.cpp.obj CMakeFiles\znn.dir\src\operators\silu.cpp.obj CMakeFiles\znn.dir\src\operators\softmax.cpp.obj CMakeFiles\znn.dir\src\operators\sum.cpp.obj CMakeFiles\znn.dir\src\operators\mean.cpp.obj CMakeFiles\znn.dir\src\operators\matmul.cpp.obj CMakeFiles\znn.dir\src\operators\matmul_eigen.cpp.obj CMakeFiles\znn.dir\src\operators\linear_eigen.cpp.obj CMakeFiles\znn.dir\src\operators\conv2d_eigen.cpp.obj CMakeFiles\znn.dir\src\operators\linear.cpp.obj CMakeFiles\znn.dir\src\operators\cat.cpp.obj CMakeFiles\znn.dir\src\operators\stack.cpp.obj CMakeFiles\znn.dir\src\operators\conv2d.cpp.obj CMakeFiles\znn.dir\src\operators\max_pool2d.cpp.obj CMakeFiles\znn.dir\src\operators\avg_pool2d.cpp.obj CMakeFiles\znn.dir\src\operators\layer_norm.cpp.obj CMakeFiles\znn.dir\src\operators\batch_norm2d.cpp.obj CMakeFiles\znn.dir\src\operators\attention.cpp.obj CMakeFiles\znn.dir\src\operators\embedding.cpp.obj CMakeFiles\znn.dir\src\operators\cross_entropy.cpp.obj CMakeFiles\znn.dir\src\operators\mse.cpp.obj CMakeFiles\znn.dir\src\operators\transpose.cpp.obj CMakeFiles\znn.dir\src\operators\reshape.cpp.obj CMakeFiles\znn.dir\src\operators\permute.cpp.obj CMakeFiles\znn.dir\src\operators\slice.cpp.obj CMakeFiles\znn.dir\src\operators\operator_list.cpp.obj CMakeFiles\znn.dir\src\layers\layer_factory.cpp.obj CMakeFiles\znn.dir\src\layers\linear.cpp.obj CMakeFiles\znn.dir\src\layers\conv2d.cpp.obj CMakeFiles\znn.dir\src\layers\batch_norm2d.cpp.obj CMakeFiles\znn.dir\src\layers\layer_norm.cpp.obj CMakeFiles\znn.dir\src\layers\embedding.cpp.obj CMakeFiles\znn.dir\src\layers\dropout.cpp.obj CMakeFiles\znn.dir\src\layers\activation.cpp.obj CMakeFiles\znn.dir\src\layers\flatten.cpp.obj CMakeFiles\znn.dir\src\layers\pool2d.cpp.obj CMakeFiles\znn.dir\src\optim\optimizer_factory.cpp.obj CMakeFiles\znn.dir\src\optim\sgd.cpp.obj CMakeFiles\znn.dir\src\optim\adam.cpp.obj CMakeFiles\znn.dir\src\optim\adamw.cpp.obj CMakeFiles\znn.dir\src\backends\cuda\cuda_device.cu.obj CMakeFiles\znn.dir\src\backends\cuda\cuda_kernels.cu.obj CMakeFiles\znn.dir\src\backends\cuda\cuda_kernels2.cu.obj CMakeFiles\znn.dir\src\backends\cuda\cuda_kernels3.cu.obj CMakeFiles\znn.dir\src\backends\cuda\linear_cuda.cu.obj
+build znn.lib: CXX_STATIC_LIBRARY_LINKER__znn_Release CMakeFiles\znn.dir\src\znn_internal.cpp.obj CMakeFiles\znn.dir\src\grad_scaler.cpp.obj CMakeFiles\znn.dir\src\backends\onednn\onednn.cpp.obj CMakeFiles\znn.dir\src\dynlib.cpp.obj CMakeFiles\znn.dir\src\autograd.cpp.obj CMakeFiles\znn.dir\src\op_dispatcher.cpp.obj CMakeFiles\znn.dir\src\operators\shared.cpp.obj CMakeFiles\znn.dir\src\operators\arange.cpp.obj CMakeFiles\znn.dir\src\operators\randn.cpp.obj CMakeFiles\znn.dir\src\operators\add.cpp.obj CMakeFiles\znn.dir\src\operators\sub.cpp.obj CMakeFiles\znn.dir\src\operators\mul.cpp.obj CMakeFiles\znn.dir\src\operators\div.cpp.obj CMakeFiles\znn.dir\src\operators\neg.cpp.obj CMakeFiles\znn.dir\src\operators\exp.cpp.obj CMakeFiles\znn.dir\src\operators\log.cpp.obj CMakeFiles\znn.dir\src\operators\sqrt.cpp.obj CMakeFiles\znn.dir\src\operators\relu.cpp.obj CMakeFiles\znn.dir\src\operators\gelu.cpp.obj CMakeFiles\znn.dir\src\operators\sigmoid.cpp.obj CMakeFiles\znn.dir\src\operators\tanh.cpp.obj CMakeFiles\znn.dir\src\operators\silu.cpp.obj CMakeFiles\znn.dir\src\operators\softmax.cpp.obj CMakeFiles\znn.dir\src\operators\sum.cpp.obj CMakeFiles\znn.dir\src\operators\mean.cpp.obj CMakeFiles\znn.dir\src\operators\matmul.cpp.obj CMakeFiles\znn.dir\src\operators\matmul_eigen.cpp.obj CMakeFiles\znn.dir\src\operators\linear_eigen.cpp.obj CMakeFiles\znn.dir\src\operators\conv2d_eigen.cpp.obj CMakeFiles\znn.dir\src\operators\linear.cpp.obj CMakeFiles\znn.dir\src\operators\cat.cpp.obj CMakeFiles\znn.dir\src\operators\stack.cpp.obj CMakeFiles\znn.dir\src\operators\conv2d.cpp.obj CMakeFiles\znn.dir\src\operators\max_pool2d.cpp.obj CMakeFiles\znn.dir\src\operators\avg_pool2d.cpp.obj CMakeFiles\znn.dir\src\operators\layer_norm.cpp.obj CMakeFiles\znn.dir\src\operators\batch_norm2d.cpp.obj CMakeFiles\znn.dir\src\operators\attention.cpp.obj CMakeFiles\znn.dir\src\operators\embedding.cpp.obj CMakeFiles\znn.dir\src\operators\cross_entropy.cpp.obj CMakeFiles\znn.dir\src\operators\mse.cpp.obj CMakeFiles\znn.dir\src\operators\transpose.cpp.obj CMakeFiles\znn.dir\src\operators\reshape.cpp.obj CMakeFiles\znn.dir\src\operators\permute.cpp.obj CMakeFiles\znn.dir\src\operators\slice.cpp.obj CMakeFiles\znn.dir\src\operators\operator_list.cpp.obj CMakeFiles\znn.dir\src\layers\layer_factory.cpp.obj CMakeFiles\znn.dir\src\layers\linear.cpp.obj CMakeFiles\znn.dir\src\layers\conv2d.cpp.obj CMakeFiles\znn.dir\src\layers\batch_norm2d.cpp.obj CMakeFiles\znn.dir\src\layers\layer_norm.cpp.obj CMakeFiles\znn.dir\src\layers\embedding.cpp.obj CMakeFiles\znn.dir\src\layers\dropout.cpp.obj CMakeFiles\znn.dir\src\layers\activation.cpp.obj CMakeFiles\znn.dir\src\layers\flatten.cpp.obj CMakeFiles\znn.dir\src\layers\pool2d.cpp.obj CMakeFiles\znn.dir\src\optim\optimizer_factory.cpp.obj CMakeFiles\znn.dir\src\optim\sgd.cpp.obj CMakeFiles\znn.dir\src\optim\adam.cpp.obj CMakeFiles\znn.dir\src\optim\adamw.cpp.obj CMakeFiles\znn.dir\src\backends\cuda\cuda_device.cu.obj CMakeFiles\znn.dir\src\backends\cuda\cuda_gemm.cu.obj CMakeFiles\znn.dir\src\backends\cuda\cuda_kernels.cu.obj CMakeFiles\znn.dir\src\backends\cuda\cuda_kernels2.cu.obj CMakeFiles\znn.dir\src\backends\cuda\cuda_kernels3.cu.obj CMakeFiles\znn.dir\src\backends\cuda\linear_cuda.cu.obj
   CONFIG = Release
   LANGUAGE_COMPILE_FLAGS = /DWIN32 /D_WINDOWS /GR /EHsc /O2 /Ob2 /DNDEBUG -MD
   LINK_FLAGS = /machine:x64

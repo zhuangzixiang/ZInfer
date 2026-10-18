@@ -139,6 +139,36 @@ pip 的 onednn 轮子是空壳(仅文档)——部署需源码构建或随包分
 实施路径(已批准方向): dynlib 加载 dnnl.dll(缺失回落 Eigen) +
 matmul/linear 走 dnnl_sgemm(一期) + conv2d 走 primitive API(二期)。
 
+## 2026-10-18 · oneDNN 全算子委托实施(dnnl.dll 动态加载, 缺失回落 Eigen/ref)
+
+覆盖: 13 逐元素(add/sub/mul/div/neg/exp/log/sqrt/relu/gelu/sigmoid/
+tanh/silu)+ softmax(任意维)+ sum/mean(≥1M 元素, 小规约 ref 更快)+
+matmul/linear(dnnl_sgemm)+ conv2d + max/avg_pool + layer_norm +
+batch_norm(推理)。ZNN_NO_ONEDNN="family,..." 可按族禁用(A/B 排查)。
+引擎/流一次性缓存(小算子高频调用的开销大头)。
+
+| 基准 | Eigen(禁用 oneDNN) | oneDNN | 加速比 |
+|---|---:|---:|---:|
+| matmul 128³ | 96 GF/s(OMP) | 72-97 GF/s | ~1×(小矩阵无益) |
+| matmul 512³ | 185 GF/s | **403 GF/s** | 2.2× |
+| matmul 1024³ | 195 GF/s | **686 GF/s** | 3.5× |
+| conv2d 8×16×32×32 | 5.2 ms | **0.97 ms** | 5.4× |
+| MLP 训练步(B=64) | 13.2-14.8 ms | **8.5 ms** | 1.55× |
+| MLP 推理步 | 5.0-6.1 ms | **0.11 ms** | 45× |
+| MNIST 5 epoch | 83 s | **42 s** | 2.0×(97.33%) |
+
+排查记录(性能诊断方法论): 首版 MLP 训练反而慢 3.6× —— 逐层分段计时
+(fwd/bwd/step)+ 逐算子微基准(µs 级)+ 按族禁用二分定位:
+1. linear_eigen.cpp 存在两个同名实现, oneDNN 钩子接在未注册的死代码上
+   (带 bias 的 Eigen 复合表达式路径 25ms/次 —— 合并后 83µs, 300×)
+2. dnnl_sgemm 是行主序约定(文档明示, 异于 cuBLAS 列主序), 转置标志
+   位置曾放错; NT 场景 trans_b='T'
+3. 卷积原语第二参数是 DNNL_ARG_WEIGHTS(非 SRC_1), 传错则 query_md
+   返回空 → 静默回落(表面"慢", 实为没走 oneDNN)
+4. sum_into 通用路径每元素做步长算术(慢 20×) —— 补连续首/末维快速路径
+   (受益于所有后端的 CPU 回落)
+5. 小规约(<1M 元素)oneDNN 线程划分不合算 → 回落 ref
+
 ## 已知瓶颈(后续优化目标)
 
 1. FP16 已接入; **GPU 反向路径存量缺口(部分)**: pools/embedding/

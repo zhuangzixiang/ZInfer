@@ -109,6 +109,7 @@ endif()
 add_library(znn
     src/znn_internal.cpp
     src/grad_scaler.cpp
+    src/backends/onednn/onednn.cpp
     src/dynlib.cpp
     src/autograd.cpp
     src/op_dispatcher.cpp
@@ -117,7 +118,8 @@ add_library(znn
     ${ZNN_OPTIM}
     ${ZNN_CUDA_SRC}
 )
-target_include_directories(znn PUBLIC include PRIVATE src third_party/eigen)
+target_include_directories(znn PUBLIC include PRIVATE src third_party/eigen
+    third_party/onednn/include)
 if(ZNN_CUDA)
     target_compile_definitions(znn PRIVATE ZNN_CUDA)
 endif()

@@ -7,6 +7,16 @@ namespace znn {
 
 extern const Operator g_div_operator;
 
+static void div_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*);
+
+static void div_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
+                        const void* o) {
+    if (!onednn::binary(in, out, (int)dnnl_binary_div)) {
+        div_ref(c, in, out, o);
+    }
+}
+
+
 static void div_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
     binary_kernel_fast(in, out, [](float a, float b) { return a / b; });
 }
@@ -26,7 +36,7 @@ const Operator g_div_operator = {
     infer_broadcast,
     div_grad,
     div_ref,
-    {nullptr, cuda_backend::div_cuda, nullptr, nullptr},
+    {div_cpu, nullptr, nullptr},
 };
 
 Tensor Tensor::div(const Tensor& a, const Tensor& b) {

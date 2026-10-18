@@ -14,6 +14,7 @@
 #if defined(ZNN_CUDA)
 #include <cublas_v2.h>
 #endif
+#include "dnnl.h"   // oneDNN 纯 C 头(vendored, 仅取类型; 符号经动态加载)
 
 namespace znn {
 namespace dynlib {
@@ -57,6 +58,40 @@ using CublasGemmStridedBatchedExFn = cublasStatus_t (*)(
     int, cublasComputeType_t, cublasGemmAlgo_t);
 extern CublasGemmStridedBatchedExFn cublas_gemm_batched_ex;
 #endif
+
+// ---- oneDNN(CPU 原语委托, third_party/onednn 头 + dnnl.dll 动态加载) ----
+// C API 无重载 → 全部 decltype 原生签名
+namespace onednn {
+bool available_onednn();
+extern dnnl_engine_t cached_engine;   // available() 成功后一次性创建, 常驻
+extern dnnl_stream_t cached_stream;
+// ZNN_NO_ONEDNN="eltwise,gemm,...": 按家族禁用(排查/对拍用); 空串=全禁
+bool family_off(const char* family);
+extern decltype(&dnnl_engine_create)  engine_create;
+extern decltype(&dnnl_stream_create)  stream_create;
+extern decltype(&dnnl_engine_destroy) engine_destroy;
+extern decltype(&dnnl_stream_destroy) stream_destroy;
+extern decltype(&dnnl_memory_destroy)  memory_destroy_ext;
+extern decltype(&dnnl_stream_wait)    stream_wait;
+extern decltype(&dnnl_memory_desc_create_with_strides) md_create;
+extern decltype(&dnnl_memory_desc_destroy)              md_destroy;
+extern decltype(&dnnl_memory_create)    memory_create;
+extern decltype(&dnnl_memory_destroy)   memory_destroy;
+extern decltype(&dnnl_primitive_create) primitive_create;
+extern decltype(&dnnl_primitive_destroy) primitive_destroy;
+extern decltype(&dnnl_primitive_desc_destroy) pd_destroy;
+extern decltype(&dnnl_primitive_execute)      execute;
+extern decltype(&dnnl_primitive_desc_query_md) pd_query_md;
+extern decltype(&dnnl_sgemm) sgemm;
+extern decltype(&dnnl_eltwise_forward_primitive_desc_create) eltwise_pd;
+extern decltype(&dnnl_binary_primitive_desc_create)          binary_pd;
+extern decltype(&dnnl_softmax_forward_primitive_desc_create) softmax_pd;
+extern decltype(&dnnl_reduction_primitive_desc_create)       reduction_pd;
+extern decltype(&dnnl_convolution_forward_primitive_desc_create) conv_pd;
+extern decltype(&dnnl_pooling_forward_primitive_desc_create)     pool_pd;
+extern decltype(&dnnl_layer_normalization_forward_primitive_desc_create) ln_pd;
+extern decltype(&dnnl_batch_normalization_forward_primitive_desc_create)  bn_pd;
+} // namespace onednn
 
 // ---- 后续新库在此添加 ----
 // bool available_onednn();
