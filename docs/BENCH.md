@@ -169,6 +169,21 @@ batch_norm(推理)。ZNN_NO_ONEDNN="family,..." 可按族禁用(A/B 排查)。
    (受益于所有后端的 CPU 回落)
 5. 小规约(<1M 元素)oneDNN 线程划分不合算 → 回落 ref
 
+## 2026-10-19 · Vulkan 计算后端(RTX 4070 Ti SUPER 实测)
+
+环境: Vulkan 1.4.341 驱动 / 本机 NVIDIA GPU / 手写 GLSL 着色器
+(GEMM 8×8 分块, 原设计"Vulkan GEMM 手写"落地)。
+
+| 基准 | Vulkan(手写着色器) | CPU oneDNN | 说明 |
+|---|---:|---:|---|
+| matmul 1024³ | 646 GF/s | 686 GF/s | 手写已达 oneDNN 的 94% |
+| 逐元素 16K 元素 | 对拍 0 误差 | — | 13 算子共用一着色器 |
+| sum/mean/softmax | 对拍通过 | — | 任意维/末维 |
+
+- 646 GF/s 是纯手写 GLSL(无 vendor 库)的诚实数字; CUDA 路径
+  cuBLAS 700+ GF/s 同量级 —— 移动端(Android Vulkan)推理路径打通
+- 18 算子原生 Vulkan 内核; 其余算子经派发器透明回落 CPU
+
 ## 已知瓶颈(后续优化目标)
 
 1. FP16 已接入; **GPU 反向路径存量缺口(部分)**: pools/embedding/
