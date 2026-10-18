@@ -4,6 +4,8 @@
 // ============================================================================
 #include "znn_internal.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
+#include "backends/metal/metal_backend.hpp"
 #include "autograd.hpp"
 #include "op_dispatcher.hpp"
 #include "operators/shared.hpp"
@@ -181,6 +183,16 @@ Storage* Storage::create(size_t bytes, Device device) {
         }
         return s;
     }
+    if (device == Device::Vulkan) {
+        if (!vulkan_backend::available()) {
+            throw std::runtime_error("znn: Vulkan device not available");
+        }
+        Storage* s = new Storage(bytes, device);
+        if (bytes > 0) {
+            s->data_ = vulkan_backend::alloc(bytes);
+        }
+        return s;
+    }
     check_cpu(device);
     Storage* s = new Storage(bytes, device);
     if (bytes > 0) {
@@ -199,6 +211,8 @@ Storage::~Storage() {
     }
     if (device_ == Device::CUDA) {
         cuda_backend::free(data_);
+    } else if (device_ == Device::Vulkan) {
+        vulkan_backend::free(data_);
     } else {
         ::operator delete(data_);
     }
@@ -581,20 +595,39 @@ Tensor Tensor::to_device(Device device) const {
         return *this;                                      // 同设备: 共享返回(~1ns)
     }
     Tensor t = Tensor::empty(impl_->shape, impl_->dtype, device);
-    if ((impl_->device == Device::CPU && device == Device::CUDA)
-        || (impl_->device == Device::CUDA && device == Device::CPU)) {
-        // 跨设备同步拷贝(v1 同步语义; 非连续视图先紧凑化)
+    const Device from = impl_->device;
+    if (from == Device::CPU && (device == Device::CUDA || device == Device::Vulkan)) {
         Tensor src = impl_->is_contiguous() ? *this : clone();
         if (device == Device::CUDA) {
             cuda_backend::copy_host_to_device(t.impl_->storage->data(),
                                               src.impl_->storage->data(),
                                               t.impl_->nbytes());
         } else {
-            cuda_backend::copy_device_to_host(t.impl_->storage->data(),
-                                              src.impl_->storage->data(),
-                                              t.impl_->nbytes());
+            vulkan_backend::copy_host_to_device(t.impl_->storage->data(),
+                                                src.impl_->storage->data(),
+                                                t.impl_->nbytes());
         }
         return t;
+    }
+    if ((from == Device::CUDA || from == Device::Vulkan) && device == Device::CPU) {
+        if (from == Device::CUDA) {
+            cuda_backend::copy_device_to_host(t.impl_->storage->data(),
+                                              impl_->storage->data(),
+                                              impl_->nbytes());
+        } else {
+            vulkan_backend::copy_device_to_host(t.impl_->storage->data(),
+                                                impl_->storage->data(),
+                                                impl_->nbytes());
+        }
+        return t;
+    }
+    if (from == Device::CUDA && device == Device::Vulkan) {
+        Tensor mid = to_device(Device::CPU);
+        return mid.to_device(Device::Vulkan);
+    }
+    if (from == Device::Vulkan && device == Device::CUDA) {
+        Tensor mid = to_device(Device::CPU);
+        return mid.to_device(Device::CUDA);
     }
     Impl::copy_elements(impl_, t.impl_);                   // CPU↔CPU
     return t;
@@ -689,7 +722,13 @@ bool Runtime::device_available(Device device) {
     if (device == Device::CUDA) {
         return cuda_backend::available();
     }
-    return false;                                          // Metal/Vulkan 未编入
+    if (device == Device::Vulkan) {
+        return vulkan_backend::available();
+    }
+    if (device == Device::Metal) {
+        return metal_backend::available();
+    }
+    return false;
 }
 
 void Runtime::set_precision(Precision p) {

@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
 
 namespace znn {
 
@@ -30,7 +31,7 @@ const Operator g_tanh_operator = {
     infer_same,
     tanh_grad,
     tanh_ref,
-    {tanh_cpu, nullptr, nullptr},
+    {tanh_cpu, nullptr, nullptr, vulkan_backend::tanh_vulkan},
 };
 
 Tensor Activator::tanh(const Tensor& x) {

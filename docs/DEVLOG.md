@@ -651,3 +651,43 @@ MNIST 97.33%(>97% 线)。
 **反思**: 架构 9/10(OpScope 零开销 RAII, thread_local 为必要例外
 并注释论证; try 覆盖 infer→建图全链) | 修复时机正确 —— 限制清单
 审计后 24 小时内落地, 高危项(崩溃类)清零。
+
+---
+
+## [22] Vulkan 后端落地(本机 NVIDIA 实测全绿) + Metal 骨架
+
+**内容**
+1. Vulkan 基础设施(vulkan_device.cpp): vulkan-1.dll 全动态加载
+   (GetProcAddress 逐函数指针, 与 dynlib 同哲学, 零链接期依赖);
+   两阶段加载(全局级仅 vkCreateInstance, 其余实例/设备级);
+   主机可见内存(Buffer+Memory+常驻映射, 内存类型按
+   memoryTypeBits∩HOST_VISIBLE 兼容筛选); 管线缓存(SPIR-V+特化常量为键)
+2. SPIR-V 工具链: third_party/glslang(Win 二进制) + tools/gen_spirv.py
+   (GLSL→SPIR-V→C 头文件嵌入); 着色器 4 个(common 逐元素×13/
+   gemm 8×8 分块 NT/reduce 任意维/softmax 末维)
+3. 算子接线(kernels[Vulkan]): 13 逐元素 + matmul + linear(NT) +
+   softmax + sum + mean(18 算子); Storage/to_device/device_available
+   全链路路由; Metal 槽位 stub
+4. Metal 骨架(metal_device.mm/metal_kernels.mm, Obj-C++/MSL 运行时编译,
+   APPLE 守卫; 本机不可编译 —— 数学与 Vulkan 版逐行对应, 首次 macOS
+   构建即验证)。MSL 四着色器与 Vulkan 同构(elementwise/gemm/reduce/
+   softmax)
+5. gpu_vulkan 冒烟测试: 内存往返 + 逐元素 + GEMM(NN/NT) + 规约 +
+   softmax 全对拍 —— 本机 NVIDIA RTX 4070 Ti SUPER 全绿
+
+**本块修复的实现 bug(全部靠对拍当场暴露)**
+- VkWriteDescriptorSet 未零初始化(pNext 垃圾 → 驱动崩溃)
+- VkSpecializationInfo pData 未设置(同上)
+- 二元算子恒把 B 绑到 A(bcast=0 分支错误 —— 8 元素全 1 测试因
+  1+1==1+1 而漏网, 256×64 随机数当场抓获)
+- reduce/softmax 输出绑 binding 1(三缓冲约定应为 2)
+- 内存类型未按缓冲区 memoryTypeBits 交集筛选
+
+**验证**: Vulkan 构建 znn_test 22 项全绿 + gpu_vulkan 全绿;
+CUDA/CPU 构建回归全绿(MNIST 未重跑 —— CPU/CUDA 路径无改动)。
+
+**反思**: 架构 8/10(全动态加载零链接依赖; 管线缓存键含特化常量;
+设备桥隐藏 Vk* 类型使内核文件不感知后端细节) | 教训 ×2:
+未零初始化的 Vulkan 结构体pNext 是驱动崩溃的常客(全部结构体
+必须 = {}); 小尺寸全 1 测试有对称性盲区(随机数 + 逐元素首错
+索引是最低成本抓虫器)。

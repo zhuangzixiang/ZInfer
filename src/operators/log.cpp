@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
 
 namespace znn {
 
@@ -30,7 +31,7 @@ const Operator g_log_operator = {
     infer_same,
     log_grad,
     log_ref,
-    {log_cpu, nullptr, nullptr},
+    {log_cpu, nullptr, nullptr, vulkan_backend::log_vulkan},
 };
 
 Tensor Tensor::log(const Tensor& x) {

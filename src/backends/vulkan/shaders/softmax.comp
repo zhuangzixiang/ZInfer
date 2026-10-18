@@ -1,0 +1,29 @@
+#version 450
+// softmax 沿末维(行主序连续行): 每线程一行, 数值稳定
+layout(local_size_x = 256) in;
+
+layout(binding = 0) readonly buffer Xbuf { float x[]; };
+layout(binding = 2) buffer Ybuf { float y[]; };
+
+layout(push_constant) uniform Pc {
+    int rows;       // 行数
+    int L;          // 行长(末维尺寸)
+} pc;
+
+void main() {
+    const int r = int(gl_GlobalInvocationID.x);
+    if (r >= pc.rows) return;
+    const int base = r * pc.L;
+    float m = -3.4e38;
+    for (int j = 0; j < pc.L; ++j) {
+        const float v = x[base + j];
+        if (v > m) m = v;
+    }
+    float s = 0.0;
+    for (int j = 0; j < pc.L; ++j) {
+        s += exp(x[base + j] - m);
+    }
+    for (int j = 0; j < pc.L; ++j) {
+        y[base + j] = exp(x[base + j] - m) / s;
+    }
+}

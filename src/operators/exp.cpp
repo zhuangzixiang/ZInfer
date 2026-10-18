@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
 
 namespace znn {
 
@@ -30,7 +31,7 @@ const Operator g_exp_operator = {
     infer_same,
     exp_grad,
     exp_ref,
-    {exp_cpu, nullptr, nullptr},
+    {exp_cpu, nullptr, nullptr, vulkan_backend::exp_vulkan},
 };
 
 Tensor Tensor::exp(const Tensor& x) {

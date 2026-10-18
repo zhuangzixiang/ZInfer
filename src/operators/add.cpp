@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
 
 namespace znn {
 
@@ -26,7 +27,7 @@ const Operator g_add_operator = {
     infer_broadcast,
     binary_grad,
     add_ref,
-    {add_cpu, nullptr, nullptr},
+    {add_cpu, nullptr, nullptr, vulkan_backend::add_vulkan},
 };
 
 Tensor Tensor::add(const Tensor& a, const Tensor& b) {

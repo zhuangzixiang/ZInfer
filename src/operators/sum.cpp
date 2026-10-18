@@ -1,5 +1,6 @@
 // sum: 沿任意 dim 求和(ReduceAttrs 选项经节点副本传入梯度规则)
 #include "shared.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
 #include <cstring>
@@ -41,7 +42,7 @@ const Operator g_sum_operator = {
     infer_reduce,
     sum_grad,
     sum_ref,
-    {sum_cpu, nullptr, nullptr},
+    {sum_cpu, cuda_backend::sum_cuda, nullptr, vulkan_backend::sum_vulkan},
     sizeof(ReduceAttrs),
 };
 

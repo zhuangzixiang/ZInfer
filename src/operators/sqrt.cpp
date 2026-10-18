@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
 
 namespace znn {
 
@@ -30,7 +31,7 @@ const Operator g_sqrt_operator = {
     infer_same,
     sqrt_grad,
     sqrt_ref,
-    {sqrt_cpu, nullptr, nullptr},
+    {sqrt_cpu, nullptr, nullptr, vulkan_backend::sqrt_vulkan},
 };
 
 Tensor Tensor::sqrt(const Tensor& x) {

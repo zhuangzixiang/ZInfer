@@ -5,5 +5,5 @@
 # This file includes the relevant testing commands required for 
 # testing this directory and lists subdirectories to be tested as well.
 add_test(smoke "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/znn_test.exe")
-set_tests_properties(smoke PROPERTIES  _BACKTRACE_TRIPLES "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/CMakeLists.txt;142;add_test;E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/CMakeLists.txt;0;")
+set_tests_properties(smoke PROPERTIES  _BACKTRACE_TRIPLES "E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/CMakeLists.txt;180;add_test;E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/CMakeLists.txt;0;")
 subdirs("examples/mnist")

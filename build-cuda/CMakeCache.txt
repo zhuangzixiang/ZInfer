@@ -226,6 +226,12 @@ ZNN_BUILD_TESTS:BOOL=ON
 //Build CUDA backend (requires nvcc)
 ZNN_CUDA:BOOL=ON
 
+//Metal compute backend (Apple only)
+ZNN_METAL:BOOL=OFF
+
+//Vulkan compute backend
+ZNN_VULKAN:BOOL=OFF
+
 //Value Computed by CMake
 zinfer_BINARY_DIR:STATIC=E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda
 

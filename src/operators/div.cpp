@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
 
 namespace znn {
 
@@ -36,7 +37,7 @@ const Operator g_div_operator = {
     infer_broadcast,
     div_grad,
     div_ref,
-    {div_cpu, nullptr, nullptr},
+    {div_cpu, nullptr, nullptr, vulkan_backend::div_vulkan},
 };
 
 Tensor Tensor::div(const Tensor& a, const Tensor& b) {

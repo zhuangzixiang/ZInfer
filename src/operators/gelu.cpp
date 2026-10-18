@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
 #include <cmath>
 
 namespace znn {
@@ -36,7 +37,7 @@ const Operator g_gelu_operator = {
     infer_same,
     gelu_grad,
     gelu_ref,
-    {gelu_cpu, nullptr, nullptr},
+    {gelu_cpu, nullptr, nullptr, vulkan_backend::gelu_vulkan},
 };
 
 Tensor Activator::gelu(const Tensor& x) {

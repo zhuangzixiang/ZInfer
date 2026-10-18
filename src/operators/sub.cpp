@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
 
 namespace znn {
 
@@ -26,7 +27,7 @@ const Operator g_sub_operator = {
     infer_broadcast,
     binary_grad,
     sub_ref,
-    {sub_cpu, nullptr, nullptr},
+    {sub_cpu, nullptr, nullptr, vulkan_backend::sub_vulkan},
 };
 
 Tensor Tensor::sub(const Tensor& a, const Tensor& b) {

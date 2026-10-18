@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
 
 namespace znn {
 
@@ -34,7 +35,7 @@ const Operator g_mul_operator = {
     infer_broadcast,
     mul_grad,
     mul_ref,
-    {mul_cpu, nullptr, nullptr},
+    {mul_cpu, nullptr, nullptr, vulkan_backend::mul_vulkan},
 };
 
 Tensor Tensor::mul(const Tensor& a, const Tensor& b) {

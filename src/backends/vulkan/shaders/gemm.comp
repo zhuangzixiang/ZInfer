@@ -1,0 +1,47 @@
+#version 450
+// 行主序 C[M,N] = A[M,K] × op(B); TB=1 时 B 为 [N,K](× w^T)
+// 朴素分块: 每工作组一个 16x16 输出块, 本地内存缓冲(shared 等价)
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(constant_id = 0) const int TB = 0;
+
+layout(binding = 0) readonly buffer Abuf { float a[]; };
+layout(binding = 1) readonly buffer Bbuf { float b[]; };
+layout(binding = 2) writeonly buffer Ybuf { float y[]; };
+
+layout(push_constant) uniform Pc {
+    int M; int N; int K;
+    int lda; int ldb; int ldc;
+} pc;
+
+shared float ta[8][9];    // A 块(转置存储防 bank 冲突)
+shared float tb[8][9];
+
+void main() {
+    const int row = int(gl_GlobalInvocationID.y);   // M 维
+    const int col = int(gl_GlobalInvocationID.x);   // N 维
+    const int lr = int(gl_LocalInvocationID.y);
+    const int lc = int(gl_LocalInvocationID.x);
+    const bool in_range = (row < pc.M) && (col < pc.N);
+
+    float acc = 0.0;
+    const int tiles = (pc.K + 7) / 8;
+    for (int t = 0; t < tiles; ++t) {
+        const int ka = t * 8 + lc;
+        ta[lr][lc] = (in_range && ka < pc.K) ? a[row * pc.lda + ka] : 0.0;
+        const int kb = t * 8 + lr;
+        if (TB == 1) {
+            tb[lc][lr] = (in_range && kb < pc.K) ? b[col * pc.ldb + kb] : 0.0;
+        } else {
+            tb[lc][lr] = (in_range && kb < pc.K) ? b[kb * pc.ldb + col] : 0.0;
+        }
+        barrier();
+        for (int k = 0; k < 8; ++k) {
+            acc += ta[lr][k] * tb[lc][k];
+        }
+        barrier();
+    }
+    if (in_range) {
+        y[row * pc.ldc + col] = acc;
+    }
+}

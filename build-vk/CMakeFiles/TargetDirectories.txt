@@ -1,0 +1,11 @@
+E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-vk/CMakeFiles/znn.dir
+E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-vk/CMakeFiles/znn_test.dir
+E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-vk/CMakeFiles/znn_bench.dir
+E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-vk/CMakeFiles/gpu_vulkan.dir
+E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-vk/CMakeFiles/test.dir
+E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-vk/CMakeFiles/edit_cache.dir
+E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-vk/CMakeFiles/rebuild_cache.dir
+E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-vk/examples/mnist/CMakeFiles/mnist.dir
+E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-vk/examples/mnist/CMakeFiles/test.dir
+E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-vk/examples/mnist/CMakeFiles/edit_cache.dir
+E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-vk/examples/mnist/CMakeFiles/rebuild_cache.dir

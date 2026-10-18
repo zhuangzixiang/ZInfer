@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
 
 namespace znn {
 
@@ -30,7 +31,7 @@ const Operator g_sigmoid_operator = {
     infer_same,
     sigmoid_grad,
     sigmoid_ref,
-    {sigmoid_cpu, nullptr, nullptr},
+    {sigmoid_cpu, nullptr, nullptr, vulkan_backend::sigmoid_vulkan},
 };
 
 Tensor Activator::sigmoid(const Tensor& x) {

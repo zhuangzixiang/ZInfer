@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
 
 namespace znn {
 
@@ -58,7 +59,7 @@ const Operator g_matmul_operator = {
     matmul_infer,
     matmul_grad,
     matmul_ref,
-    {matmul_cpu_kernel(), cuda_backend::matmul_cuda, nullptr, nullptr},  // CPU=Eigen, CUDA=朴素GEMM
+    {matmul_cpu_kernel(), cuda_backend::matmul_cuda, nullptr, vulkan_backend::matmul_vulkan},  // CPU=Eigen, CUDA=朴素GEMM
 };
 
 Tensor Tensor::matmul(const Tensor& a, const Tensor& b) {

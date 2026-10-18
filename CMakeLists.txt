@@ -106,6 +106,33 @@ else()
     set(ZNN_CUDA_SRC src/backends/cuda/cuda_stub.cpp)
 endif()
 
+# ---- Vulkan 后端(跨平台 GPU 计算; SPIR-V 构建期生成, 见 tools/gen_spirv.py) ----
+option(ZNN_VULKAN "Vulkan compute backend" OFF)
+if(ZNN_VULKAN)
+    set(ZNN_VULKAN_SRC
+        src/backends/vulkan/vulkan_device.cpp
+        src/backends/vulkan/vulkan_kernels.cpp)
+else()
+    set(ZNN_VULKAN_SRC src/backends/vulkan/vulkan_stub.cpp)
+endif()
+
+# ---- Metal 后端(Apple GPU; MSL 运行时编译, 仅 APPLE 平台) ----
+option(ZNN_METAL "Metal compute backend (Apple only)" OFF)
+if(ZNN_METAL)
+    if(NOT APPLE)
+        message(FATAL_ERROR "ZNN_METAL requires Apple platform")
+    endif()
+    enable_language(OBJCXX)
+    set(ZNN_METAL_SRC
+        src/backends/metal/metal_device.mm
+        src/backends/metal/metal_kernels.mm)
+    set_source_files_properties(src/backends/metal/metal_device.mm
+                                src/backends/metal/metal_kernels.mm
+                                PROPERTIES COMPILE_FLAGS "-fobjc-arc")
+else()
+    set(ZNN_METAL_SRC src/backends/metal/metal_stub.cpp)
+endif()
+
 add_library(znn
     src/znn_internal.cpp
     src/grad_scaler.cpp
@@ -117,11 +144,22 @@ add_library(znn
     ${ZNN_LAYERS}
     ${ZNN_OPTIM}
     ${ZNN_CUDA_SRC}
+    ${ZNN_VULKAN_SRC}
+    ${ZNN_METAL_SRC}
 )
 target_include_directories(znn PUBLIC include PRIVATE src third_party/eigen
-    third_party/onednn/include)
+    third_party/onednn/include third_party/vulkan/include)
 if(ZNN_CUDA)
     target_compile_definitions(znn PRIVATE ZNN_CUDA)
+endif()
+if(ZNN_VULKAN)
+    target_compile_definitions(znn PRIVATE ZNN_VULKAN)
+    # 加载器全动态(vulkan_device.cpp 经 LoadLibrary/dlopen + GetProcAddress
+    # 解析全部入口点, 与 dynlib 同哲学) —— 无链接期依赖, 驱动自带即用
+endif()
+if(ZNN_METAL)
+    target_compile_definitions(znn PRIVATE ZNN_METAL)
+    target_link_libraries(znn PRIVATE "-framework Metal" "-framework Foundation")
 endif()
 
 # Eigen 多线程 GEMM 走 OpenMP(MSVC /openmp; gcc/clang -fopenmp 由下方统一)
@@ -146,6 +184,12 @@ if(ZNN_BUILD_TESTS)
 
     if(ZNN_CUDA)
         add_executable(gpu_smoke tests/gpu_smoke.cpp)
+    endif()
+    if(ZNN_VULKAN)
+        add_executable(gpu_vulkan tests/gpu_vulkan.cpp)
+        target_link_libraries(gpu_vulkan PRIVATE znn)
+    endif()
+    if(ZNN_CUDA)
         target_link_libraries(gpu_smoke PRIVATE znn)
         add_executable(gpu_bench tests/gpu_bench.cpp)
         target_link_libraries(gpu_bench PRIVATE znn)

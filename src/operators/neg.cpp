@@ -2,6 +2,7 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "backends/vulkan/vulkan_backend.hpp"
 
 namespace znn {
 
@@ -30,7 +31,7 @@ const Operator g_neg_operator = {
     infer_same,
     neg_grad,
     neg_ref,
-    {neg_cpu, nullptr, nullptr},
+    {neg_cpu, nullptr, nullptr, vulkan_backend::neg_vulkan},
 };
 
 Tensor Tensor::neg(const Tensor& x) {
