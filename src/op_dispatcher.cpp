@@ -11,6 +11,28 @@
 namespace znn {
 
 namespace {
+
+// 算子调用栈(异常可追溯): 入栈/出栈零分配, 仅异常路径打印。
+// thread_local 是必要例外——嵌套算子调用(梯度规则组合前向)的深度
+// 与归属线程一一对应, 全局栈在多线程下会串线
+thread_local std::vector<const char*> t_op_stack;
+
+struct OpScope {
+    const char* name;
+    explicit OpScope(const char* n) : name(n) { t_op_stack.push_back(n); }
+    ~OpScope() { t_op_stack.pop_back(); }
+};
+
+// 打印"算子 ← 调用者 ← ..."轨迹到 stderr(抛出前调用, 未捕获异常
+// 也已在崩溃前留下现场 —— 0xC0000409 fastfail 会吞掉异常文本)
+void print_trace(const char* op, const char* what) {
+    std::fprintf(stderr, "znn ERROR: op '%s' failed: %s\n", op, what);
+    for (size_t i = t_op_stack.size() - 1; i > 0; --i) {
+        std::fprintf(stderr, "  at '%s' <- '%s'\n", t_op_stack[i],
+                     t_op_stack[i - 1]);
+    }
+}
+
 // CPU 中间结果拷回原设备输出(经 Storage 直写, 保持输出张量身份)
 void Impl_copy_back(const Tensor& cpu_src, Tensor& dst) {
     cuda_backend::copy_host_to_device(dst.data<float>(), cpu_src.data<float>(),
@@ -42,6 +64,17 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
     if (inputs.size() == 0 || !op->infer) {
         throw std::runtime_error("znn: operator needs inputs and infer");
     }
+    // 0. 设备一致性校验(混合设备输入此前直达内核 = 越界读崩溃, 存量缺口)
+    for (size_t i = 1; i < inputs.size(); ++i) {
+        if (inputs[i]->device() != inputs[0]->device()) {
+            throw std::runtime_error(
+                std::string("znn: op '") + op->name
+                + "' inputs on different devices (input#0 vs input#"
+                + std::to_string(i) + "); use to_device() to align");
+        }
+    }
+    OpScope scope(op->name);
+    try {
     // 1. 名片与形状推理(契约收指针数组)
     std::vector<TensorMeta> meta_storage(inputs.size());
     std::vector<const TensorMeta*> metas(inputs.size());
@@ -105,6 +138,11 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
         }
     }
     return out;
+    } catch (const std::exception& e) {
+        print_trace(op->name, e.what());
+        throw std::runtime_error(std::string("znn: op '") + op->name
+                                 + "' failed: " + e.what());
+    }
 }
 
 } // namespace znn

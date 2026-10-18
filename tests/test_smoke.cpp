@@ -658,6 +658,7 @@ static void grad_parity(const char* name, std::vector<Tensor> inputs,
         gi.push_back(t.to_device(Device::CUDA));
     }
     for (size_t i = 0; i < xi.size(); ++i) {
+        if (xi[i].dtype() != DType::F32) continue;   // I64 无梯度语义(v1 抛错)
         xi[i].requires_grad(true);
         gi[i].requires_grad(true);
     }
@@ -750,6 +751,51 @@ static void test_gpu_backward_parity() {
     std::printf("GPU backward parity tests passed\n");
 }
 
+// t22: 使用限制守卫 —— 混合设备明确报错、非 F32 梯度明确报错、
+// 异常携带算子名与调用轨迹(可追溯)
+static void test_limit_guards() {
+    // 混合设备: 抛错且消息含算子名与设备提示(需 CUDA; 纯 CPU 构建
+    // 下 to_device(CUDA) 先抛"设备不可用", 测不到混设备路径)
+    if (!Runtime::device_available(Device::CUDA)) {
+        std::printf("CUDA not available, skipping mixed-device guard%s", "");
+        puts("");
+        return;
+    }
+    bool threw = false;
+    try {
+        Tensor a = Tensor::randn({4, 4}, 1);
+        Tensor b = Tensor::randn({4, 4}, 2).to_device(Device::CUDA);
+        (void)Tensor::add(a, b);                      // CPU + CUDA 混合
+    } catch (const std::exception& e) {
+        threw = true;
+        const std::string m = e.what();
+        check(m.find("'add'") != std::string::npos
+              && m.find("different devices") != std::string::npos,
+              "mixed-device error carries op name + hint");
+    }
+    check(threw, "mixed-device inputs throw");
+
+    // 越界形状: 消息明确(既有行为, 锁进回归)
+    try {
+        Tensor::zeros({2,2,2,2,2,2,2,2,2});
+        check(false, "9-dim should throw");
+    } catch (const std::exception&) {
+    }
+
+    // 非 F32 requires_grad: 明确报错(此前静默跳过梯度累加)
+    if (Runtime::device_available(Device::CUDA)) {
+        try {
+            Tensor idx = Tensor::zeros({4}, DType::I64, Device::CPU);
+            idx.requires_grad(true);
+            check(false, "I64 requires_grad should throw");
+        } catch (const std::exception& e) {
+            const std::string m = e.what();
+            check(m.find("F32") != std::string::npos, "I64 grad error mentions F32");
+        }
+    }
+    puts("limit guard tests passed");
+}
+
 // t20: GradScaler 动态损失缩放(机制单元, CPU 路径)
 static void test_grad_scaler() {
     GradScaler scaler(1024.f, 2);
@@ -823,6 +869,7 @@ int main() {
     std::fprintf(stderr, "t19\n"); test_cuda_parity();
     std::fprintf(stderr, "t20\n"); test_grad_scaler();
     std::fprintf(stderr, "t21\n"); test_gpu_backward_parity();
+    std::fprintf(stderr, "t22\n"); test_limit_guards();
     if (failures == 0) {
         std::printf("ALL BASIC TESTS PASSED\n");
         return 0;

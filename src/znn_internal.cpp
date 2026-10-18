@@ -641,6 +641,10 @@ template int64_t  Tensor::item<int64_t>() const;
 // ============================================================ 自动求导
 
 void Tensor::requires_grad(bool yes) {
+    if (yes && impl_ && impl_->dtype != DType::F32) {
+        // 非 F32(如 I64 indices)无梯度语义; 此前静默跳过累加, 现明确报错
+        throw std::runtime_error("znn: requires_grad only supports F32 tensors in v1");
+    }
     require(impl_, "empty tensor");
     impl_->requires_grad = yes;
 }
@@ -689,6 +693,17 @@ bool Runtime::device_available(Device device) {
 }
 
 void Runtime::set_precision(Precision p) {
+#ifndef ZNN_CUDA
+    if (p != Precision::FP32 && p != Precision::AUTO) {
+        static bool warned = false;   // 一次性告警(必要例外: 免每步刷屏)
+        if (!warned) {
+            std::fprintf(stderr,
+                         "znn: precision %d affects GPU GEMM only; ignored on CPU build\\n",
+                         (int)p);
+            warned = true;
+        }
+    }
+#endif
     OpDispatcher::instance().set_precision(p);
 }
 Precision Runtime::precision() {
