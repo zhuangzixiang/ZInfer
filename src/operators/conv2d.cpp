@@ -56,7 +56,9 @@ void conv2d_naive(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                                 const int64_t j = wo * o->stride[1] + kj * o->dilation[1] - o->pad[1];
                                 if (j < 0 || j >= W) continue;
                                 acc += xp[n * xs[0] + c * xs[1] + i * xs[2] + j * xs[3]]
-                                     * wp[((oc * Cg + c) * KH + ki) * KW + kj];
+                         * wp[(((int64_t)oc * Cg + (c - g * Cg)) * KH + ki) * KW + kj];
+                    // 组内局部通道索引(c - g*Cg): 此前用全局 c, 分组时
+                    // 权重越组读取(ZNN_FORCE_REF 下分组卷积一直算错, 存量 bug)
                             }
                         }
                     }
