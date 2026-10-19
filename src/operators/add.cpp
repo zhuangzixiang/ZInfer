@@ -1,8 +1,7 @@
 // add: 逐元素二元运算(输入间自动广播)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
-#include "backends/vulkan/vulkan_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -27,7 +26,7 @@ const Operator g_add_operator = {
     infer_broadcast,
     binary_grad,
     add_ref,
-    {add_cpu, nullptr, nullptr, vulkan_backend::add_vulkan},
+    {add_cpu, nullptr, nullptr, ZNN_VULKAN_K(add_vulkan)},
 };
 
 Tensor Tensor::add(const Tensor& a, const Tensor& b) {

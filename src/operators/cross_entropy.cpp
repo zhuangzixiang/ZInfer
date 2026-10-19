@@ -2,7 +2,7 @@
 // 前向 = 稳定 log_softmax 的负对数似然取平均; 梯度 = (softmax - onehot)/N
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -61,7 +61,7 @@ const Operator g_cross_entropy_operator = {
     ce_infer,
     ce_grad,
     ce_ref,
-    {nullptr, cuda_backend::cross_entropy_cuda, nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(cross_entropy_cuda), nullptr, nullptr},
 };
 
 Tensor Loss::cross_entropy(const Tensor& logits, const Tensor& targets) {

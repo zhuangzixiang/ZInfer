@@ -1,8 +1,7 @@
 // mean: 沿任意 dim 平均 = sum / n; 梯度 = 广播回填 / n
 #include "shared.hpp"
-#include "backends/vulkan/vulkan_backend.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 #include <cstring>
 
 namespace znn {
@@ -49,7 +48,7 @@ static void mean_grad(BackwardContext& c) {
                                      : (a->keepdim ? d : (d > dim ? d - 1 : d));
             eff[d] = (gd < 0 || g.size(gd) == 1) ? 0 : gs[gd];
         }
-        cuda_backend::grad_bcast_cuda(g.data<float>(),
+        ZNN_CUDA_K(grad_bcast_cuda)(g.data<float>(),
                                       c.grad_inputs[0]->data<float>(),
                                       c.grad_inputs[0]->numel(), rank, dims, eff, inv);
         return;
@@ -65,7 +64,7 @@ const Operator g_mean_operator = {
     infer_reduce,
     mean_grad,
     mean_ref,
-    {mean_cpu, cuda_backend::mean_cuda, nullptr, vulkan_backend::mean_vulkan},
+    {mean_cpu, ZNN_CUDA_K(mean_cuda), nullptr, ZNN_VULKAN_K(mean_vulkan)},
     sizeof(ReduceAttrs),
 };
 

@@ -1,8 +1,7 @@
 // sub: 逐元素二元运算(输入间自动广播)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
-#include "backends/vulkan/vulkan_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -27,7 +26,7 @@ const Operator g_sub_operator = {
     infer_broadcast,
     binary_grad,
     sub_ref,
-    {sub_cpu, nullptr, nullptr, vulkan_backend::sub_vulkan},
+    {sub_cpu, nullptr, nullptr, ZNN_VULKAN_K(sub_vulkan)},
 };
 
 Tensor Tensor::sub(const Tensor& a, const Tensor& b) {

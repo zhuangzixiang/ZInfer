@@ -1,7 +1,7 @@
 // SGD: p -= lr * (grad + weight_decay*p) [+ 动量]
 #include "optim.hpp"
 #include "znn_internal.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -27,7 +27,7 @@ void SgdImpl::step() {
             if (param_.momentum > 0 && !velocity_[i]) {
                 velocity_[i] = Tensor::zeros(p.shape(), DType::F32, Device::CUDA);
             }
-            cuda_backend::sgd_step_cuda(
+            ZNN_CUDA_K(sgd_step_cuda)(
                 p.data<float>(), p.grad().data<float>(),
                 param_.momentum > 0 ? velocity_[i].data<float>() : nullptr,
                 n, param_.lr, param_.momentum, param_.weight_decay);
@@ -56,7 +56,7 @@ void SgdImpl::clear() {
     for (Tensor& p : params_) {
         if (p.grad()) {
             if (p.device() == Device::CUDA) {
-                cuda_backend::memset0_cuda(p.grad().data<float>(),
+                ZNN_CUDA_K(memset0_cuda)(p.grad().data<float>(),
                                            static_cast<size_t>(p.numel()) * sizeof(float));
             } else {
                 std::memset(p.grad().data<float>(), 0,

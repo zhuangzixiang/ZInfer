@@ -2,7 +2,7 @@
 // metal_backend.hpp — Metal 后端内部接口(znn_internal 经此调用)
 //
 // 职责: 设备/命令队列/缓冲管理 + 管线(MSL 运行时编译) + 算子内核工厂。
-// 非 Metal 构建由 metal_stub.cpp 提供同名实现(明确报错)。
+// 未编入(ZNN_METAL 未定义)时算子槽位为 nullptr, 派发器透明回落 CPU。
 // 实现: metal_device.mm / metal_kernels.mm(Objective-C++, 仅 APPLE 编译;
 // MSL 着色器以源码字符串内嵌, 由 Metal 驱动运行时编译 —— 与 Vulkan 的
 // 构建期 SPIR-V 不同, 这是 Metal 官方推荐路径, 无离线工具依赖)。

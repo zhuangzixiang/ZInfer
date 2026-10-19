@@ -1,7 +1,7 @@
 // arange: 等差序列 [0, n)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -17,7 +17,7 @@ const Operator g_arange_operator = {
     nullptr,   // 前端直接构造, 不经派发
     nullptr,   // 无需求导
     arange_ref,
-    {nullptr, cuda_backend::arange_cuda, nullptr, nullptr},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, ZNN_CUDA_K(arange_cuda), nullptr, nullptr},        // kernels[CPU/CUDA/Metal/Vulkan]
 };
 
 Tensor Tensor::arange(int64_t n, DType dtype, Device device) {
@@ -26,7 +26,7 @@ Tensor Tensor::arange(int64_t n, DType dtype, Device device) {
     Tensor* outs[1] = {&t};
     KernelContext ctx{device, nullptr};
     if (device == Device::CUDA) {
-        cuda_backend::arange_cuda(ctx, Span<const Tensor*>(nullptr, 0),
+        ZNN_CUDA_K(arange_cuda)(ctx, Span<const Tensor*>(nullptr, 0),
                                   Span<Tensor*>(outs, 1), nullptr);
     } else {
         float* p = t.data<float>();

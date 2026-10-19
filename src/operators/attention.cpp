@@ -2,7 +2,7 @@
 // 前向 = CPU 朴素 / CUDA 两遍内核; 反向 = 算子组合(自动走当前后端)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 #include <cmath>
 #include <vector>
 
@@ -120,7 +120,7 @@ const Operator g_attention_operator = {
     attention_infer,
     attention_grad,
     attention_ref,
-    {nullptr, cuda_backend::attention_cuda, nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(attention_cuda), nullptr, nullptr},
     sizeof(AttentionOptions),
 };
 

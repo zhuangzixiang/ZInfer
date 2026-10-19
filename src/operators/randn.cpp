@@ -1,7 +1,7 @@
 // randn: 标准正态随机张量(seed=0 用全局引擎)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 #include <random>
 
 namespace znn {
@@ -34,7 +34,7 @@ Tensor Tensor::randn(Shape shape, unsigned seed, DType dtype, Device device) {
     Tensor* outs[1] = {&t};
     KernelContext ctx{device, nullptr};
     if (device == Device::CUDA) {
-        cuda_backend::randn_cuda(ctx, Span<const Tensor*>(nullptr, 0),
+        ZNN_CUDA_K(randn_cuda)(ctx, Span<const Tensor*>(nullptr, 0),
                                  Span<Tensor*>(outs, 1), &seed);
     } else {
         randn_ref(ctx, Span<const Tensor*>(nullptr, 0), Span<Tensor*>(outs, 1), &seed);

@@ -1,7 +1,7 @@
 // op_dispatcher.cpp — 派发器实现(索引构建为结构性实现, 派发链为占位)
 #include "op_dispatcher.hpp"
 #include "autograd.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 #include "znn_internal.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -35,8 +35,9 @@ void print_trace(const char* op, const char* what) {
 
 // CPU 中间结果拷回原设备输出(经 Storage 直写, 保持输出张量身份)
 void Impl_copy_back(const Tensor& cpu_src, Tensor& dst) {
-    cuda_backend::copy_host_to_device(dst.data<float>(), cpu_src.data<float>(),
-                                      static_cast<size_t>(cpu_src.numel()) * sizeof(float));
+    ZNN_CUDA_CALL(cuda_backend::copy_host_to_device(dst.data<float>(),
+                                     cpu_src.data<float>(),
+                                     static_cast<size_t>(cpu_src.numel()) * sizeof(float)));
 }
 } // namespace
 

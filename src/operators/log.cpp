@@ -1,8 +1,7 @@
 // log: 逐元素一元运算()
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
-#include "backends/vulkan/vulkan_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -31,7 +30,7 @@ const Operator g_log_operator = {
     infer_same,
     log_grad,
     log_ref,
-    {log_cpu, nullptr, nullptr, vulkan_backend::log_vulkan},
+    {log_cpu, nullptr, nullptr, ZNN_VULKAN_K(log_vulkan)},
 };
 
 Tensor Tensor::log(const Tensor& x) {

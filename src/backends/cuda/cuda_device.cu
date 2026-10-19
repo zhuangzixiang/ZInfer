@@ -2,7 +2,7 @@
 // cuda_device.cu — CUDA 后端骨架(里程碑 2 起点)
 //
 // 职责: 设备内存与拷贝(经 cuda_backend 接口暴露) + 第一个示范内核(add)。
-// 编译条件: CMake ZNN_CUDA=ON 时替代 cuda_stub.cpp 进入构建。
+// 编译条件: CMake ZNN_CUDA=ON 时进入构建(未开时该目录不参与编译)。
 // 扩展路径(DESIGN §5.2): 新算子 = operators/foo.cu 填 kernels[CUDA] 槽位。
 // ============================================================================
 #include <cuda_runtime.h>

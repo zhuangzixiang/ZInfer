@@ -1,7 +1,7 @@
 // embedding: 按索引取行(indices: I64 任意形状); 梯度 scatter-add 回权重
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -46,7 +46,7 @@ static void embedding_grad(BackwardContext& c) {
     Tensor& dw = *c.grad_inputs[0];                       // 已零初始化
     const int64_t D = dw.size(1);
     if (g.device() == Device::CUDA) {       // 原生: 行散射原子累加
-        cuda_backend::embedding_grad_cuda(
+        ZNN_CUDA_K(embedding_grad_cuda)(
             g.data<float>(), idx.data<int64_t>(), dw.data<float>(),
             idx.numel() * D, (int)D);
         return;
@@ -67,7 +67,7 @@ const Operator g_embedding_operator = {
     embedding_infer,
     embedding_grad,
     embedding_ref,
-    {nullptr, cuda_backend::embedding_cuda, nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(embedding_cuda), nullptr, nullptr},
 };
 
 Tensor Tensor::embedding(const Tensor& weight, const Tensor& indices) {

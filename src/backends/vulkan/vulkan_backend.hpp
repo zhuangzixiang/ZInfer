@@ -2,7 +2,7 @@
 // vulkan_backend.hpp — Vulkan 后端内部接口(znn_internal 经此调用)
 //
 // 职责: 设备/队列/内存管理 + 计算管线缓存 + 算子内核工厂。
-// 非 Vulkan 构建时由 vulkan_stub.cpp 提供同名实现(明确报错/返回空内核),
+// 未编入(ZNN_VULKAN 未定义)时算子槽位为 nullptr, 派发器透明回落;
 // Vulkan 构建时由 vulkan_device.cpp + vulkan_kernels.cpp 提供真实实现。
 // SPIR-V: 着色器(src/backends/vulkan/shaders/*.comp)构建期经 glslang
 // 编译为字节码头文件嵌入(third_party/glslang/bin)。

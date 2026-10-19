@@ -1,7 +1,7 @@
 // shared.cpp — 逐元素类算子的共用实现
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 #include <Eigen/Dense>
 #include <cstring>
 
@@ -155,7 +155,7 @@ const Operator g_unary_bwd_operator = {
     unary_bwd_infer,
     nullptr,                                   // 内部算子, 无二次反向
     unary_bwd_ref,
-    {nullptr, cuda_backend::unary_bwd_cuda, nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(unary_bwd_cuda), nullptr, nullptr},
     sizeof(UnaryBwd),
 };
 
@@ -293,7 +293,7 @@ void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
                                     : (keepdim ? d : (d > dim ? d - 1 : d));
             eff[d] = (gd < 0 || g.size(gd) == 1) ? 0 : gs[gd];
         }
-        cuda_backend::grad_bcast_cuda(g.data<float>(), out.data<float>(),
+        ZNN_CUDA_K(grad_bcast_cuda)(g.data<float>(), out.data<float>(),
                                       out.numel(), rank, dims, eff, 1.f);
         return;
     }

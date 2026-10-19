@@ -2,7 +2,7 @@
 // 纯推理态 Tensor::permute 直接返回零拷贝视图
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -64,7 +64,7 @@ static void permute_grad(BackwardContext& c) {
             dims[d] = ds.dims[d];
             eff[d] = gs[o->order[d]];       // idx[p] 的步长 = g 第 order[p] 维步长
         }
-        cuda_backend::grad_bcast_cuda(g.data<float>(), dx.data<float>(),
+        ZNN_CUDA_K(grad_bcast_cuda)(g.data<float>(), dx.data<float>(),
                                       dx.numel(), (int)ds.rank, dims, eff, 1.f);
         return;
     }
@@ -90,7 +90,7 @@ const Operator g_permute_operator = {
     permute_infer,
     permute_grad,
     permute_ref,
-    {nullptr, cuda_backend::permute_cuda, nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(permute_cuda), nullptr, nullptr},
     sizeof(PermuteOptions),
 };
 

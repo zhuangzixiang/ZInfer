@@ -121,8 +121,8 @@ void matmul_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     void* p = bridge::get_pipeline(spirv::gemm, spirv::gemm_bytes, 0, 0);
     require(p, "gemm pipeline");
     struct { int32_t M, N, K, lda, ldb, ldc; } pc{M, N, K, K, N, N};
-    const uint32_t gx = (uint32_t)((N + 7) / 8);
-    const uint32_t gy = (uint32_t)((M + 7) / 8);
+    const uint32_t gx = (uint32_t)((N + 31) / 32);
+    const uint32_t gy = (uint32_t)((M + 31) / 32);
     bridge::dispatch(p, vhandle(a), vhandle(b), vhandle(y), &pc, sizeof(pc), gx, gy, 1);
 }
 
@@ -138,8 +138,8 @@ void linear_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     void* p = bridge::get_pipeline(spirv::gemm, spirv::gemm_bytes, 1, 0);
     require(p, "gemm-t pipeline");
     struct { int32_t M, N, K, lda, ldb, ldc; } pc{M, N, K, K, K, N};
-    const uint32_t gx = (uint32_t)((N + 7) / 8);
-    const uint32_t gy = (uint32_t)((M + 7) / 8);
+    const uint32_t gx = (uint32_t)((N + 31) / 32);
+    const uint32_t gy = (uint32_t)((M + 31) / 32);
     bridge::dispatch(p, vhandle(x), vhandle(w), vhandle(y), &pc, sizeof(pc), gx, gy, 1);
     // bias: in[2] 存在时逐行广播加(复用 elementwise 广播通道)
     if (in.size() > 2 && in[2]) {

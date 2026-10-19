@@ -2,7 +2,7 @@
 // 纯推理态 Tensor::slice 直接返回零拷贝视图
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 #include <cstring>
 
 namespace znn {
@@ -55,7 +55,7 @@ const Operator g_slice_operator = {
     slice_infer,
     slice_grad,
     slice_ref,
-    {nullptr, cuda_backend::slice_cuda, nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(slice_cuda), nullptr, nullptr},
     sizeof(SliceOptions),
 };
 

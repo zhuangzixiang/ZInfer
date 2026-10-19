@@ -1,58 +1,14 @@
-[vk] createInstance=0
-[vk] phys devices=1
-[vk] createDevice=0
-[vk] pre-devload
-[vk] dev fns loaded
-[vk] queue=0000024DA8AF14D0
-[vk] host_mem=2
-[vk] cmd pool ok
-[vk] desc pool ok
-[pg] dsl ok
 [pg] shader st=0
-[pg] layout ok
 [pg] pipeline st=0
-[dp] desc updated
-[dp] dispatched
-[dp] done
-[pg] dsl ok
 [pg] shader st=0
-[pg] layout ok
 [pg] pipeline st=0
-[dp] desc updated
-[dp] dispatched
-[dp] done
-[pg] dsl ok
 [pg] shader st=0
-[pg] layout ok
 [pg] pipeline st=0
-[dp] desc updated
-[dp] dispatched
-[dp] done
-[pg] dsl ok
 [pg] shader st=0
-[pg] layout ok
 [pg] pipeline st=0
-[dp] desc updated
-[dp] dispatched
-[dp] done
-[pg] dsl ok
 [pg] shader st=0
-[pg] layout ok
 [pg] pipeline st=0
-[dp] desc updated
-[dp] dispatched
-[dp] done
-[pg] dsl ok
 [pg] shader st=0
-[pg] layout ok
 [pg] pipeline st=0
-[dp] desc updated
-[dp] dispatched
-[dp] done
-[pg] dsl ok
 [pg] shader st=0
-[pg] layout ok
 [pg] pipeline st=0
-[dp] desc updated
-[dp] dispatched
-[dp] done

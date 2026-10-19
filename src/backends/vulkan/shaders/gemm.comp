@@ -1,7 +1,8 @@
 #version 450
 // 行主序 C[M,N] = A[M,K] × op(B); TB=1 时 B 为 [N,K](× w^T)
-// 朴素分块: 每工作组一个 16x16 输出块, 本地内存缓冲(shared 等价)
-layout(local_size_x = 8, local_size_y = 8) in;
+// 32×32 分块, K 步 16; 256 线程/组(16×16), 每线程 2×2 寄存器累加器。
+// 算术强度 ~32 FLOP/装载元素 —— 高于内存带宽上限, 计算受限。
+layout(local_size_x = 16, local_size_y = 16) in;
 
 layout(constant_id = 0) const int TB = 0;
 
@@ -14,34 +15,59 @@ layout(push_constant) uniform Pc {
     int lda; int ldb; int ldc;
 } pc;
 
-shared float ta[8][9];    // A 块(转置存储防 bank 冲突)
-shared float tb[8][9];
+shared float sA[32][16];
+shared float sB[16][32];
 
 void main() {
-    const int row = int(gl_GlobalInvocationID.y);   // M 维
-    const int col = int(gl_GlobalInvocationID.x);   // N 维
+    const int i0 = int(gl_WorkGroupID.y) * 32;
+    const int j0 = int(gl_WorkGroupID.x) * 32;
     const int lr = int(gl_LocalInvocationID.y);
     const int lc = int(gl_LocalInvocationID.x);
-    const bool in_range = (row < pc.M) && (col < pc.N);
 
-    float acc = 0.0;
-    const int tiles = (pc.K + 7) / 8;
+    float acc00 = 0.0, acc01 = 0.0, acc10 = 0.0, acc11 = 0.0;
+
+    const int tiles = (pc.K + 15) / 16;
     for (int t = 0; t < tiles; ++t) {
-        const int ka = t * 8 + lc;
-        ta[lr][lc] = (in_range && ka < pc.K) ? a[row * pc.lda + ka] : 0.0;
-        const int kb = t * 8 + lr;
-        if (TB == 1) {
-            tb[lc][lr] = (in_range && kb < pc.K) ? b[col * pc.ldb + kb] : 0.0;
+        const int k0 = t * 16;
+        // A 块 32×16: 线程(lr,lc) → sA[2lr..2lr+1][lc]
+        const int ra = i0 + 2 * lr;
+        const float av0 = (ra < pc.M && k0 + lc < pc.K)
+                            ? a[ra * pc.lda + k0 + lc] : 0.0;
+        const float av1 = (ra + 1 < pc.M && k0 + lc < pc.K)
+                            ? a[(ra + 1) * pc.lda + k0 + lc] : 0.0;
+        sA[2 * lr][lc] = av0;
+        sA[2 * lr + 1][lc] = av1;
+        // B 块 16×32: sB[k][j] = op(B)[k0+k][j0+j]
+        if (TB == 0) {
+            const int jb = j0 + 2 * lc;
+            sB[lr][2 * lc] = (k0 + lr < pc.K && jb < pc.N)
+                               ? b[(k0 + lr) * pc.ldb + jb] : 0.0;
+            sB[lr][2 * lc + 1] = (k0 + lr < pc.K && jb + 1 < pc.N)
+                               ? b[(k0 + lr) * pc.ldb + jb + 1] : 0.0;
         } else {
-            tb[lc][lr] = (in_range && kb < pc.K) ? b[kb * pc.ldb + col] : 0.0;
+            const int jb = j0 + 2 * lc;
+            sB[lr][2 * lc] = (jb < pc.N && k0 + lr < pc.K)
+                               ? b[jb * pc.ldb + k0 + lr] : 0.0;
+            sB[lr][2 * lc + 1] = (jb + 1 < pc.N && k0 + lr < pc.K)
+                               ? b[(jb + 1) * pc.ldb + k0 + lr] : 0.0;
         }
         barrier();
-        for (int k = 0; k < 8; ++k) {
-            acc += ta[lr][k] * tb[lc][k];
+        for (int k = 0; k < 16; ++k) {
+            const float a0 = sA[2 * lr + 0][k];
+            const float a1 = sA[2 * lr + 1][k];
+            const float b0 = sB[k][2 * lc + 0];
+            const float b1 = sB[k][2 * lc + 1];
+            acc00 += a0 * b0;
+            acc01 += a0 * b1;
+            acc10 += a1 * b0;
+            acc11 += a1 * b1;
         }
         barrier();
     }
-    if (in_range) {
-        y[row * pc.ldc + col] = acc;
-    }
+    const int r0 = i0 + 2 * lr;
+    const int c0 = j0 + 2 * lc;
+    if (r0 < pc.M && c0 < pc.N)         y[r0 * pc.ldc + c0] = acc00;
+    if (r0 < pc.M && c0 + 1 < pc.N)     y[r0 * pc.ldc + c0 + 1] = acc01;
+    if (r0 + 1 < pc.M && c0 < pc.N)     y[(r0 + 1) * pc.ldc + c0] = acc10;
+    if (r0 + 1 < pc.M && c0 + 1 < pc.N) y[(r0 + 1) * pc.ldc + c0 + 1] = acc11;
 }

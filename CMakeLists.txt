@@ -102,9 +102,8 @@ if(ZNN_CUDA)
         src/backends/cuda/cuda_kernels3.cu
         src/backends/cuda/linear_cuda.cu)
     set(CUDA_STANDARD 17)
-else()
-    set(ZNN_CUDA_SRC src/backends/cuda/cuda_stub.cpp)
 endif()
+# 未编入的后端: 槽位为 nullptr, 派发器透明回落(backend_slots.hpp; 无 stub)
 
 # ---- Vulkan 后端(跨平台 GPU 计算; SPIR-V 构建期生成, 见 tools/gen_spirv.py) ----
 option(ZNN_VULKAN "Vulkan compute backend" OFF)
@@ -112,8 +111,6 @@ if(ZNN_VULKAN)
     set(ZNN_VULKAN_SRC
         src/backends/vulkan/vulkan_device.cpp
         src/backends/vulkan/vulkan_kernels.cpp)
-else()
-    set(ZNN_VULKAN_SRC src/backends/vulkan/vulkan_stub.cpp)
 endif()
 
 # ---- Metal 后端(Apple GPU; MSL 运行时编译, 仅 APPLE 平台) ----
@@ -129,8 +126,6 @@ if(ZNN_METAL)
     set_source_files_properties(src/backends/metal/metal_device.mm
                                 src/backends/metal/metal_kernels.mm
                                 PROPERTIES COMPILE_FLAGS "-fobjc-arc")
-else()
-    set(ZNN_METAL_SRC src/backends/metal/metal_stub.cpp)
 endif()
 
 add_library(znn

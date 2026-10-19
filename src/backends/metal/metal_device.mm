@@ -3,7 +3,7 @@
 //
 // 链路: MTLCreateSystemDefaultDevice → 命令队列 → 共享内存缓冲(MTLStorageModeShared,
 // CPU/GPU 均可直接访问, 免 staging —— Apple 统一内存架构天然支持)。
-// 注: 本文件仅在 APPLE 平台被 CMake 选用(ZNN_METAL=ON); Windows 构建走 metal_stub。
+// 注: 本文件仅在 APPLE 平台被 CMake 选用(ZNN_METAL=ON)。
 // ============================================================================
 #include "backends/metal/metal_backend.hpp"
 

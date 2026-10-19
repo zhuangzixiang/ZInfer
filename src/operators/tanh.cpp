@@ -1,8 +1,7 @@
 // tanh: 激活函数()
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
-#include "backends/vulkan/vulkan_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -31,7 +30,7 @@ const Operator g_tanh_operator = {
     infer_same,
     tanh_grad,
     tanh_ref,
-    {tanh_cpu, nullptr, nullptr, vulkan_backend::tanh_vulkan},
+    {tanh_cpu, nullptr, nullptr, ZNN_VULKAN_K(tanh_vulkan)},
 };
 
 Tensor Activator::tanh(const Tensor& x) {

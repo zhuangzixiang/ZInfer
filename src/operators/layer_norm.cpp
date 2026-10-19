@@ -1,7 +1,7 @@
 // layer_norm: 末维归一化 + 仿射; 梯度按标准 LN 反传公式
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 #include <cmath>
 
 namespace znn {

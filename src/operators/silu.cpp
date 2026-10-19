@@ -1,8 +1,7 @@
 // silu: 激活函数()
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
-#include "backends/vulkan/vulkan_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -31,7 +30,7 @@ const Operator g_silu_operator = {
     infer_same,
     silu_grad,
     silu_ref,
-    {silu_cpu, nullptr, nullptr, vulkan_backend::silu_vulkan},
+    {silu_cpu, nullptr, nullptr, ZNN_VULKAN_K(silu_vulkan)},
 };
 
 Tensor Activator::silu(const Tensor& x) {

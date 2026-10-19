@@ -1,8 +1,7 @@
 // softmax: 沿任意 dim 归一化指数(数值稳定); 梯度 s·(g - Σ g·s) 逐行
 #include "shared.hpp"
-#include "backends/vulkan/vulkan_backend.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -84,7 +83,7 @@ const Operator g_softmax_operator = {
     softmax_infer,
     softmax_grad,
     softmax_ref,
-    {softmax_cpu, cuda_backend::softmax_cuda, nullptr, vulkan_backend::softmax_vulkan},
+    {softmax_cpu, ZNN_CUDA_K(softmax_cuda), nullptr, ZNN_VULKAN_K(softmax_vulkan)},
     sizeof(SoftmaxOptions),
 };
 

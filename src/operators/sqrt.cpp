@@ -1,8 +1,7 @@
 // sqrt: 逐元素一元运算()
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
-#include "backends/vulkan/vulkan_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -31,7 +30,7 @@ const Operator g_sqrt_operator = {
     infer_same,
     sqrt_grad,
     sqrt_ref,
-    {sqrt_cpu, nullptr, nullptr, vulkan_backend::sqrt_vulkan},
+    {sqrt_cpu, nullptr, nullptr, ZNN_VULKAN_K(sqrt_vulkan)},
 };
 
 Tensor Tensor::sqrt(const Tensor& x) {

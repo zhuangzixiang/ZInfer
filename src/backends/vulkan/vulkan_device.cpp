@@ -108,6 +108,9 @@ struct VkState {
     uint32_t host_mem_idx = UINT32_MAX;
     bool ok = false;
     std::mutex mu;                       // 提交串行化(v1 单队列)
+    // 缓冲池: 尺寸桶(2^n)空闲链表 —— 每调用 vkCreateBuffer+AllocateMemory
+    // 是毫秒级开销, 复用免分配(与 CUDA 驱动池同动机; 归还而非销毁)
+    std::unordered_map<size_t, std::vector<void*>> buf_pool;
 };
 VkState* st() {
     static VkState s;
@@ -226,9 +229,31 @@ bool available() {
     return ok;
 }
 
+namespace {
+size_t bucket_of(size_t bytes) {          // 桶 = ≥256 的下一个 2^n
+    size_t b = 256;
+    while (b < bytes) b <<= 1;
+    return b;
+}
+}
+
 void* alloc(size_t bytes) {
     VkState* v = st();
     if (!v->ok || bytes == 0) return nullptr;
+    {   // 池命中(桶内有等容块直接复用; 容量由桶保证; 超大块不池化
+        //  —— 64MB+ 主机可见块复用表现异常, 直接驱动分配)
+        if (bytes <= (size_t)32 << 20) {
+        const size_t bk = bucket_of(bytes);
+        std::lock_guard<std::mutex> lk(v->mu);
+        auto it = v->buf_pool.find(bk);
+        if (it != v->buf_pool.end() && !it->second.empty()) {
+            void* p = it->second.back();
+            it->second.pop_back();
+            return p;
+        }
+        bytes = bk;                       // 新建也按桶容量(下次可复用)
+        }
+    }
     VkBufferCreateInfo bci{};
     bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bci.size = bytes;
@@ -290,13 +315,20 @@ void* alloc(size_t bytes) {
 void free(void* p) {
     VkState* v = st();
     if (!p) return;
-    VkBuf* b = static_cast<VkBuf*>(p);
     if (v->ok) {
+        VkBuf* b = static_cast<VkBuf*>(p);
+        if (b->cap <= (size_t)32 << 20) {  // 池内块归还复用; 超大块真销毁
+            std::lock_guard<std::mutex> lk(v->mu);
+            v->buf_pool[bucket_of(b->cap)].push_back(p);
+            return;
+        }
         vkUnmapMemory(v->dev, b->mem);
         vkFreeMemory(v->dev, b->mem, nullptr);
         vkDestroyBuffer(v->dev, b->buf, nullptr);
+        delete b;
+        return;
     }
-    delete b;
+    delete static_cast<VkBuf*>(p);
 }
 
 // 主机可见内存: 拷贝即 memcpy(常驻映射), 设备一致性由 COHERENT 保证

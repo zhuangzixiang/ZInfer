@@ -1,7 +1,7 @@
 // max_pool2d: NCHW 最大池化; 梯度经"重找窗口最大位置"回填(无需保存掩码)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -71,7 +71,7 @@ static void max_pool2d_grad(BackwardContext& c) {
     const int64_t C = x.size(1), H = x.size(2), W = x.size(3);
     const int64_t HO = g.size(2), WO = g.size(3);
     if (x.device() == Device::CUDA) {       // 原生: 重找窗口最大后原子散射
-        cuda_backend::max_pool_grad_cuda(
+        ZNN_CUDA_K(max_pool_grad_cuda)(
             x.data<float>(), g.data<float>(), dx.data<float>(),
             x.size(0) * C * HO * WO, (int)H, (int)W, (int)HO, (int)WO,
             (int)o->kernel[0], (int)o->kernel[1],

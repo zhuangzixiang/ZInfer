@@ -3,9 +3,8 @@
 // (引擎在 autograd/op_dispatcher; 层/优化器在各自目录; 算子在 operators/)
 // ============================================================================
 #include "znn_internal.hpp"
-#include "backends/cuda/cuda_backend.hpp"
-#include "backends/vulkan/vulkan_backend.hpp"
-#include "backends/metal/metal_backend.hpp"
+#include "backend_slots.hpp"
+
 #include "autograd.hpp"
 #include "op_dispatcher.hpp"
 #include "operators/shared.hpp"
@@ -26,7 +25,7 @@ void copy_view_to(const Tensor& src, Tensor& dst) {
             ds[d] = dst.strides()[d];
             sh[d] = dst.size(d);
         }
-        cuda_backend::strided_copy_cuda(src.data<float>(), dst.data<float>(),
+        ZNN_CUDA_K(strided_copy_cuda)(src.data<float>(), dst.data<float>(),
                                         rank, ss, ds, sh, dst.numel());
         return;
     }
@@ -79,8 +78,8 @@ void Tensor::Impl::copy_elements(const Tensor::Impl* src, Tensor::Impl* dst) {
             throw std::runtime_error("znn: cross-device copy must go through to_device");
         }
         if (src->is_contiguous()) {
-            cuda_backend::copy_device_to_device(dst->storage->data(), src->storage->data(),
-                                                dst->nbytes());
+            ZNN_CUDA_CALL(cuda_backend::copy_device_to_device(
+                dst->storage->data(), src->storage->data(), dst->nbytes()));
             return;
         }
         // 非连续视图(转置/切片): 按步长收集(此前扁平 memcpy 静默拷错 —— 存量 bug)
@@ -95,7 +94,7 @@ void Tensor::Impl::copy_elements(const Tensor::Impl* src, Tensor::Impl* dst) {
             sh[d] = dst->shape.dims[d];
             total *= dst->shape.dims[d];
         }
-        cuda_backend::strided_copy_cuda(
+        ZNN_CUDA_K(strided_copy_cuda)(
             static_cast<const float*>(src->storage->data()) + src->offset,
             static_cast<float*>(dst->storage->data()), rank, ss, ds, sh, total);
         return;
@@ -174,22 +173,22 @@ bool Shape::operator==(const Shape& other) const {
 
 Storage* Storage::create(size_t bytes, Device device) {
     if (device == Device::CUDA) {
-        if (!cuda_backend::available()) {
+        if (!ZNN_CUDA_AVAIL()) {
             throw std::runtime_error("znn: CUDA device not available");
         }
         Storage* s = new Storage(bytes, device);
         if (bytes > 0) {
-            s->data_ = cuda_backend::alloc(bytes);
+            s->data_ = ZNN_CUDA_K(alloc)(bytes);
         }
         return s;
     }
     if (device == Device::Vulkan) {
-        if (!vulkan_backend::available()) {
+        if (!ZNN_VULKAN_AVAIL()) {
             throw std::runtime_error("znn: Vulkan device not available");
         }
         Storage* s = new Storage(bytes, device);
         if (bytes > 0) {
-            s->data_ = vulkan_backend::alloc(bytes);
+            s->data_ = ZNN_VULKAN_K(alloc)(bytes);
         }
         return s;
     }
@@ -210,9 +209,9 @@ Storage::~Storage() {
         return;
     }
     if (device_ == Device::CUDA) {
-        cuda_backend::free(data_);
+        ZNN_CUDA_CALL(cuda_backend::free(data_));
     } else if (device_ == Device::Vulkan) {
-        vulkan_backend::free(data_);
+        ZNN_VULKAN_CALL(vulkan_backend::free(data_));
     } else {
         ::operator delete(data_);
     }
@@ -343,7 +342,7 @@ Tensor Tensor::empty(Shape shape, DType dtype, Device device) {
 Tensor Tensor::zeros(Shape shape, DType dtype, Device device) {
     Tensor t = Tensor::empty(shape, dtype, device);
     if (device == Device::CUDA) {
-        cuda_backend::memset0(t.impl_->storage->data(), t.impl_->nbytes());
+        ZNN_CUDA_CALL(cuda_backend::memset0(t.impl_->storage->data(), t.impl_->nbytes()));
     } else {
         std::memset(t.impl_->storage->data(), 0, t.impl_->nbytes());
     }
@@ -379,8 +378,8 @@ Tensor Tensor::from_host(const void* data, Shape shape, DType dtype, Device devi
     Tensor t = Tensor::empty(shape, dtype, device);
     if (t.numel() > 0) {
         if (device == Device::CUDA) {
-            cuda_backend::copy_host_to_device(t.impl_->storage->data(), data,
-                                              t.impl_->nbytes());
+            ZNN_CUDA_CALL(cuda_backend::copy_host_to_device(
+                t.impl_->storage->data(), data, t.impl_->nbytes()));
         } else {
             std::memcpy(t.impl_->storage->data(), data, t.impl_->nbytes());
         }
@@ -599,25 +598,25 @@ Tensor Tensor::to_device(Device device) const {
     if (from == Device::CPU && (device == Device::CUDA || device == Device::Vulkan)) {
         Tensor src = impl_->is_contiguous() ? *this : clone();
         if (device == Device::CUDA) {
-            cuda_backend::copy_host_to_device(t.impl_->storage->data(),
-                                              src.impl_->storage->data(),
-                                              t.impl_->nbytes());
+            ZNN_CUDA_CALL(cuda_backend::copy_host_to_device(
+                t.impl_->storage->data(), src.impl_->storage->data(),
+                t.impl_->nbytes()));
         } else {
-            vulkan_backend::copy_host_to_device(t.impl_->storage->data(),
-                                                src.impl_->storage->data(),
-                                                t.impl_->nbytes());
+            ZNN_VULKAN_CALL(vulkan_backend::copy_host_to_device(
+                t.impl_->storage->data(), src.impl_->storage->data(),
+                t.impl_->nbytes()));
         }
         return t;
     }
     if ((from == Device::CUDA || from == Device::Vulkan) && device == Device::CPU) {
         if (from == Device::CUDA) {
-            cuda_backend::copy_device_to_host(t.impl_->storage->data(),
-                                              impl_->storage->data(),
-                                              impl_->nbytes());
+            ZNN_CUDA_CALL(cuda_backend::copy_device_to_host(
+                t.impl_->storage->data(), impl_->storage->data(),
+                impl_->nbytes()));
         } else {
-            vulkan_backend::copy_device_to_host(t.impl_->storage->data(),
-                                                impl_->storage->data(),
-                                                impl_->nbytes());
+            ZNN_VULKAN_CALL(vulkan_backend::copy_device_to_host(
+                t.impl_->storage->data(), impl_->storage->data(),
+                impl_->nbytes()));
         }
         return t;
     }
@@ -659,8 +658,8 @@ T Tensor::item() const {
     require(numel() == 1, "item on non-scalar");
     if (impl_->device == Device::CUDA) {                   // GPU: 自动同步拷回单值
         T v;
-        cuda_backend::copy_device_to_host(&v, impl_->storage->data(),
-                                          sizeof(T));
+        ZNN_CUDA_CALL(cuda_backend::copy_device_to_host(
+            &v, impl_->storage->data(), sizeof(T)));
         return v;
     }
     return *data<T>();
@@ -720,13 +719,13 @@ bool Runtime::device_available(Device device) {
         return true;
     }
     if (device == Device::CUDA) {
-        return cuda_backend::available();
+        return ZNN_CUDA_AVAIL();
     }
     if (device == Device::Vulkan) {
-        return vulkan_backend::available();
+        return ZNN_VULKAN_AVAIL();
     }
     if (device == Device::Metal) {
-        return metal_backend::available();
+        return ZNN_METAL_AVAIL();
     }
     return false;
 }

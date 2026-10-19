@@ -1,8 +1,7 @@
 // exp: 逐元素一元运算()
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
-#include "backends/vulkan/vulkan_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -31,7 +30,7 @@ const Operator g_exp_operator = {
     infer_same,
     exp_grad,
     exp_ref,
-    {exp_cpu, nullptr, nullptr, vulkan_backend::exp_vulkan},
+    {exp_cpu, nullptr, nullptr, ZNN_VULKAN_K(exp_vulkan)},
 };
 
 Tensor Tensor::exp(const Tensor& x) {

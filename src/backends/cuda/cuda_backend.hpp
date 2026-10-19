@@ -2,7 +2,7 @@
 // cuda_backend.hpp — CUDA 后端内部接口(znn_internal 经此调用)
 //
 // 职责: 设备内存分配/释放/拷贝/清零 + CUDA 算子内核工厂。
-// 非CUDA 构建时由 cuda_stub.cpp 提供同名实现(明确报错/返回空内核),
+// 未编入(ZNN_CUDA 未定义)时算子槽位为 nullptr, 派发器透明回落;
 // CUDA 构建时由 cuda_device.cu / cuda_kernels.cu 提供真实实现。
 // 链路位置: Storage 与 Tensor::to_device 经此分发;
 // 各算子文件经 shared.hpp 的内核工厂填充 kernels[CUDA] 槽位。
@@ -83,7 +83,7 @@ void conv2d_grad_cuda(const float* x, const float* w, const float* g,
 // 行主序 C[M,N] = A[M,K] × op(B); ld 为行距(列切片时传母矩阵整宽);
 // b_transposed=true 时 B 按 [N,K] 行主序传入(× w^T, 权重布局免转置拷贝)
 // 返回 false = cuBLAS 不可用, 调用方走朴素内核兜底
-// (仅 CUDA 内核内部使用, 无 stub 版本)
+// (仅 CUDA 内核内部使用)
 #if defined(ZNN_CUDA)
 bool gemm_cuda(const float* A, int lda, const float* B, int ldb,
                float* C, int ldc, int M, int N, int K,

@@ -1,7 +1,7 @@
 // Adam: 动量 + 偏差校正(L2 衰减并入梯度); AdamW 见 adamw.cpp
 #include "optim.hpp"
 #include "znn_internal.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 #include <cmath>
 
 namespace znn {
@@ -29,7 +29,7 @@ void AdamImpl::step() {
             moments_[i].v = Tensor::zeros(p.shape(), DType::F32, p.device());
         }
         if (p.device() == Device::CUDA) {         // GPU: 原生内核更新
-            cuda_backend::adam_step_cuda(
+            ZNN_CUDA_K(adam_step_cuda)(
                 p.data<float>(), p.grad().data<float>(),
                 moments_[i].m.data<float>(), moments_[i].v.data<float>(),
                 n, param_.lr, b1, b2, param_.eps, param_.weight_decay,
@@ -55,7 +55,7 @@ void AdamImpl::clear() {
     for (Tensor& p : params_) {
         if (p.grad()) {
             if (p.device() == Device::CUDA) {
-                cuda_backend::memset0_cuda(p.grad().data<float>(),
+                ZNN_CUDA_K(memset0_cuda)(p.grad().data<float>(),
                                            static_cast<size_t>(p.numel()) * sizeof(float));
             } else {
                 std::memset(p.grad().data<float>(), 0,

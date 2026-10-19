@@ -1,8 +1,7 @@
 // div: 逐元素除法(广播); 梯度 ga=g/b, gb=-g·a/b²(经算子组合表达)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
-#include "backends/vulkan/vulkan_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -37,7 +36,7 @@ const Operator g_div_operator = {
     infer_broadcast,
     div_grad,
     div_ref,
-    {div_cpu, nullptr, nullptr, vulkan_backend::div_vulkan},
+    {div_cpu, nullptr, nullptr, ZNN_VULKAN_K(div_vulkan)},
 };
 
 Tensor Tensor::div(const Tensor& a, const Tensor& b) {

@@ -2,7 +2,7 @@
 // 纯推理态 Tensor::transpose 直接返回零拷贝视图, 不经此文件。
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -64,7 +64,7 @@ const Operator g_transpose_operator = {
     transpose_infer,
     transpose_grad,
     transpose_ref,
-    {nullptr, cuda_backend::transpose_cuda, nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(transpose_cuda), nullptr, nullptr},
     sizeof(TransposeOptions),
 };
 

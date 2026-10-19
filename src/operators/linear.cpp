@@ -1,7 +1,7 @@
 // linear: y = x @ w.T + b —— 完整算子(融合内核 + 独立梯度);
 // 不再组合 matmul+add(省一次中间分配和一次内核启动)
 #include "shared.hpp"
-#include "backends/vulkan/vulkan_backend.hpp"
+#include "backend_slots.hpp"
 #include "op_dispatcher.hpp"
 
 namespace znn {
@@ -77,7 +77,7 @@ const Operator g_linear_operator = {
     linear_infer,
     linear_grad,
     linear_ref,
-    {linear_cpu_eigen(), cuda_backend::linear_cuda, nullptr, vulkan_backend::linear_vulkan},
+    {linear_cpu_eigen(), ZNN_CUDA_K(linear_cuda), nullptr, ZNN_VULKAN_K(linear_vulkan)},
     sizeof(LinearOptions),
 };
 

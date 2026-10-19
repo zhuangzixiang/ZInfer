@@ -2,7 +2,7 @@
 // 梯度 dX/dW 按标准卷积反传公式直接累加
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -80,7 +80,7 @@ static void conv2d_grad(BackwardContext& c) {
     const int64_t O = w.size(0), KH = w.size(2), KW = w.size(3);
     const int64_t HO = g.size(2), WO = g.size(3);
     if (x.device() == Device::CUDA) {          // 专用 CUDA 梯度内核(原生)
-        cuda_backend::conv2d_grad_cuda(
+        ZNN_CUDA_K(conv2d_grad_cuda)(
             x.data<float>(), w.data<float>(), g.data<float>(),
             dx.data<float>(), dw.data<float>(),
             (int)N, (int)C, (int)H, (int)W, (int)O, (int)KH, (int)KW,
@@ -130,7 +130,7 @@ const Operator g_conv2d_operator = {
     conv2d_infer,
     conv2d_grad,
     conv2d_ref,
-    {conv2d_cpu_kernel(), cuda_backend::conv2d_cuda, nullptr, nullptr},
+    {conv2d_cpu_kernel(), ZNN_CUDA_K(conv2d_cuda), nullptr, nullptr},
     sizeof(Conv2dOptions),
 };
 

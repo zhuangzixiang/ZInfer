@@ -1,8 +1,7 @@
 // neg: 逐元素一元运算()
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
-#include "backends/cuda/cuda_backend.hpp"
-#include "backends/vulkan/vulkan_backend.hpp"
+#include "backend_slots.hpp"
 
 namespace znn {
 
@@ -31,7 +30,7 @@ const Operator g_neg_operator = {
     infer_same,
     neg_grad,
     neg_ref,
-    {neg_cpu, nullptr, nullptr, vulkan_backend::neg_vulkan},
+    {neg_cpu, nullptr, nullptr, ZNN_VULKAN_K(neg_vulkan)},
 };
 
 Tensor Tensor::neg(const Tensor& x) {
