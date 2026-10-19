@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/cmake_install.cmake",
-		"E:/Documents/ZShared/ZProjs/ZSpeedAI/ZInfer/build-cuda/examples/mnist/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

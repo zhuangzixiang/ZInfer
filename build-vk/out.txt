@@ -1,6 +1,0 @@
-Vulkan device OK
-rt done
-add done
-matmul done
-linear done
-VULKAN SMOKE TEST PASSED

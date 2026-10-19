@@ -30,6 +30,7 @@
 *.exe
 *.out
 *.app
-build/
+*.pdb
+build*/
 data/
 third_party/
