@@ -722,3 +722,40 @@ CUDA/CPU 构建回归全绿(MNIST 未重跑 —— CPU/CUDA 路径无改动)。
 教条) | 教训: 性能微调的每一步都要 A/B 实测 —— "显存一定比系统
 内存快"的直觉被 2048³ 数据推翻(8MB 阈值版本慢 2.6×);
 ones 测试第二次证明其对称性盲区(需递增/随机矩阵佐证)。
+---
+
+## [24] third_party/data 误删事故: 依赖一键恢复机制(restore_deps.sh)
+
+**事故与排查**
+1. third_party/ 与 data/ 被整目录误删 —— 两目录全在 gitignore,
+   git 无法恢复; 排查确认: 全部源码/SPIR-V gen 头均被 git 跟踪
+   零损失, 损失面 = 外部依赖与数据集
+2. build/ 同窗口消失(环境另有进程删目录): canary 文件 10 秒存活
+   验证后重新 cmake 配置, CPU 22 项回归全绿
+
+**恢复与机制化**
+1. TEMP 残留覆盖 oneDNN-3.13.4/Vulkan-Headers-1.4.304/glslang-bin/
+   odnn-build(事实上的离线通道); Eigen 3.4.0 从 GitLab 下载
+2. tools/restore_deps.sh: 幂等一键重建, 单项可装
+   (eigen|onednn|vulkan|glslang|mnist); oneDNN 构建生成头
+   (dnnl_config/version/hash)随仓库走(tools/onednn-generated/),
+   免 TEMP 免 cmake 配置
+3. MNIST 假成功链修复: 旧脚本 100 字节下限放行 404 XML(320B) →
+   运行期 "bad IDX magic"; 现为精确字节数校验
+   (47040016/60008/7840016/10008) + 三级源: ossci/googleapis 直链
+   → deepai 整包 zip(zip 内为 .gz, 双层解压)。本网络两个直链镜像
+   均返回 S3 NoSuchKey 错误页, 整包兜底实测恢复成功
+4. 跨边界路径 bug: Git Bash 的 /tmp 是 MSYS 虚拟路径, 传入原生
+   python 代码字符串不翻译 → 打不开; winpath()(cygpath -m, 非
+   Windows 原样返回)统一转换; do_glslang 同款潜在 bug(此前被
+   TEMP 残留路径掩盖)一并修复
+
+**验证**: restore_deps.sh mnist 端到端重放(含自愈清理上次 300B
+垃圾文件)→ 4 文件字节精确 + 魔数正确; MNIST 重训 97.16%(≥97%);
+CPU 22 项全绿。
+
+**反思**: 韧性 8/10(单命令幂等 + 三级源 + 精确校验 + TEMP 离线
+通道) | 教训 ×3: (a) gitignore 的外部资产必须有等价恢复通道,
+否则等于单点丢失; (b) 下载校验用字节数下限会放行错误页 —— 错误
+页也是合法字节流, 必须精确匹配; (c) 镜像会死(双直链同日
+NoSuchKey), 恢复脚本要多源多形态(直链 + 整包)才够韧。
