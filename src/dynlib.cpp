@@ -143,6 +143,9 @@ bool available_onednn() {
         #else
         void* h = dlopen("libdnnl.so.3", RTLD_LAZY);
         if (!h) h = dlopen("libdnnl.so", RTLD_LAZY);
+        if (!h) h = dlopen("libdnnl.3.dylib", RTLD_LAZY);   // macOS(homebrew: lib/libdnnl.3.dylib)
+        if (!h) h = dlopen("/opt/homebrew/lib/libdnnl.3.dylib", RTLD_LAZY);
+        if (!h) h = dlopen("/usr/local/lib/libdnnl.3.dylib", RTLD_LAZY);   // Intel mac
         #endif
         if (h) {
             ZNN_DLSYM_DNNL(engine_create, "dnnl_engine_create");

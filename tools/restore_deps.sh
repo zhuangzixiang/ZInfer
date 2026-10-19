@@ -19,12 +19,14 @@ cd "$(dirname "$0")/.."   # 仓库根
 
 TMP="${TMPDIR:-/tmp}"
 winpath() { cygpath -m "$1" 2>/dev/null || echo "$1"; }  # 给 python 等原生程序的路径
+fsize() { stat -c%s "$1" 2>/dev/null || stat -f%z "$1" 2>/dev/null || echo 0; }  # GNU/BSD 通用
+PY="$(command -v python || command -v python3 || echo python3)"  # mac 无 python 只有 python3
 fetch() {  # fetch <url> <dest> [最小字节]
     local url="$1" dest="$2" min="${3:-1000}"
     for i in 1 2 3; do
         echo "  [$i/3] $url"
         curl -sL --max-time 300 -o "$dest" "$url" || true
-        if [ -f "$dest" ] && [ "$(stat -c%s "$dest" 2>/dev/null || echo 0)" -ge "$min" ]; then
+        if [ -f "$dest" ] && [ "$(fsize "$dest")" -ge "$min" ]; then
             return 0
         fi
         sleep 3
@@ -94,6 +96,7 @@ do_vulkan() {
 
 # ---- glslang(SPIR-V 编译器, 仅 Windows 构建需要) ----
 do_glslang() {
+    case "$(uname -s)" in Darwin|Linux) echo "[glslang] 跳过(SPIR-V 已随仓库, 仅 Windows 重生成时需要)"; return 0 ;; esac
     if [ -f third_party/glslang/bin/glslang.exe ]; then echo "[glslang] 已就位"; return 0; fi
     if [ -f "$TMP/glslang-bin/bin/glslang.exe" ]; then
         echo "[glslang] 从 TEMP 恢复..."
@@ -104,7 +107,7 @@ do_glslang() {
         fetch "https://github.com/KhronosGroup/glslang/releases/download/16.6.0/glslang-16.6.0-windows-x86_64-release.zip" \
               "$TMP/glslang.zip" 5000000 || return 1
         local tmpw; tmpw=$(winpath "$TMP")
-        python -c "import zipfile; zipfile.ZipFile('$tmpw/glslang.zip').extractall('$tmpw/glslang-bin')" 2>/dev/null \
+        $PY -c "import zipfile; zipfile.ZipFile('$tmpw/glslang.zip').extractall('$tmpw/glslang-bin')" 2>/dev/null \
         || unzip -o "$TMP/glslang.zip" -d "$TMP/glslang-bin" >/dev/null
         mkdir -p third_party/glslang/bin
         find "$TMP/glslang-bin" -name glslang.exe -exec cp {} third_party/glslang/bin/ \;
@@ -121,14 +124,14 @@ t10k-images-idx3-ubyte:7840016 t10k-labels-idx1-ubyte:10008"
     local ok=1 missing=""
     for f in $files; do
         local name="${f%%:*}" want="${f##*:}"
-        local sz; sz=$(stat -c%s "data/mnist/$name" 2>/dev/null || echo 0)
+        local sz; sz=$(fsize "data/mnist/$name")
         if [ "$sz" = "$want" ]; then continue; fi
         local got=0
         for base in "https://ossci-datasets.s3.amazonaws.com/mnist" \
                     "https://storage.googleapis.com/cvdf-datasets/mnist"; do
             rm -f "data/mnist/$name"
             if fetch "$base/$name" "data/mnist/$name" "$want"; then
-                sz=$(stat -c%s "data/mnist/$name" 2>/dev/null || echo 0)
+                sz=$(fsize "data/mnist/$name")
                 if [ "$sz" = "$want" ]; then got=1; break; fi
                 echo "[mnist] $name 得 $sz 字节 != $want(404/截断), 换镜像"
             fi
@@ -141,7 +144,7 @@ t10k-images-idx3-ubyte:7840016 t10k-labels-idx1-ubyte:10008"
         fetch "https://data.deepai.org/mnist.zip" "$TMP/mnist.zip" 10000000 \
           || { echo "[mnist] FAIL"; return 1; }
         rm -rf "$TMP/mnist-ex"; mkdir -p "$TMP/mnist-ex"
-        python -c "
+        $PY -c "
 import gzip, shutil, zipfile
 z = zipfile.ZipFile('$tmpw/mnist.zip')
 for n in z.namelist():
@@ -150,7 +153,7 @@ for n in z.namelist():
 " || { echo "[mnist] 解包失败"; return 1; }
         for f in $files; do
             local name="${f%%:*}" want="${f##*:}"
-            local sz; sz=$(stat -c%s "$TMP/mnist-ex/$name" 2>/dev/null || echo 0)
+            local sz; sz=$(fsize "$TMP/mnist-ex/$name")
             if [ "$sz" = "$want" ]; then mv "$TMP/mnist-ex/$name" "data/mnist/$name"
             else echo "[mnist] $name 整包内容异常($sz 字节)"; ok=0; fi
         done
