@@ -24,8 +24,7 @@ void copy_view_to(const Tensor& src, Tensor& dst) {
         ds[d] = dst.strides()[d];
         sh[d] = dst.size(d);
     }
-    strided_copy_dispatch(dst.device(), src.data<float>(), dst.data<float>(),
-                          rank, ss, ds, sh, dst.numel());
+    strided_copy_dispatch(src, dst, rank, ss, ds, sh, dst.numel());
 }
 
 } // namespace impl
@@ -119,10 +118,9 @@ void Tensor::Impl::copy_elements(const Tensor::Impl* src, Tensor::Impl* dst) {
             sh[d] = dst->shape.dims[d];
             total *= dst->shape.dims[d];
         }
-        strided_copy_dispatch(src->device,
-                              static_cast<const float*>(src->storage->data()) + src->offset,
-                              static_cast<float*>(dst->storage->data()),
-                              rank, ss, ds, sh, total);
+        strided_copy_raw(src->device, src->storage->data(), src->offset,
+                         dst->storage->data(), dst->offset,
+                         rank, ss, ds, sh, total);
         return;
     }
     const int64_t total = static_cast<int64_t>(dst->nbytes() / dtype_size(dst->dtype));
@@ -293,6 +291,8 @@ void Tensor::Impl::release() {
         delete this;    // ~Impl 递归释放 grad(Tensor 成员)与 storage
     }
 }
+
+
 
 Tensor::Impl::~Impl() {
     if (storage) {
@@ -653,32 +653,60 @@ Tensor Tensor::clone() const {
 
 // ============================================================ 数据读取
 
+// ---- 数据指针: 设备×请求类型匹配才非空(调用方判空) ----
+// CPU: 宿主缓冲(含视图偏移); CUDA: 显存地址(设备指针语义, 含偏移);
+// Metal/Vulkan: 裸句柄(不做偏移算术 —— 句柄不可算术, 子缓冲由绑定层处理)
 template <class T>
 T* Tensor::data() const {
-    require(impl_ && impl_->storage, "empty tensor");
-    if ((std::is_same<T, float>::value && impl_->dtype != DType::F32) ||
-        (std::is_same<T, int64_t>::value && impl_->dtype != DType::I64)) {
-        throw std::runtime_error("znn: data<T> dtype mismatch");
+    if constexpr (std::is_same<T, float>::value || std::is_same<T, int64_t>::value) {
+        if (!impl_ || !impl_->storage || impl_->device != Device::CPU
+            || impl_->dtype != (std::is_same<T, float>::value ? DType::F32
+                                                              : DType::I64)) {
+            return nullptr;
+        }
+        return static_cast<T*>(impl_->storage->data()) + impl_->offset;
+    } else if constexpr (std::is_same<T, Tensor::CudaDataPtr>::value) {
+        if (!impl_ || !impl_->storage || impl_->device != Device::CUDA) {
+            return nullptr;
+        }
+        return reinterpret_cast<T*>(static_cast<char*>(impl_->storage->data())
+                                    + impl_->offset * dtype_size(impl_->dtype));
+    } else if constexpr (std::is_same<T, Tensor::MetalDataPtr>::value
+                         || std::is_same<T, Tensor::VulkanDataPtr>::value) {
+        if (!impl_ || !impl_->storage
+            || impl_->device != (std::is_same<T, Tensor::MetalDataPtr>::value
+                                     ? Device::Metal : Device::Vulkan)) {
+            return nullptr;
+        }
+        return reinterpret_cast<T*>(impl_->storage->data());
+    } else {
+        static_assert(!sizeof(T),
+                      "data<T>: T must be float/int64_t/CudaDataPtr/"
+                      "MetalDataPtr/VulkanDataPtr");
     }
-    return reinterpret_cast<T*>(static_cast<char*>(impl_->storage->data())
-                                + impl_->offset * dtype_size(impl_->dtype));
 }
 
 template <class T>
 T Tensor::item() const {
     require(impl_, "empty tensor");
     require(numel() == 1, "item on non-scalar");
-    if (impl_->device == Device::CUDA) {                   // GPU: 自动同步拷回单值
+    if (impl_->device != Device::CPU) {          // GPU: 同步拷回单值
         T v;
-        ZNN_CUDA_CALL(cuda_backend::copy_device_to_host(
-            &v, impl_->storage->data(), sizeof(T)));
+        device_copy_d2h(impl_->device, &v, impl_->storage->data(), sizeof(T));
         return v;
     }
-    return *data<T>();
+    const T* p = data<T>();
+    if (!p) {
+        throw std::runtime_error("znn: item dtype mismatch");
+    }
+    return *p;
 }
 
-template float*   Tensor::data<float>() const;
-template int64_t* Tensor::data<int64_t>() const;
+template float*                Tensor::data<float>() const;
+template int64_t*              Tensor::data<int64_t>() const;
+template Tensor::CudaDataPtr*  Tensor::data<Tensor::CudaDataPtr>() const;
+template Tensor::MetalDataPtr* Tensor::data<Tensor::MetalDataPtr>() const;
+template Tensor::VulkanDataPtr* Tensor::data<Tensor::VulkanDataPtr>() const;
 template float    Tensor::item<float>() const;
 template int64_t  Tensor::item<int64_t>() const;
 
@@ -708,7 +736,7 @@ Tensor& Tensor::grad() {
 
 void Tensor::backward() const {
     require(impl_, "empty tensor");
-    AutogradEngine::instance().backward(*this);
+    run_backward(*this);
 }
 
 Tensor Tensor::detach() const {

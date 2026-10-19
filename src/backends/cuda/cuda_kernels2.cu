@@ -85,7 +85,7 @@ void softmax_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     dim3 block(32, 8);
     dim3 grid(static_cast<unsigned>((n + 7) / 8));
     softmax_lastdim_k<<<grid, block, 2 * 8 * 32 * sizeof(float)>>>(
-        x.data<float>(), out[0]->data<float>(), n, d);
+        dptr(x), dptr(*out[0]), n, d);
 }
 
 // ---- sum / mean 任意维规约: 每线程沿 dim 求和(与 CPU 语义一致;
@@ -138,7 +138,7 @@ static void reduce_host(Span<const Tensor*> in, Span<Tensor*> out,
     }
     const long long total = out[0]->numel();
     reduce_any_k<<<(unsigned)((total + kBlock - 1) / kBlock), kBlock>>>(
-        x.data<float>(), out[0]->data<float>(), total, m);
+        dptr(x), dptr(*out[0]), total, m);
 }
 
 void sum_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
@@ -178,7 +178,7 @@ void cross_entropy_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> ou
     require_contiguous2c(*in[0], *in[1], *out[0]);
     const Tensor& x = *in[0];
     cross_entropy_k<<<1, kBlock, kBlock * sizeof(float)>>>(
-        x.data<float>(), in[1]->data<int64_t>(), out[0]->data<float>(),
+        dptr(x), in[1]->data<int64_t>(), dptr(*out[0]),
         x.size(0), x.size(1));
 }
 
@@ -202,7 +202,7 @@ __global__ void mse_k(const float* p, const float* t, float* loss, int64_t n) {
 void mse_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
     require_contiguous2c(*in[0], *in[1], *out[0]);
     mse_k<<<1, kBlock, kBlock * sizeof(float)>>>(
-        in[0]->data<float>(), in[1]->data<float>(), out[0]->data<float>(),
+        dptr(*in[0]), dptr(*in[1]), dptr(*out[0]),
         in[0]->numel());
 }
 
@@ -374,27 +374,27 @@ void conv2d_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
     // 快速路径: im2col → 逐组 GEMM(列切片靠 ld 表达, 免拷贝) → NCHW 回转
     Tensor col = Tensor::empty(Shape{M, CK}, DType::F32, Device::CUDA);
     im2col_k<<<(unsigned)((M * C + kBlock - 1) / kBlock), kBlock>>>(
-        x.data<float>(), col.data<float>(), N, C, H, W, HO, WO, KH, KW,
+        dptr(x), dptr(col), N, C, H, W, HO, WO, KH, KW,
         o->stride[0], o->stride[1], o->pad[0], o->pad[1],
         o->dilation[0], o->dilation[1]);
     Tensor y2 = Tensor::empty(Shape{M, O}, DType::F32, Device::CUDA);
     bool ok = true;
     for (int g = 0; g < G && ok; ++g) {
-        ok = gemm_cuda(col.data<float>() + (int64_t)g * CKg, CK,   // A 列切片, ld=CK
-                       w.data<float>() + (int64_t)g * Og * CK, CK, // B=w^T 布局
-                       y2.data<float>() + (int64_t)g * Og, O,      // C 列切片, ld=O
+        ok = gemm_cuda(dptr(col) + (int64_t)g * CKg, CK,   // A 列切片, ld=CK
+                       dptr(w) + (int64_t)g * Og * CK, CK, // B=w^T 布局
+                       dptr(y2) + (int64_t)g * Og, O,      // C 列切片, ld=O
                        (int)M, Og, CKg,
                        /*b_transposed=*/true, ctx.precision);
     }
     if (ok) {
         rowmajor_to_nchw_k<<<(unsigned)((y.numel() + kBlock - 1) / kBlock), kBlock>>>(
-            y2.data<float>(), y.data<float>(), O, HO, WO, y.numel());
+            dptr(y2), dptr(y), O, HO, WO, y.numel());
         return;
     }
 
     // 兜底: 朴素卷积(cuBLAS 缺失或 GEMM 失败)
     conv2d_k<<<static_cast<unsigned>((y.numel() + kBlock - 1) / kBlock), kBlock>>>(
-        x.data<float>(), w.data<float>(), y.data<float>(),
+        dptr(x), dptr(w), dptr(y),
         N, C, H, W, O, KH, KW, HO, WO,
         o->stride[0], o->stride[1], o->pad[0], o->pad[1],
         o->dilation[0], o->dilation[1], G);
@@ -459,7 +459,7 @@ void max_pool2d_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const Tensor& x = *in[0];
     Tensor& y = *out[0];
     max_pool_k<<<static_cast<unsigned>((y.numel() + kBlock - 1) / kBlock), kBlock>>>(
-        x.data<float>(), y.data<float>(),
+        dptr(x), dptr(y),
         x.size(0), x.size(1), x.size(2), x.size(3), y.size(2), y.size(3),
         o->kernel[0], o->kernel[1], o->pool.stride[0], o->pool.stride[1],
         o->pool.pad[0], o->pool.pad[1]);
@@ -472,7 +472,7 @@ void avg_pool2d_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const Tensor& x = *in[0];
     Tensor& y = *out[0];
     avg_pool_k<<<static_cast<unsigned>((y.numel() + kBlock - 1) / kBlock), kBlock>>>(
-        x.data<float>(), y.data<float>(),
+        dptr(x), dptr(y),
         x.size(0), x.size(1), x.size(2), x.size(3), y.size(2), y.size(3),
         o->kernel[0], o->kernel[1], o->pool.stride[0], o->pool.stride[1],
         o->pool.pad[0], o->pool.pad[1]);

@@ -76,14 +76,17 @@ bool dispatch_bufs(void* pipe, void* const* bufs, int nbuf,
 // ---- 直连内核(梯度规则/内部拷贝/优化器经 backend_slots 宏调用) ----
 void unary_bwd_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>,
                       const void*);
-void grad_bcast_vulkan(const float* g, float* out, long long total, int rank,
+void grad_bcast_vulkan(const Tensor& g, Tensor& out, long long total, int rank,
                        const long long* dims, const long long* eff, float scale);
-void strided_copy_vulkan(const float* src, float* dst, int rank,
+void strided_copy_vulkan(const Tensor& src, Tensor& dst, int rank,
                          const long long* ss, const long long* ds,
                          const long long* sh, long long total);
-void sgd_step_vulkan(float* p, const float* g, float* vel, long long n,
+void strided_copy_raw_vk(const void* src, void* dst, int rank,
+                         const long long* ss, const long long* ds,
+                         const long long* sh, long long total);
+void sgd_step_vulkan(void* p, const void* g, void* vel, long long n,
                      float lr, float momentum, float wd);
-void adam_step_vulkan(float* p, const float* g, float* m, float* v,
+void adam_step_vulkan(void* p, const void* g, void* m, void* v,
                       long long n, float lr, float b1, float b2, float eps,
                       float wd, float bias1, float bias2);
 

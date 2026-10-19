@@ -45,7 +45,7 @@ void embedding_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const Tensor& w = *in[0];
     const Tensor& idx = *in[1];
     const int64_t D = w.size(1);
-    embedding_k<<<blocks3(idx.numel() * D), kBlk3>>>(w.data<float>(), idx.data<int64_t>(), out[0]->data<float>(),
+    embedding_k<<<blocks3(idx.numel() * D), kBlk3>>>(dptr(w), dptr_i64(idx), dptr(*out[0]),
         idx.numel(), D, w.numel() / D);
 }
 
@@ -93,7 +93,7 @@ void reshape_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                   const void*) {
     req1c(*in[0], *out[0]);
     // 连续时 reshape = d2d memcpy
-    cuda_backend::copy_device_to_device(out[0]->data<float>(), in[0]->data<float>(),
+    cuda_backend::copy_device_to_device(dptr(*out[0]), dptr(*in[0]),
                                         static_cast<size_t>(in[0]->numel()) * sizeof(float));
 }
 
@@ -116,7 +116,7 @@ void transpose_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> ou
                             : (d == d1 ? y.strides()[d0] : y.strides()[d]);
     }
     strided_copy_k<<<blocks3(x.numel()), kBlk3>>>(
-        x.data<float>(), y.data<float>(), x.numel(), m);
+        dptr(x), dptr(y), x.numel(), m);
 }
 
 // 通用双步长拷贝 host 入口(copy_view_to 的 CUDA 路径共用)
@@ -154,7 +154,7 @@ void permute_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
         m.de[d] = y.strides()[inv[d]];
     }
     strided_copy_k<<<blocks3(x.numel()), kBlk3>>>(
-        x.data<float>(), y.data<float>(), x.numel(), m);
+        dptr(x), dptr(y), x.numel(), m);
 }
 
 void slice_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
@@ -175,8 +175,8 @@ void slice_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
         m.de[d] = y.strides()[d];
     }
     strided_copy_k<<<blocks3(y.numel()), kBlk3>>>(
-        x.data<float>() + o->begin * x.strides()[dim],
-        y.data<float>(), y.numel(), m);
+        dptr(x) + o->begin * x.strides()[dim],
+        dptr(y), y.numel(), m);
 }
 
 // ---- cat / stack: 每输入一次 strided copy(逐输入启动) ----
@@ -191,7 +191,7 @@ void cat_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
         req1c(x, y);
         // 沿 dim 的偏移体现在 base pointer
         strided_copy_k<<<blocks3(x.numel()), kBlk3>>>(
-            x.data<float>(), y.data<float>() + offset * y.strides()[dim],
+            dptr(x), dptr(y) + offset * y.strides()[dim],
             x.numel(), make_copy_map(x, y));
         offset += x.size(dim);
     }
@@ -212,8 +212,8 @@ void stack_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
             m.de[d] = y.strides()[d < dim ? d : d + 1];      // 输出多一维
         }
         strided_copy_k<<<blocks3(x.numel()), kBlk3>>>(
-            x.data<float>(),
-            y.data<float>() + static_cast<int64_t>(i) * y.strides()[dim],
+            dptr(x),
+            dptr(y) + static_cast<int64_t>(i) * y.strides()[dim],
             x.numel(), m);
     }
 }
@@ -227,7 +227,7 @@ __global__ void arange_k(float* y, int64_t n) {
 void arange_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*> out,
                  const void*) {
     arange_k<<<blocks3(out[0]->numel()), kBlk3>>>(
-        out[0]->data<float>(), out[0]->numel());
+        dptr(*out[0]), out[0]->numel());
 }
 
 // ---- randn: host 生成 Box-Muller, h2d 拷贝 ----
@@ -239,7 +239,7 @@ void randn_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*> out,
     std::mt19937 engine(seed ? seed : 42);
     std::normal_distribution<float> dist(0.f, 1.f);
     for (int64_t i = 0; i < n; ++i) host[i] = dist(engine);
-    cuda_backend::copy_host_to_device(out[0]->data<float>(), host.data(),
+    cuda_backend::copy_host_to_device(dptr(*out[0]), host.data(),
                                       static_cast<size_t>(n) * sizeof(float));
 }
 
@@ -284,8 +284,8 @@ void layer_norm_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const int64_t d = x.size(-1);
     const int64_t n_rows = x.numel() / d;
     layer_norm_k<<<static_cast<unsigned>(n_rows), kBlk3, 2 * kBlk3 * sizeof(float)>>>(
-        x.data<float>(), in[1]->data<float>(), in[2]->data<float>(),
-        out[0]->data<float>(), n_rows, d, static_cast<float>(eps));
+        dptr(x), dptr(*in[1]), dptr(*in[2]),
+        dptr(*out[0]), n_rows, d, static_cast<float>(eps));
 }
 
 // ---- batch_norm2d: 每块一通道, 训练态批统计+running 更新, eval 用 running ----
@@ -354,9 +354,9 @@ void batch_norm2d_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out
     const Tensor& x = *in[0];
     const int C = x.size(1);
     batch_norm2d_k<<<C, kBlk3, kBlk3 * sizeof(float)>>>(
-        x.data<float>(), in[1]->data<float>(), in[2]->data<float>(),
-        in[3]->data<float>(), in[4]->data<float>(),
-        out[0]->data<float>(), x.size(0), C, x.size(2), x.size(3),
+        dptr(x), dptr(*in[1]), dptr(*in[2]),
+        dptr(*in[3]), dptr(*in[4]),
+        dptr(*out[0]), x.size(0), C, x.size(2), x.size(3),
         opts[0], opts[1], static_cast<int>(opts[2]));
 }
 
@@ -426,16 +426,16 @@ void attention_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> ou
     Tensor p = Tensor::empty(Shape{bh * L, L}, DType::F32, Device::CUDA);
 
     // 快速路径: S=Q×K^T(批量, K 原布局 b_transposed 即 × K^T) → softmax → O=P×V
-    if (gemm_batched_cuda(q.data<float>(), D, L * D,
-                          k.data<float>(), D, L * D,
-                          p.data<float>(), L, (int64_t)L * L,
+    if (gemm_batched_cuda(dptr(q), D, L * D,
+                          dptr(k), D, L * D,
+                          dptr(p), L, (int64_t)L * L,
                           L, L, D, (int)bh,
                           /*b_transposed=*/true, ctx.precision)) {
         attn_softmax_k<<<(unsigned)((bh * L + kBlk3 - 1) / kBlk3), kBlk3>>>(
-            p.data<float>(), bh * L, L, scale);
-        if (gemm_batched_cuda(p.data<float>(), L, (int64_t)L * L,
-                              v.data<float>(), D, (int64_t)L * D,
-                              y.data<float>(), D, (int64_t)L * D,
+            dptr(p), bh * L, L, scale);
+        if (gemm_batched_cuda(dptr(p), L, (int64_t)L * L,
+                              dptr(v), D, (int64_t)L * D,
+                              dptr(y), D, (int64_t)L * D,
                               L, D, L, (int)bh,
                               /*b_transposed=*/false, ctx.precision)) {
             return;
@@ -445,11 +445,11 @@ void attention_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> ou
     // 兜底: 朴素内核(cuBLAS 缺失或 GEMM 失败)
     const int64_t ns = bh * L * L, no = bh * L * D;
     attn_scores_k<<<(unsigned)((ns + kBlk3 - 1) / kBlk3), kBlk3>>>(
-        q.data<float>(), k.data<float>(), p.data<float>(), ns, L, D, scale);
+        dptr(q), dptr(k), dptr(p), ns, L, D, scale);
     attn_softmax_k<<<(unsigned)((bh * L + kBlk3 - 1) / kBlk3), kBlk3>>>(
-        p.data<float>(), bh * L, L, 1.f);   // naive 分数已缩放
+        dptr(p), bh * L, L, 1.f);   // naive 分数已缩放
     attn_output_k<<<(unsigned)((no + kBlk3 - 1) / kBlk3), kBlk3>>>(
-        p.data<float>(), v.data<float>(), y.data<float>(), no, L, D);
+        dptr(p), dptr(v), dptr(y), no, L, D);
 }
 
 } // namespace cuda_backend

@@ -47,7 +47,7 @@ static void embedding_grad(BackwardContext& c) {
     const int64_t D = dw.size(1);
     if (g.device() == Device::CUDA) {       // 原生: 行散射原子累加
         ZNN_CUDA_CALL(ZNN_CUDA_K(embedding_grad_cuda)(
-            g.data<float>(), idx.data<int64_t>(), dw.data<float>(),
+            cuda_ptr(g), reinterpret_cast<int64_t*>(cuda_ptr(idx)), cuda_ptr(dw),
             idx.numel() * D, (int)D));
         return;
     }

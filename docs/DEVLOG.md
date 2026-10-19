@@ -895,3 +895,36 @@ Metal 侧 MSL 与 host 全镜像(待 Mac 端验证)。
    item()/data() 在 GPU 张量上是句柄裸读(文档化限制)—— 测试须先
    to_device(CPU); (d) python heredoc 改 C++ 源码第三次炸(\n 实体
    化)—— 已全面回到 Edit 工具。
+
+---
+
+## [29] 稳定性整改 I: 数据指针类型化 + TensorTape(去全局 tape)
+
+**data<T>() 按用户裁决重设计**(原: GPU 张量返回 float* = 类型洗白通道)
+- 公共头新增类型标记 CudaDataPtr/MetalDataPtr/VulkanDataPtr;
+  data<T>() = 设备×请求类型匹配才非空, 调用方判空。CPU 用
+  float/int64_t(宿主缓冲含偏移), CUDA 用 CudaDataPtr(显存地址含偏移),
+  Metal/Vulkan 用各自标记(裸句柄, 不做偏移算术 —— 偏移并入绑定层
+  待办)。if-constexpr 单模板 + 5 显式实例化
+- item() 全设备化(经 device_copy_d2h); 全库迁移: .cu 61 处 → dptr
+  家族, VK/Metal vhandle/mbuf → 标记类型, 梯度规则/优化器/grad_scaler
+  → cuda_ptr; 派发助手改 Tensor 签名(句柄不再跨层); 新增
+  strided_copy_raw(Impl 级, CUDA 偏移并入指针, M/V 偏移明确报错)
+- 残留误用即返空暴露(调试期发现并修复: Impl_copy_back 用 data<float>
+  取 GPU 句柄 → nullptr 崩溃 → 改标记类型)
+
+**TensorTape(去全局可变引擎 —— 用户设计裁决)**
+- struct TensorTape{op, inputs, options} 挂在 Tensor::Impl(叶子为空),
+  attach/of 为 TensorTape 静态成员(znn.hpp 一行 friend 授权)
+- record_tape 替代 AutogradEngine::record; run_backward 从损失 DFS
+  收集本图(后序=拓扑序, Tape 地址去重)逆序执行 —— 全局 tape_/单例/
+  一次性消费/插节点 UB 全部结构性消失; 图随张量引用计数存亡,
+  天然可重入; 算子梯度规则零改动(BackwardContext 不变)
+
+**验证**: Windows 三构建全量(CPU 22 项 + Vulkan 测试+冒烟 EXIT=0
+含 bwd2 双端解析 0 误差逐位一致 + CUDA 全项含 GPU 对拍) + MNIST
+97.16% + clang 严格解析 64/64 全绿。
+
+**反思**: 设计 9/10(两类病灶均改为结构性不可发生: 错型即空、无全局
+可变状态) | 教训: 正则批量改码三次误伤(:: 前缀/箭头形态/宏参数),
+每次靠 grep+构建即时拦截 —— 机械迁移必须配同轮构建门禁。

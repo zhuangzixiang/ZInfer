@@ -57,6 +57,8 @@ public:
 
 // ---------------------------------------------------------------- Tensor
 
+struct TensorTape;   // 内部: 归属张量的计算记录(见 autograd.hpp)
+
 class Tensor {
 public:
     // ---- 创建(目标设备默认 CPU) ----
@@ -139,8 +141,15 @@ public:
     Tensor to_device(Device dev) const;      // 跨设备同步拷贝; 同设备则共享返回
     Tensor clone() const;                    // 同设备深拷贝(存储独立, 仍参与建图)
 
-    // ---- 数据读取(仅两个原语; GPU 张量先 to_device(Device::CPU)) ----
-    template <class T> T* data() const;   // 仅 CPU 张量合法, 零拷贝内部缓冲
+    // ---- 数据读取 ----
+    // 数据指针按需取型: 设备与请求类型匹配才返回非空, 否则 nullptr
+    // (调用方判空, 常规约定)。CPU 用 data<float>()/data<int64_t>()(宿主
+    // 缓冲, 含视图偏移); GPU 用对应标记类型取地址/句柄(调用者须明确
+    // 知道自己要什么)。宿主读写 GPU 数据走 to_device/item。
+    struct CudaDataPtr {};     // 类型标记: 请求 CUDA 显存地址
+    struct MetalDataPtr {};    // 类型标记: 请求 Metal 缓冲句柄(MtlBuf*)
+    struct VulkanDataPtr {};   // 类型标记: 请求 Vulkan 缓冲句柄(VkBuf*)
+    template <class T> T* data() const;
     template <class T> T  item() const;   // 任意设备合法, 同步读取单值
 
     // ---- 自动求导 ----
@@ -153,6 +162,7 @@ public:
 private:
     struct Impl;               // 内部实体, 定义在 znn_internal.hpp
     Impl* impl_;               // 引用计数句柄, 生命周期由库管理
+    friend struct TensorTape;  // 内部建图访问(见 autograd.hpp; 实现细节)
 };
 
 // ---------------------------------------------------------------- Activator

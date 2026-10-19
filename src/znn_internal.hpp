@@ -12,8 +12,11 @@
 #include "backends/cuda/cuda_backend.hpp"
 #include <stdexcept>
 #include <string>
+#include <memory>
 
 namespace znn {
+
+struct TensorTape;   // 见 autograd.hpp —— 归属本张量的计算记录
 
 // 未实现占位: 骨架阶段统一抛出, 待逐项填充真实逻辑
 #define ZNN_TODO() throw std::runtime_error(std::string("znn: TODO ") + __func__)
@@ -43,8 +46,8 @@ private:
 
 // ============================================================ Tensor 内部
 
-// 公共 Tensor 的唯一实体: 存储视图。
-// 不含任何计算图信息——tape 归 AutogradEngine 所有, 引擎经公共接口工作。
+// 公共 Tensor 的唯一实体: 存储视图 + 归属自己的 TensorTape(叶子为空)。
+// 计算图随张量引用计数存亡, 无全局 tape(见 autograd.hpp)。
 struct Tensor::Impl {
     std::atomic<int64_t> refcount = 1;
     Storage*   storage = nullptr;     // null = 空句柄
@@ -56,6 +59,8 @@ struct Tensor::Impl {
 
     bool       requires_grad = false;
     Tensor     grad;                  // 惰性分配, grad() 首次访问时创建
+    std::unique_ptr<TensorTape> tape; // 本张量作为算子输出被生产的记录
+
 
     static Impl* create(const Shape& shape, DType dtype, Device device);
     ~Impl();

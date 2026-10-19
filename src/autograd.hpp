@@ -1,51 +1,39 @@
 // ============================================================================
-// autograd.hpp — 自动求导引擎
+// autograd.hpp — 可微计算图(TensorTape)
 //
-// 职责: 前向时为参与训练的算子记录计算图(tape), 反向时按拓扑序执行各
-// 算子的 grad 规则, 把梯度写进各参数的 .grad()。
-// 实现范围: 节点池分配 / 图所有权 / 梯度缓冲合并(等价 PyTorch InputBuffer)
-// / 广播梯度规约(BackwardContext::reduce_to) / 前向选项副本。
-//
-// 设计: tape 由引擎自持——张量本体不携带任何图信息(无 grad_fn 字段),
-// 引擎经公共接口工作(requires_grad() 判断 / grad() 可写引用),
-// 因此 Tensor 无需 friend 授权。
-//
-// 链路位置: OpDispatcher::run 在内核执行后调用 record 建图;
-// Tensor::backward() 调用 backward 执行反向。
+// 职责: 前向时为参与训练的算子记录 TensorTape —— "本张量作为算子输出
+// 被生产"这一事件, 挂在输出张量的 impl 上(叶子张量无 Tape)。inputs 持
+// 句柄 → 天然链接上游, 图随张量引用计数存亡 —— 无全局 tape。
+// 反向: 从损失张量出发 DFS 收集本图(后序=拓扑序), 逆序执行各算子
+// grad 规则, 把梯度累加进各输入 .grad()。
+// 链路位置: OpDispatcher::run 在内核执行后调用 record_tape 建图;
+// Tensor::backward() 调用 run_backward 执行反向。
 // ============================================================================
 #pragma once
 #include "operator.hpp"
+#include <memory>
 #include <vector>
 
 namespace znn {
 
-// 前向建图节点: 创建序即拓扑序(动态图天然性质, 反向免排序)
-struct GraphNode {
-    const Operator* op = nullptr;            // 反向规则入口
-    std::vector<Tensor> saved_inputs;        // 前向输入(默认全存)
-    std::vector<Tensor> saved_outputs;       // 前向输出(默认全存)
-    std::vector<char>   options_copy;        // 前向选项副本(op->options_size>0 时)
-    int pending = 0;                         // 尚未到齐的上游梯度数
+// 归属单个张量的计算记录: 算子 + 输入句柄 + 参数副本
+struct TensorTape {
+    const Operator*     op = nullptr;    // 反向规则入口(叶子为 null)
+    std::vector<Tensor> inputs;          // 前向输入(句柄共享 → 链接上游 Tape)
+    std::vector<char>   options;         // 前向选项副本(op->options_size>0 时)
+
+    // 挂载/读取(znn.hpp 中 friend 授权访问 Tensor 私有 impl_)
+    static void        attach(Tensor& t, std::unique_ptr<TensorTape> node);
+    static TensorTape* of(const Tensor& t);
 };
 
-class AutogradEngine {
-public:
-    static AutogradEngine& instance();
+// 建图: 有 grad 规则且任一输入 requires_grad 时由 OpDispatcher 调用;
+// options 为调用方栈上指针, 按 op->options_size 深拷贝进 Tape
+void record_tape(Tensor& out, const Operator* op, Span<const Tensor*> inputs,
+                 const void* options = nullptr);
 
-    // 前向: 有 grad 规则且任一输入 requires_grad 时由 OpDispatcher 调用;
-    // options: 调用方栈上的前向选项, 引擎按 op->options_size 深拷贝进节点,
-    // 反向时经 BackwardContext::options 交还(梯度规则可读前向选项)
-    GraphNode* record(const Operator* op,
-                      Span<const Tensor*> inputs,
-                      Span<const Tensor*> outputs,
-                      const void* options = nullptr);
-    // 反向: 从标量损失出发, 逆拓扑序填充各参数 .grad()
-    void backward(const Tensor& loss);
-
-private:
-    AutogradEngine() = default;
-
-    std::vector<GraphNode*> tape_;           // 建图序 = 拓扑序
-};
+// 反向: 从标量损失出发, 逆拓扑序填充各参数 .grad()
+// (图随张量存亡 —— 张量在图在, 天然支持二次 backward, 梯度继续累加)
+void run_backward(const Tensor& loss);
 
 } // namespace znn

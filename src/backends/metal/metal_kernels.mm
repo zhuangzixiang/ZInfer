@@ -22,7 +22,7 @@ namespace metal_backend {
 namespace {
 
 id<MTLBuffer> mbuf(const Tensor& t) {
-    return device::buf_of(t.data<float>());   // Storage 裸句柄 = MtlBuf*
+    return device::buf_of(t.data<Tensor::MetalDataPtr>());   // 裸句柄(基址)
 }
 
 uint32_t rup(uint32_t n, uint32_t a) { return (n + a - 1) / a * a; }  // 向上取整到组宽
@@ -491,7 +491,7 @@ void copy_pc_fill(int* pc, long long total, int rank, const long long* ss,
 }
 } // namespace
 
-void grad_bcast_metal(const float* g, float* out, long long total, int rank,
+void grad_bcast_metal(const Tensor& g, Tensor& out, long long total, int rank,
                       const long long* dims, const long long* eff, float scale) {
     static id<MTLComputePipelineState> p = nil;
     if (!p) p = device::pipeline(kMslBcastGrad, "bcastgrad");
@@ -503,28 +503,40 @@ void grad_bcast_metal(const float* g, float* out, long long total, int rank,
         pc[20 + d] = (int)eff[d];
     }
     std::memcpy(&pc[30], &scale, sizeof(scale));   // 尾部 float 位型
-    id<MTLBuffer> bufs[2] = {device::buf_of(const_cast<float*>(g)),
-                             device::buf_of(out)};
+    id<MTLBuffer> bufs[2] = {mbuf(g), mbuf(out)};
     const uint32_t n = (uint32_t)total;
     device::dispatch_bufs(p, bufs, 2, pc, sizeof(pc),
                           MTLSizeMake(rup(n, 256), 1, 1), MTLSizeMake(256, 1, 1));
 }
 
-void strided_copy_metal(const float* src, float* dst, int rank,
+void strided_copy_metal(const Tensor& src, Tensor& dst, int rank,
                         const long long* ss, const long long* ds,
                         const long long* sh, long long total) {
     static id<MTLComputePipelineState> p = nil;
     if (!p) p = device::pipeline(kMslCopy, "stridedcopy");
     int pc[40] = {0};
     copy_pc_fill(pc, total, rank, ss, ds, sh);
-    id<MTLBuffer> bufs[2] = {device::buf_of(const_cast<float*>(src)),
+    id<MTLBuffer> bufs[2] = {mbuf(src), mbuf(dst)};
+    const uint32_t n = (uint32_t)total;
+    device::dispatch_bufs(p, bufs, 2, pc, sizeof(pc),
+                          MTLSizeMake(rup(n, 256), 1, 1), MTLSizeMake(256, 1, 1));
+}
+
+void strided_copy_raw_mt(const void* src, void* dst, int rank,
+                         const long long* ss, const long long* ds,
+                         const long long* sh, long long total) {
+    static id<MTLComputePipelineState> p = nil;
+    if (!p) p = device::pipeline(kMslCopy, "stridedcopy");
+    int pc[40] = {0};
+    copy_pc_fill(pc, total, rank, ss, ds, sh);
+    id<MTLBuffer> bufs[2] = {device::buf_of(const_cast<void*>(src)),
                              device::buf_of(dst)};
     const uint32_t n = (uint32_t)total;
     device::dispatch_bufs(p, bufs, 2, pc, sizeof(pc),
                           MTLSizeMake(rup(n, 256), 1, 1), MTLSizeMake(256, 1, 1));
 }
 
-void sgd_step_metal(float* p, const float* g, float* vel, long long n,
+void sgd_step_metal(void* p, const void* g, void* vel, long long n,
                     float lr, float momentum, float wd) {
     static id<MTLComputePipelineState> pl = nil;
     if (!pl) pl = device::pipeline(kMslOpt, "optstep");
@@ -534,14 +546,14 @@ void sgd_step_metal(float* p, const float* g, float* vel, long long n,
     const float pf[3] = {lr, momentum, wd};
     std::memcpy(&pc[2], pf, sizeof(pf));
     id<MTLBuffer> bufs[4] = {device::buf_of(p),
-                             device::buf_of(const_cast<float*>(g)),
+                             device::buf_of(const_cast<void*>(g)),
                              device::buf_of(vel), device::buf_of(vel)};
     device::dispatch_bufs(pl, bufs, 4, pc, sizeof(pc),
                           MTLSizeMake(rup((uint32_t)n, 256), 1, 1),
                           MTLSizeMake(256, 1, 1));
 }
 
-void adam_step_metal(float* p, const float* g, float* m, float* v,
+void adam_step_metal(void* p, const void* g, void* m, void* v,
                      long long n, float lr, float b1, float b2, float eps,
                      float wd, float bias1, float bias2) {
     static id<MTLComputePipelineState> pl = nil;
@@ -552,7 +564,7 @@ void adam_step_metal(float* p, const float* g, float* m, float* v,
     const float pf[7] = {lr, b1, b2, eps, wd, bias1, bias2};
     std::memcpy(&pc[2], pf, sizeof(pf));
     id<MTLBuffer> bufs[4] = {device::buf_of(p),
-                             device::buf_of(const_cast<float*>(g)),
+                             device::buf_of(const_cast<void*>(g)),
                              device::buf_of(m), device::buf_of(v)};
     device::dispatch_bufs(pl, bufs, 4, pc, sizeof(pc),
                           MTLSizeMake(rup((uint32_t)n, 256), 1, 1),

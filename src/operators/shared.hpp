@@ -57,13 +57,24 @@ void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
 
 // 设备无关内核派发(GPU 原生 / CPU 宿主循环; eff 由调用方按语义预计算)
 // 梯度广播/置换: out[i] = scale × g[Σ idx·eff]
-void grad_bcast_dispatch(Device dev, const float* g, float* out,
-                         long long total, int rank, const long long* dims,
-                         const long long* eff, float scale);
+void grad_bcast_dispatch(const Tensor& g, Tensor& out, long long total, int rank,
+                         const long long* dims, const long long* eff, float scale);
 // 双步长拷贝(dst 可散射): dp[Σ idx·ds] = sp[Σ idx·ss]
-void strided_copy_dispatch(Device dev, const float* src, float* dst, int rank,
+void strided_copy_dispatch(const Tensor& src, Tensor& dst, int rank,
                            const long long* ss, const long long* ds,
                            const long long* sh, long long total);
+// Impl 级形态(基址+元素偏移; Storage 拷贝用。CUDA 偏移并入设备指针,
+// Metal/Vulkan 偏移须为 0 —— 句柄不可算术, 子缓冲绑定待绑定层支持)
+void strided_copy_raw(Device dev, const void* src, int64_t soff, void* dst,
+                      int64_t doff, int rank, const long long* ss,
+                      const long long* ds, const long long* sh, long long total);
+// CUDA 显存地址(经标记类型取回; 非 CUDA 张量返回 nullptr)
+inline float* cuda_ptr(const Tensor& t) {
+    return reinterpret_cast<float*>(t.data<Tensor::CudaDataPtr>());
+}
+inline const float* cuda_ptr_const(const Tensor& t) {
+    return reinterpret_cast<const float*>(t.data<Tensor::CudaDataPtr>());
+}
 
 // conv2d 朴素参考(对拍与回退共用)
 void conv2d_naive(KernelContext& ctx, Span<const Tensor*> in,

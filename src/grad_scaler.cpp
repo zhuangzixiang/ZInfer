@@ -3,6 +3,7 @@
 // (动机与用法见 znn.hpp 的 GradScaler 注释)
 // ============================================================================
 #include "znn_internal.hpp"
+#include "operators/shared.hpp"
 #include "backend_slots.hpp"
 #include <cmath>
 
@@ -26,7 +27,7 @@ bool GradScaler::unscale(Optimizer& opt) {
         if (g.device() == Device::CUDA) {
             // 原生内核: 梯度 ×(1/s) + 发现 inf/nan 置标志
             Tensor bad = Tensor::zeros(Shape{1}, DType::F32, Device::CUDA);
-            ZNN_CUDA_CALL(ZNN_CUDA_K(grad_unscale_cuda)(g.data<float>(), bad.data<float>(),
+            ZNN_CUDA_CALL(ZNN_CUDA_K(grad_unscale_cuda)(cuda_ptr(g), cuda_ptr(bad),
                                             n, inv));
             finite = finite && bad.to_device(Device::CPU).data<float>()[0] == 0.f;
         } else {

@@ -27,22 +27,28 @@ void SgdImpl::step() {
             if (param_.momentum > 0 && !velocity_[i]) {
                 velocity_[i] = Tensor::zeros(p.shape(), DType::F32, p.device());
             }
-            float* vel = param_.momentum > 0 && velocity_[i]
-                           ? velocity_[i].data<float>() : p.data<float>();  // 占位
+            Tensor& velv = velocity_[i];   // momentum>0 时已按参数设备分配
             switch (p.device()) {
             case Device::CUDA:
                 ZNN_CUDA_CALL(ZNN_CUDA_K(sgd_step_cuda)(
-                    p.data<float>(), p.grad().data<float>(), vel, n,
+                    cuda_ptr(p), cuda_ptr(p.grad()),
+                    param_.momentum > 0 ? cuda_ptr(velv) : cuda_ptr(p), n,
                     param_.lr, param_.momentum, param_.weight_decay));
                 break;
             case Device::Vulkan:
                 ZNN_VULKAN_CALL(vulkan_backend::sgd_step_vulkan(
-                    p.data<float>(), p.grad().data<float>(), vel, n,
+                    p.data<Tensor::VulkanDataPtr>(),
+                    p.grad().data<Tensor::VulkanDataPtr>(),
+                    param_.momentum > 0 ? velv.data<Tensor::VulkanDataPtr>()
+                                        : p.data<Tensor::VulkanDataPtr>(), n,
                     param_.lr, param_.momentum, param_.weight_decay));
                 break;
             case Device::Metal:
                 ZNN_METAL_CALL(metal_backend::sgd_step_metal(
-                    p.data<float>(), p.grad().data<float>(), vel, n,
+                    p.data<Tensor::MetalDataPtr>(),
+                    p.grad().data<Tensor::MetalDataPtr>(),
+                    param_.momentum > 0 ? velv.data<Tensor::MetalDataPtr>()
+                                        : p.data<Tensor::MetalDataPtr>(), n,
                     param_.lr, param_.momentum, param_.weight_decay));
                 break;
             default: break;

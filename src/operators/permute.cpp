@@ -58,8 +58,7 @@ static void permute_grad(BackwardContext& c) {
         dims[d] = ds.dims[d];
         eff[d] = gs[o->order[d]];             // idx[p] 的步长 = g 第 order[p] 维步长
     }
-    grad_bcast_dispatch(g.device(), g.data<float>(), dx.data<float>(),
-                        dx.numel(), (int)ds.rank, dims, eff, 1.f);
+    grad_bcast_dispatch(g, dx, dx.numel(), (int)ds.rank, dims, eff, 1.f);
 }
 
 const Operator g_permute_operator = {

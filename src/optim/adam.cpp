@@ -32,22 +32,26 @@ void AdamImpl::step() {
             switch (p.device()) {
             case Device::CUDA:
                 ZNN_CUDA_CALL(ZNN_CUDA_K(adam_step_cuda)(
-                    p.data<float>(), p.grad().data<float>(),
-                    moments_[i].m.data<float>(), moments_[i].v.data<float>(),
+                    cuda_ptr(p), cuda_ptr(p.grad()),
+                    cuda_ptr(moments_[i].m), cuda_ptr(moments_[i].v),
                     n, param_.lr, b1, b2, param_.eps, param_.weight_decay,
                     bias1, bias2));
                 break;
             case Device::Vulkan:
                 ZNN_VULKAN_CALL(vulkan_backend::adam_step_vulkan(
-                    p.data<float>(), p.grad().data<float>(),
-                    moments_[i].m.data<float>(), moments_[i].v.data<float>(),
+                    p.data<Tensor::VulkanDataPtr>(),
+                    p.grad().data<Tensor::VulkanDataPtr>(),
+                    moments_[i].m.data<Tensor::VulkanDataPtr>(),
+                    moments_[i].v.data<Tensor::VulkanDataPtr>(),
                     n, param_.lr, b1, b2, param_.eps, param_.weight_decay,
                     bias1, bias2));
                 break;
             case Device::Metal:
                 ZNN_METAL_CALL(metal_backend::adam_step_metal(
-                    p.data<float>(), p.grad().data<float>(),
-                    moments_[i].m.data<float>(), moments_[i].v.data<float>(),
+                    p.data<Tensor::MetalDataPtr>(),
+                    p.grad().data<Tensor::MetalDataPtr>(),
+                    moments_[i].m.data<Tensor::MetalDataPtr>(),
+                    moments_[i].v.data<Tensor::MetalDataPtr>(),
                     n, param_.lr, b1, b2, param_.eps, param_.weight_decay,
                     bias1, bias2));
                 break;

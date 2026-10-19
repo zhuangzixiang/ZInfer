@@ -47,22 +47,22 @@ void linear_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
     const int N = x.size(0), IN = x.size(1), OUT = w.size(0);
 
     // 快速路径: GEMM 原语(w 按 [OUT,IN] 原布局直传, b_transposed 即 × w^T)
-    if (gemm_cuda(x.data<float>(), IN, w.data<float>(), IN,
-                  y.data<float>(), OUT, N, OUT, IN,
+    if (gemm_cuda(dptr(x), IN, dptr(w), IN,
+                  dptr(y), OUT, N, OUT, IN,
                   /*b_transposed=*/true, ctx.precision)) {
         if (has_bias) {
             const long long total = (long long)N * OUT;
             bias_row_k<<<(int)((total + kBlk - 1) / kBlk), kBlk>>>(
-                y.data<float>(), in[2]->data<float>(), total, OUT);
+                dptr(y), dptr(*in[2]), total, OUT);
         }
         return;
     }
 
     const int64_t total = y.numel();
     linear_k<<<(int)((total + kBlk - 1) / kBlk), kBlk>>>(
-        x.data<float>(), w.data<float>(),
-        has_bias ? in[2]->data<float>() : nullptr,
-        y.data<float>(), x.size(0), x.size(1), w.size(0), has_bias ? 1 : 0);
+        dptr(x), dptr(w),
+        has_bias ? dptr(*in[2]) : nullptr,
+        dptr(y), x.size(0), x.size(1), w.size(0), has_bias ? 1 : 0);
 }
 
 } // namespace cuda_backend

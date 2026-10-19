@@ -103,6 +103,17 @@ void adam_step_cuda(float* p, const float* g, float* m, float* v, long long n,
                     float bias1, float bias2);
 void memset0_cuda(void* p, size_t bytes);
 
+// CUDA 显存地址(标记类型取回; 非 CUDA 张量返回 nullptr —— 调用方判空)
+inline float* dptr(const Tensor& t) {
+    return reinterpret_cast<float*>(t.data<Tensor::CudaDataPtr>());
+}
+inline const float* dptr_const(const Tensor& t) {
+    return reinterpret_cast<const float*>(t.data<Tensor::CudaDataPtr>());
+}
+inline int64_t* dptr_i64(const Tensor& t) {
+    return reinterpret_cast<int64_t*>(t.data<Tensor::CudaDataPtr>());
+}
+
 // unary 反向内部算子(options = UnaryBwd 枚举一字节)
 void unary_bwd_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 // 梯度专用内核(反向路径, 铁律: 原生无桥接)

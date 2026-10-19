@@ -72,7 +72,7 @@ static void max_pool2d_grad(BackwardContext& c) {
     const int64_t HO = g.size(2), WO = g.size(3);
     if (x.device() == Device::CUDA) {       // 原生: 重找窗口最大后原子散射
         ZNN_CUDA_CALL(ZNN_CUDA_K(max_pool_grad_cuda)(
-            x.data<float>(), g.data<float>(), dx.data<float>(),
+            cuda_ptr(x), cuda_ptr(g), cuda_ptr(dx),
             x.size(0) * C * HO * WO, (int)H, (int)W, (int)HO, (int)WO,
             (int)o->kernel[0], (int)o->kernel[1],
             (int)o->pool.stride[0], (int)o->pool.stride[1],

@@ -48,8 +48,7 @@ static void mean_grad(BackwardContext& c) {
                                      : (a->keepdim ? d : (d > dim ? d - 1 : d));
             eff[d] = (gd < 0 || g.size(gd) == 1) ? 0 : gs[gd];
         }
-        grad_bcast_dispatch(g.device(), g.data<float>(),
-                            c.grad_inputs[0]->data<float>(),
+        grad_bcast_dispatch(g, *c.grad_inputs[0],
                             c.grad_inputs[0]->numel(), rank, dims, eff, inv);
         return;
     }

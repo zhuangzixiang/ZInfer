@@ -36,7 +36,7 @@ void require(bool ok, const char* what) {
 
 // Storage 裸句柄(与 CUDA 内核同模式; Vulkan 侧为 VkBuf*)
 void* vhandle(const Tensor& t) {
-    return t.data<float>();
+    return t.data<Tensor::VulkanDataPtr>();   // 裸句柄(基址)
 }
 
 // 右对齐广播步长(维长 1 → 步长 0); 与 CUDA bcast_map 同构
@@ -286,7 +286,7 @@ void unary_bwd_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                           (unsigned)((n + 255) / 256), 1, 1);
 }
 
-void grad_bcast_vulkan(const float* g, float* out, long long total, int rank,
+void grad_bcast_vulkan(const Tensor& g, Tensor& out, long long total, int rank,
                        const long long* dims, const long long* eff, float scale) {
     void* p = bridge::get_pipeline(spirv::bcastgrad, spirv::bcastgrad_bytes,
                                    0, 0, 2);
@@ -303,12 +303,12 @@ void grad_bcast_vulkan(const float* g, float* out, long long total, int rank,
         pc.dims[d] = (int32_t)dims[d];
         pc.eff[d] = (int32_t)eff[d];
     }
-    void* bufs[2] = {const_cast<void*>((const void*)g), out};
+    void* bufs[2] = {vhandle(g), vhandle(out)};
     bridge::dispatch_bufs(p, bufs, 2, &pc, sizeof(pc),
                           (unsigned)((total + 255) / 256), 1, 1);
 }
 
-void strided_copy_vulkan(const float* src, float* dst, int rank,
+void strided_copy_vulkan(const Tensor& src, Tensor& dst, int rank,
                          const long long* ss, const long long* ds,
                          const long long* sh, long long total) {
     void* p = bridge::get_pipeline(spirv::copy, spirv::copy_bytes, 0, 0, 2);
@@ -324,29 +324,50 @@ void strided_copy_vulkan(const float* src, float* dst, int rank,
         pc.ds[d] = (int32_t)ds[d];
         pc.sh[d] = (int32_t)sh[d];
     }
-    void* bufs[2] = {const_cast<void*>((const void*)src), dst};
+    void* bufs[2] = {vhandle(src), vhandle(dst)};
     bridge::dispatch_bufs(p, bufs, 2, &pc, sizeof(pc),
                           (unsigned)((total + 255) / 256), 1, 1);
 }
 
-void sgd_step_vulkan(float* p, const float* g, float* vel, long long n,
+void strided_copy_raw_vk(const void* src, void* dst, int rank,
+                         const long long* ss, const long long* ds,
+                         const long long* sh, long long total) {
+    void* p = bridge::get_pipeline(spirv::copy, spirv::copy_bytes, 0, 0, 2);
+    require(p, "copy pipeline");
+    struct Pc {
+        int32_t total, rank;
+        int32_t ss[8], ds[8], sh[8];
+    } pc{};
+    pc.total = (int32_t)total;
+    pc.rank = rank;
+    for (int d = 0; d < rank; ++d) {
+        pc.ss[d] = (int32_t)ss[d];
+        pc.ds[d] = (int32_t)ds[d];
+        pc.sh[d] = (int32_t)sh[d];
+    }
+    void* bufs[2] = {const_cast<void*>(src), dst};
+    bridge::dispatch_bufs(p, bufs, 2, &pc, sizeof(pc),
+                          (unsigned)((total + 255) / 256), 1, 1);
+}
+
+void sgd_step_vulkan(void* p, const void* g, void* vel, long long n,
                      float lr, float momentum, float wd) {
     void* pl = bridge::get_pipeline(spirv::opt, spirv::opt_bytes, 0, 0, 4);
     require(pl, "sgd pipeline");
     struct Pc { int32_t n; float lr, p1, p2; } pc{(int32_t)n, lr, momentum, wd};
-    void* bufs[4] = {p, const_cast<float*>(g), vel, vel};   // U2 占位(OPT=0 不读)
+    void* bufs[4] = {p, const_cast<void*>(g), vel, vel};   // U2 占位(OPT=0 不读)
     bridge::dispatch_bufs(pl, bufs, 4, &pc, sizeof(pc),
                           (unsigned)((n + 255) / 256), 1, 1);
 }
 
-void adam_step_vulkan(float* p, const float* g, float* m, float* v,
+void adam_step_vulkan(void* p, const void* g, void* m, void* v,
                       long long n, float lr, float b1, float b2, float eps,
                       float wd, float bias1, float bias2) {
     void* pl = bridge::get_pipeline(spirv::opt, spirv::opt_bytes, 1, 0, 4);
     require(pl, "adam pipeline");
     struct Pc { int32_t n; float lr, p1, p2, p3, p4, p5, p6; } pc{
         (int32_t)n, lr, b1, b2, eps, wd, bias1, bias2};
-    void* bufs[4] = {p, const_cast<float*>(g), m, v};
+    void* bufs[4] = {p, const_cast<void*>(g), m, v};
     bridge::dispatch_bufs(pl, bufs, 4, &pc, sizeof(pc),
                           (unsigned)((n + 255) / 256), 1, 1);
 }

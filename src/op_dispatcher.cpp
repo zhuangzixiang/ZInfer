@@ -35,7 +35,12 @@ void print_trace(const char* op, const char* what) {
 
 // CPU 中间结果拷回原设备输出(经 Storage 直写, 保持输出张量身份)
 void Impl_copy_back(const Tensor& cpu_src, Tensor& dst) {
-    device_copy_h2d(dst.device(), dst.data<float>(), cpu_src.data<float>(),
+    void* dh = dst.device() == Device::CUDA
+                 ? static_cast<void*>(dst.data<Tensor::CudaDataPtr>())
+                 : dst.device() == Device::Vulkan
+                     ? static_cast<void*>(dst.data<Tensor::VulkanDataPtr>())
+                     : static_cast<void*>(dst.data<Tensor::MetalDataPtr>());
+    device_copy_h2d(dst.device(), dh, cpu_src.data<float>(),
                     static_cast<size_t>(cpu_src.numel()) * sizeof(float));
 }
 } // namespace
@@ -133,8 +138,7 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
         }
         if (any) {
             out.requires_grad(true);
-            const Tensor* out_c[1] = {&out};
-            AutogradEngine::instance().record(op, inputs, Span<const Tensor*>(out_c, 1), options);
+            record_tape(out, op, inputs, options);
         }
     }
     return out;

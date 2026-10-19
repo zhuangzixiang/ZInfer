@@ -155,8 +155,8 @@ void binary_bcast_host(Span<const Tensor*> in, Span<Tensor*> out, int op) {
         throw std::runtime_error("znn: shapes not broadcastable");
     }
     const long long n = y.numel();
-    binary_bcast_k<<<blocks(n), kBlock>>>(a.data<float>(), b.data<float>(),
-                                          y.data<float>(), n, m);
+    binary_bcast_k<<<blocks(n), kBlock>>>(dptr(a), dptr(b),
+                                          dptr(y), n, m);
 }
 } // namespace
 
@@ -170,8 +170,8 @@ void div_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const v
                const void*) {                                                 \
         require_contiguous1(*in[0], *out[0]);                                 \
         const long long n = out[0]->numel();                                  \
-        kname<<<blocks(n), kBlock>>>(in[0]->data<float>(),                    \
-                                     out[0]->data<float>(), n);               \
+        kname<<<blocks(n), kBlock>>>dptr(*in[0]),                    \
+                                     dptr(*out[0]), n);               \
     }
 
 ZNN_UNARY_HOST(neg_cuda, neg_k)
@@ -194,8 +194,8 @@ void matmul_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
     const int M = a.size(0), K = a.size(1), N = b.size(1);
 
     // 快速路径: 共享 GEMM 原语(cuBLAS, DLL 缺失时 false → 朴素内核)
-    if (gemm_cuda(a.data<float>(), K, b.data<float>(), N,
-                  y.data<float>(), N, M, N, K,
+    if (gemm_cuda(dptr(a), K, dptr(b), N,
+                  dptr(y), N, M, N, K,
                   /*b_transposed=*/false, ctx.precision)) {
         return;
     }
@@ -203,8 +203,8 @@ void matmul_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
     // 备选路径: 朴素内核(DLL 缺失时)
     dim3 block(16, 16);
     dim3 grid((N + 15) / 16, (M + 15) / 16);
-    matmul_k<<<grid, block>>>(a.data<float>(), b.data<float>(),
-                              y.data<float>(), M, K, N);
+    matmul_k<<<grid, block>>>(dptr(a), dptr(b),
+                              dptr(y), M, K, N);
 }
 
 // ---- 优化器 host 入口 ----
@@ -254,8 +254,8 @@ void unary_bwd_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                     const void* options) {
     const int fn = static_cast<int>(*static_cast<const unsigned char*>(options));
     const long long n = out[0]->numel();
-    unary_bwd_k<<<blocks(n), kBlock>>>(in[0]->data<float>(), in[1]->data<float>(),
-                                       in[2]->data<float>(), out[0]->data<float>(),
+    unary_bwd_k<<<blocks(n), kBlock>>>dptr(*in[0]), dptr(*in[1]),
+                                       dptr(*in[2]), dptr(*out[0]),
                                        n, fn);
 }
 

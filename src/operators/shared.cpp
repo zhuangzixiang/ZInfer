@@ -312,18 +312,16 @@ void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
                                 : (keepdim ? d : (d > dim ? d - 1 : d));
         eff[d] = (gd < 0 || g.size(gd) == 1) ? 0 : gs[gd];
     }
-    grad_bcast_dispatch(g.device(), g.data<float>(), out.data<float>(),
-                        out.numel(), rank, dims, eff, 1.f);
+    grad_bcast_dispatch(g, out, out.numel(), rank, dims, eff, 1.f);
 }
 
 // ---- 设备无关内核派发(GPU 原生 / CPU 宿主循环) ----
-void grad_bcast_dispatch(Device dev, const float* g, float* out,
-                         long long total, int rank, const long long* dims,
-                         const long long* eff, float scale) {
-    switch (dev) {
+void grad_bcast_dispatch(const Tensor& g, Tensor& out, long long total, int rank,
+                         const long long* dims, const long long* eff, float scale) {
+    switch (g.device()) {
     case Device::CUDA:
-        ZNN_CUDA_CALL(ZNN_CUDA_K(grad_bcast_cuda)(g, out, total, rank, dims,
-                                                  eff, scale));
+        ZNN_CUDA_CALL(ZNN_CUDA_K(grad_bcast_cuda)(cuda_ptr_const(g), cuda_ptr(out),
+                                                  total, rank, dims, eff, scale));
         return;
     case Device::Vulkan:
         ZNN_VULKAN_CALL(vulkan_backend::grad_bcast_vulkan(g, out, total, rank,
@@ -335,13 +333,15 @@ void grad_bcast_dispatch(Device dev, const float* g, float* out,
         return;
     default: break;
     }
+    const float* gp = g.data<float>();
+    float* op = out.data<float>();
     int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     for (int64_t i = 0; i < total; ++i) {
         int64_t go = 0;
         for (int64_t d = 0; d < rank; ++d) {
             go += idx[d] * eff[d];
         }
-        out[i] = scale * g[go];
+        op[i] = scale * gp[go];
         for (int64_t d = rank - 1; d >= 0; --d) {
             if (++idx[d] < dims[d]) break;
             idx[d] = 0;
@@ -349,13 +349,14 @@ void grad_bcast_dispatch(Device dev, const float* g, float* out,
     }
 }
 
-void strided_copy_dispatch(Device dev, const float* src, float* dst, int rank,
+void strided_copy_dispatch(const Tensor& src, Tensor& dst, int rank,
                            const long long* ss, const long long* ds,
                            const long long* sh, long long total) {
-    switch (dev) {
+    switch (src.device()) {
     case Device::CUDA:
-        ZNN_CUDA_CALL(ZNN_CUDA_K(strided_copy_cuda)(src, dst, rank, ss, ds, sh,
-                                                    total));
+        ZNN_CUDA_CALL(ZNN_CUDA_K(strided_copy_cuda)(cuda_ptr_const(src),
+                                                    cuda_ptr(dst), rank, ss, ds,
+                                                    sh, total));
         return;
     case Device::Vulkan:
         ZNN_VULKAN_CALL(vulkan_backend::strided_copy_vulkan(src, dst, rank, ss,
@@ -367,6 +368,8 @@ void strided_copy_dispatch(Device dev, const float* src, float* dst, int rank,
         return;
     default: break;
     }
+    const float* sp = src.data<float>();
+    float* dp = dst.data<float>();
     int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     for (int64_t i = 0; i < total; ++i) {
         int64_t so = 0, doff = 0;              // 双步长: dst 可为非连续视图(散射)
@@ -374,7 +377,49 @@ void strided_copy_dispatch(Device dev, const float* src, float* dst, int rank,
             so += idx[d] * ss[d];
             doff += idx[d] * ds[d];
         }
-        dst[doff] = src[so];
+        dp[doff] = sp[so];
+        for (int64_t d = rank - 1; d >= 0; --d) {
+            if (++idx[d] < sh[d]) break;
+            idx[d] = 0;
+        }
+    }
+}
+
+void strided_copy_raw(Device dev, const void* src, int64_t soff, void* dst,
+                      int64_t doff, int rank, const long long* ss,
+                      const long long* ds, const long long* sh, long long total) {
+    switch (dev) {
+    case Device::CUDA:
+        ZNN_CUDA_CALL(ZNN_CUDA_K(strided_copy_cuda)(
+            static_cast<const float*>(src) + soff, static_cast<float*>(dst) + doff,
+            rank, ss, ds, sh, total));
+        return;
+    case Device::Vulkan:
+        if (soff || doff) {
+            throw std::runtime_error("znn: vulkan strided copy offset unsupported");
+        }
+        ZNN_VULKAN_CALL(vulkan_backend::strided_copy_raw_vk(src, dst, rank, ss,
+                                                            ds, sh, total));
+        return;
+    case Device::Metal:
+        if (soff || doff) {
+            throw std::runtime_error("znn: metal strided copy offset unsupported");
+        }
+        ZNN_METAL_CALL(metal_backend::strided_copy_raw_mt(src, dst, rank, ss, ds,
+                                                          sh, total));
+        return;
+    default: break;
+    }
+    const float* sp = static_cast<const float*>(src) + soff;
+    float* dp = static_cast<float*>(dst) + doff;
+    int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    for (int64_t i = 0; i < total; ++i) {
+        int64_t so = 0, doff2 = 0;
+        for (int64_t d = 0; d < rank; ++d) {
+            so += idx[d] * ss[d];
+            doff2 += idx[d] * ds[d];
+        }
+        dp[doff2] = sp[so];
         for (int64_t d = rank - 1; d >= 0; --d) {
             if (++idx[d] < sh[d]) break;
             idx[d] = 0;
