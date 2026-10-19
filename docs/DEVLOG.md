@@ -791,3 +791,35 @@ MSVC 扩展在托底。为避免 69 个编译单元逐轮贴报错, 用本机 ND
 成本的第二意见, 早该进回归)。MSVC 的三类宽容(限定名前置声明、
 nullptr 调用、临时绑非 const 引用)都是"编译过但只在 MSVC 过"的
 定时炸弹, clang 扫描应作为提交门禁。
+
+---
+
+## [26] Metal 首编译修复: 6 处编译错 + 3 处自查出的隐性 bug
+
+**编译错(Mac 实报, 63/68 已过 —— 可移植层全绿)**
+1. `static_cast<MtlBuf*>(const void*)` 去 const → const MtlBuf*
+2. MSEL 选择器 `copyFromBuffer:...length:` → `size:`(Metal API 实名)
+3. `NSError.UTF8String` 不存在 → localizedDescription.UTF8String ×2
+4. 两处 std::string 用而未含 <string>; 另 device:: 跨编译单元不可见
+   —— 新增 metal_device.hpp(仅 .mm 内部包含, 含 MTL 类型; 纯 C++
+   单元经 backend_slots 间接包含的 metal_backend.hpp 保持无 MTL 类型)
+
+**自查修复(不等运行期炸)**
+1. dispatchThreads 网格语义错: 第一参数是总线程数, host 却按"组数"
+   传(少发 256×线程); 且线程组硬编码 (threadExecutionWidth,1,1) 而
+   GEMM 内核按 8×8 二维组写 → .y 恒 0。dispatch 签名改传 MTLSize
+   grid/tg, 调用点各自声明(逐元素/规约/softmax: 256×1×1, GEMM: 8×8)
+2. reduce/softmax MSL 输出误绑 buffer(1) —— Vulkan 同坑复发(host 传
+   (x,x,y), buffer(1)=x, 内核会写进输入) → 绑 buffer(2)
+3. GEMM 边界 tile: ta/tb 装载用 inr(row&&col 联合)守 → M/N 非 8 倍数
+   时漏写 threadgroup 单元读到脏数据; 改 ta 按 row、tb 按 col 独立守
+   (读者所需单元必被同行/同列线程写过 —— 数学可证)
+
+**验证**: 结构体布局核对(ReduceAttrs/SoftmaxOptions 首成员 int64_t
+dim ✓); Windows 不编译 .mm, 三构建不受影响(可移植源码本轮零改动)。
+
+**反思**: 质量 5/10 前值(首次真机编译 6 错 + 3 隐雷) | 教训: (a)
+从未被任何编译器编译过的代码 = 未验证代码, "数学与 Vulkan 逐行对应"
+挡不住 API 层笔误(选择器名/绑定号); (b) dispatchThreads 的 grid 语义
+与 CUDA/Vulkan 的 group 数语义不同, 移植数学时最容易漏的是语义层
+而非数学层。

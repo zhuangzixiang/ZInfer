@@ -7,12 +7,14 @@
 // ============================================================================
 #include "operator.hpp"
 #include "backends/metal/metal_backend.hpp"
+#include "backends/metal/metal_device.hpp"
 
 #if defined(__APPLE__) && defined(ZNN_METAL)
 
 #import <Metal/Metal.h>
 #import <Foundation/Foundation.h>
 #include <stdexcept>
+#include <string>
 
 namespace znn {
 namespace metal_backend {
@@ -22,6 +24,8 @@ namespace {
 id<MTLBuffer> mbuf(const Tensor& t) {
     return device::buf_of(t.data<float>());   // Storage 裸句柄 = MtlBuf*
 }
+
+uint32_t rup(uint32_t n, uint32_t a) { return (n + a - 1) / a * a; }  // 向上取整到组宽
 
 // MSL: 通用逐元素(13 算子共用; op/bcast/n 经 constant 缓冲)
 const char* kMslElementwise = R"MSL(
@@ -81,12 +85,14 @@ kernel void gemm(device const float* a [[buffer(0)]],
     const int tiles = (pc[2] + 7) / 8;
     for (int t = 0; t < tiles; ++t) {
         const int ka = t * 8 + lc;
-        ta[lr][lc] = (inr && ka < pc[2]) ? a[row * pc[3] + ka] : 0.0f;
+        // ta 按 row 守、tb 按 col 守(独立): 边界 tile 时读者所需单元必被
+        // 同行/同列线程写过; 若联合守(inr)会漏写 → 读到未初始化 threadgroup
+        ta[lr][lc] = (row < pc[0] && ka < pc[2]) ? a[row * pc[3] + ka] : 0.0f;
         const int kb = t * 8 + lr;
         if (pc[6] == 1) {
-            tb[lc][lr] = (inr && kb < pc[2]) ? b[col * pc[4] + kb] : 0.0f;
+            tb[lc][lr] = (col < pc[1] && kb < pc[2]) ? b[col * pc[4] + kb] : 0.0f;
         } else {
-            tb[lc][lr] = (inr && kb < pc[2]) ? b[kb * pc[4] + col] : 0.0f;
+            tb[lc][lr] = (col < pc[1] && kb < pc[2]) ? b[kb * pc[4] + col] : 0.0f;
         }
         threadgroup_barrier(mem_flags::mem_threadgroup);
         for (int k = 0; k < 8; ++k) {
@@ -106,7 +112,7 @@ const char* kMslReduce = R"MSL(
 using namespace metal;
 
 kernel void reduce(device const float* x [[buffer(0)]],
-                   device float* y [[buffer(1)]],
+                   device float* y [[buffer(2)]],
                    constant const int* pc [[buffer(3)]]) {
     // pc[0]=total pc[1]=n_dim pc[2]=s_dim pc[3]=RANK pc[4]=MEAN
     // pc[10+d]=odims[d], pc[20+d]=xstr[d]
@@ -132,7 +138,7 @@ const char* kMslSoftmax = R"MSL(
 using namespace metal;
 
 kernel void softmax(device const float* x [[buffer(0)]],
-                    device float* y [[buffer(1)]],
+                    device float* y [[buffer(2)]],
                     constant const int* pc [[buffer(3)]]) {
     const int r = (int)((thread_position_in_grid).x);
     if (r >= pc[0]) return;
@@ -166,8 +172,9 @@ void elementwise(Span<const Tensor*> in, Span<Tensor*> out, int op, int bcast) {
     if (!p) p = device::pipeline(kMslElementwise, "elementwise");
     const int pc[3] = {(int)y.numel(), op, bcast};
     id<MTLBuffer> vb = bcast ? mbuf(*in[1]) : mbuf(a);
-    const uint32_t gx = (uint32_t)(((int)y.numel() + 255) / 256);
-    device::dispatch(p, mbuf(a), vb, mbuf(y), pc, sizeof(pc), gx, 1, 1, nil);
+    const uint32_t n = (uint32_t)y.numel();
+    device::dispatch(p, mbuf(a), vb, mbuf(y), pc, sizeof(pc),
+                     MTLSizeMake(rup(n, 256), 1, 1), MTLSizeMake(256, 1, 1), nil);
 }
 
 } // namespace
@@ -220,9 +227,9 @@ void gemm_run(const Tensor& a, const Tensor& b, Tensor& y,
     static id<MTLComputePipelineState> p = nil;
     if (!p) p = device::pipeline(kMslGemm, "gemm");
     const int pc[7] = {M, N, K, lda, ldb, (int)y.size(1), tb};
-    const uint32_t gx = (uint32_t)((N + 7) / 8);
-    const uint32_t gy = (uint32_t)((M + 7) / 8);
-    device::dispatch(p, mbuf(a), mbuf(b), mbuf(y), pc, sizeof(pc), gx, gy, 1, nil);
+    device::dispatch(p, mbuf(a), mbuf(b), mbuf(y), pc, sizeof(pc),
+                     MTLSizeMake(rup((uint32_t)N, 8), rup((uint32_t)M, 8), 1),
+                     MTLSizeMake(8, 8, 1), nil);
 }
 } // namespace
 
@@ -271,8 +278,9 @@ void reduce_run(Span<const Tensor*> in, Span<Tensor*> out, int64_t dim, bool mea
         pc[20 + r] = (int)x.strides()[d];
         ++r;
     }
-    const uint32_t gx = (uint32_t)((pc[0] + 255) / 256);
-    device::dispatch(p, mbuf(x), mbuf(x), mbuf(y), pc, sizeof(pc), gx, 1, 1, nil);
+    const uint32_t total = (uint32_t)pc[0];
+    device::dispatch(p, mbuf(x), mbuf(x), mbuf(y), pc, sizeof(pc),
+                     MTLSizeMake(rup(total, 256), 1, 1), MTLSizeMake(256, 1, 1), nil);
 }
 } // namespace
 
@@ -302,8 +310,9 @@ void softmax_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     static id<MTLComputePipelineState> p = nil;
     if (!p) p = device::pipeline(kMslSoftmax, "softmax");
     const int pc[2] = {(int)(x.numel() / x.size(d)), (int)x.size(d)};
-    const uint32_t gx = (uint32_t)((pc[0] + 255) / 256);
-    device::dispatch(p, mbuf(x), mbuf(x), mbuf(y), pc, sizeof(pc), gx, 1, 1, nil);
+    const uint32_t rows = (uint32_t)pc[0];
+    device::dispatch(p, mbuf(x), mbuf(x), mbuf(y), pc, sizeof(pc),
+                     MTLSizeMake(rup(rows, 256), 1, 1), MTLSizeMake(256, 1, 1), nil);
 }
 
 } // namespace metal_backend

@@ -6,6 +6,7 @@
 // 注: 本文件仅在 APPLE 平台被 CMake 选用(ZNN_METAL=ON)。
 // ============================================================================
 #include "backends/metal/metal_backend.hpp"
+#include "backends/metal/metal_device.hpp"
 
 #if defined(__APPLE__) && defined(ZNN_METAL)
 
@@ -13,6 +14,7 @@
 #import <Foundation/Foundation.h>
 #include <cstring>
 #include <stdexcept>
+#include <string>
 
 namespace znn {
 namespace metal_backend {
@@ -71,7 +73,7 @@ void copy_host_to_device(void* dst, const void* src, size_t bytes) {
     memcpy(static_cast<MtlBuf*>(dst)->mapped, src, bytes);   // 共享内存直拷
 }
 void copy_device_to_host(void* dst, const void* src, size_t bytes) {
-    memcpy(dst, static_cast<MtlBuf*>(src)->mapped, bytes);
+    memcpy(dst, static_cast<const MtlBuf*>(src)->mapped, bytes);
 }
 
 void copy_device_to_device(void* dst, const void* src, size_t bytes) {
@@ -81,7 +83,7 @@ void copy_device_to_device(void* dst, const void* src, size_t bytes) {
     MtlBuf* d = static_cast<MtlBuf*>(dst);
     MtlBuf* s = static_cast<MtlBuf*>(const_cast<void*>(src));
     [enc copyFromBuffer:s->buffer sourceOffset:0
-                 toBuffer:d->buffer destinationOffset:0 length:bytes];
+                 toBuffer:d->buffer destinationOffset:0 size:bytes];
     [enc endEncoding];
     [cb commit];
     [cb waitUntilCompleted];
@@ -91,11 +93,9 @@ void memset0(void* p, size_t bytes) {
     memset(static_cast<MtlBuf*>(p)->mapped, 0, bytes);       // 共享内存
 }
 
-// ---- 计算派发入口(内核文件使用) ----
+// ---- 计算派发入口(内核文件使用; 声明见 metal_device.hpp) ----
 namespace device {
 
-id<MTLDevice> dev() { return st()->device; }
-id<MTLCommandQueue> queue() { return st()->queue; }
 id<MTLBuffer> buf_of(void* p) { return static_cast<MtlBuf*>(p)->buffer; }
 
 // MSL 源码 → 管线(驱动运行时编译; Metal 官方路径, 无离线工具)
@@ -107,7 +107,7 @@ id<MTLComputePipelineState> pipeline(const char* msl, const char* name) {
                                                       error:&err];
     if (!lib) {
         throw std::runtime_error(std::string("znn metal: MSL compile failed: ")
-                                 + err.UTF8String);
+                                 + err.localizedDescription.UTF8String);
     }
     id<MTLFunction> fn = [lib newFunctionWithName:
                                   [NSString stringWithUTF8String:name]];
@@ -119,14 +119,14 @@ id<MTLComputePipelineState> pipeline(const char* msl, const char* name) {
         [st()->device newComputePipelineStateWithFunction:fn error:&perr];
     if (!p) {
         throw std::runtime_error(std::string("znn metal: pipeline failed: ")
-                                 + perr.UTF8String);
+                                 + perr.localizedDescription.UTF8String);
     }
     return p;
 }
 
 void dispatch(id<MTLComputePipelineState> p, id<MTLBuffer> a, id<MTLBuffer> b,
               id<MTLBuffer> y, const void* push, size_t push_size,
-              uint32_t gx, uint32_t gy, uint32_t gz,
+              MTLSize grid, MTLSize tg,
               void (^config)(id<MTLComputeCommandEncoder>)) {
     MtlState* v = st();
     id<MTLCommandBuffer> cb = [v->queue commandBuffer];
@@ -139,9 +139,7 @@ void dispatch(id<MTLComputePipelineState> p, id<MTLBuffer> a, id<MTLBuffer> b,
         [enc setBytes:push length:push_size atIndex:3];   // 推送常量=缓冲3
     }
     if (config) config(enc);
-    const MTLSize tg = MTLSizeMake(p.threadExecutionWidth, 1, 1);
-    const MTLSize gr = MTLSizeMake(gx, gy, gz);
-    [enc dispatchThreads:gr threadsPerThreadgroup:tg];
+    [enc dispatchThreads:grid threadsPerThreadgroup:tg];
     [enc endEncoding];
     [cb commit];
     [cb waitUntilCompleted];

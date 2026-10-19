@@ -1,0 +1,28 @@
+// ============================================================================
+// metal_device.hpp — Metal 设备层跨编译单元声明(仅 .mm 内部包含)
+//
+// metal_kernels.mm 经 device:: 派发; 本头含 MTL 类型, 纯 C++ 编译单元
+// (经 backend_slots.hpp 间接包含的 metal_backend.hpp)不得包含本文件。
+// 实现: metal_device.mm
+// ============================================================================
+#pragma once
+
+#import <Metal/Metal.h>
+
+namespace znn {
+namespace metal_backend {
+namespace device {
+
+id<MTLBuffer> buf_of(void* p);                        // Storage 句柄 → MTLBuffer
+id<MTLComputePipelineState> pipeline(const char* msl, // MSL 源码运行时编译
+                                     const char* name);
+// grid=总线程数, tg=每线程组线程数(dispatchThreads 语义); 绑定 0/1/2=a/b/y,
+// push 常量走 buffer(3); config 可追加设置(无则传 nil)
+void dispatch(id<MTLComputePipelineState> p, id<MTLBuffer> a, id<MTLBuffer> b,
+              id<MTLBuffer> y, const void* push, size_t push_size,
+              MTLSize grid, MTLSize tg,
+              void (^config)(id<MTLComputeCommandEncoder>));
+
+} // namespace device
+} // namespace metal_backend
+} // namespace znn
