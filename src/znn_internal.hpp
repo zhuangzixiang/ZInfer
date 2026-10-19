@@ -71,8 +71,6 @@ struct Tensor::Impl {
     size_t nbytes() const;            // numel × 元素大小
 };
 
-struct Tensor::Impl;   // 前置(下方工具签名)
-
 namespace impl {
 // 视图(src 可为任意 strided) → dst(连续)的逐元素紧凑拷贝
 void copy_view_to(const Tensor& src, Tensor& dst);

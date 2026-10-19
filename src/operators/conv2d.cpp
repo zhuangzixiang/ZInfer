@@ -80,13 +80,13 @@ static void conv2d_grad(BackwardContext& c) {
     const int64_t O = w.size(0), KH = w.size(2), KW = w.size(3);
     const int64_t HO = g.size(2), WO = g.size(3);
     if (x.device() == Device::CUDA) {          // 专用 CUDA 梯度内核(原生)
-        ZNN_CUDA_K(conv2d_grad_cuda)(
+        ZNN_CUDA_CALL(ZNN_CUDA_K(conv2d_grad_cuda)(
             x.data<float>(), w.data<float>(), g.data<float>(),
             dx.data<float>(), dw.data<float>(),
             (int)N, (int)C, (int)H, (int)W, (int)O, (int)KH, (int)KW,
             (int)HO, (int)WO, (int)o->stride[0], (int)o->stride[1],
             (int)o->pad[0], (int)o->pad[1], (int)o->dilation[0],
-            (int)o->dilation[1], (int)o->groups);
+            (int)o->dilation[1], (int)o->groups));
         return;
     }
     const float* xp = x.data<float>();

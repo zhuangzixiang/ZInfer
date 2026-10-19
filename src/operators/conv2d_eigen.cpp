@@ -22,7 +22,8 @@ static void conv2d_eigen(KernelContext&, Span<const Tensor*> in,
         return;   // oneDNN 直接卷积(缺失/分组/膨胀回落 im2col+Eigen)
     }
     if (!fast) {
-        conv2d_naive(KernelContext{Device::CPU, nullptr}, in, out, options);
+        KernelContext c{Device::CPU, nullptr};
+        conv2d_naive(c, in, out, options);
         return;
     }
     const int64_t N = x.size(0), C = x.size(1), H = x.size(2), W = x.size(3);

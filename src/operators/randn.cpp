@@ -34,8 +34,8 @@ Tensor Tensor::randn(Shape shape, unsigned seed, DType dtype, Device device) {
     Tensor* outs[1] = {&t};
     KernelContext ctx{device, nullptr};
     if (device == Device::CUDA) {
-        ZNN_CUDA_K(randn_cuda)(ctx, Span<const Tensor*>(nullptr, 0),
-                                 Span<Tensor*>(outs, 1), &seed);
+        ZNN_CUDA_CALL(ZNN_CUDA_K(randn_cuda)(ctx, Span<const Tensor*>(nullptr, 0),
+                                 Span<Tensor*>(outs, 1), &seed));
     } else {
         randn_ref(ctx, Span<const Tensor*>(nullptr, 0), Span<Tensor*>(outs, 1), &seed);
     }

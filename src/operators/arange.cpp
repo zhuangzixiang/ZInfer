@@ -26,8 +26,8 @@ Tensor Tensor::arange(int64_t n, DType dtype, Device device) {
     Tensor* outs[1] = {&t};
     KernelContext ctx{device, nullptr};
     if (device == Device::CUDA) {
-        ZNN_CUDA_K(arange_cuda)(ctx, Span<const Tensor*>(nullptr, 0),
-                                  Span<Tensor*>(outs, 1), nullptr);
+        ZNN_CUDA_CALL(ZNN_CUDA_K(arange_cuda)(ctx, Span<const Tensor*>(nullptr, 0),
+                                  Span<Tensor*>(outs, 1), nullptr));
     } else {
         float* p = t.data<float>();
         for (int64_t i = 0; i < n; ++i) p[i] = static_cast<float>(i);

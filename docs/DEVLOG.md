@@ -759,3 +759,35 @@ CPU 22 项全绿。
 否则等于单点丢失; (b) 下载校验用字节数下限会放行错误页 —— 错误
 页也是合法字节流, 必须精确匹配; (c) 镜像会死(双直链同日
 NoSuchKey), 恢复脚本要多源多形态(直链 + 整包)才够韧。
+
+---
+
+## [25] 可移植性清障: MSVC 方言清零(clang 严格解析 64/64)
+
+**背景**: Mac 首编译(Apple Clang 17)第一文件即炸 —— Windows 全绿是
+MSVC 扩展在托底。为避免 69 个编译单元逐轮贴报错, 用本机 NDK clang
+(android target, 头文件一致)做 -fsyntax-only 全量扫描, 一次抓完。
+
+**三类 MSVC 方言(全部实证复现)**
+1. `struct Tensor::Impl;` 类外限定名前置声明嵌套类 —— znn_internal.hpp
+   多余行, 删除(公共头类内已有声明)
+2. `nullptr(实参)` —— backend_slots.hpp 的 K 宏未编入时展开 nullptr,
+   18 处直调点写成 ZNN_*_K(f)(args) 形态; MSVC 警告 C4353 放行
+   (实测 3 行探针复现), 标准非法。修法: 语句位包 ZNN_CUDA_CALL(expr)
+   / 值位(alloc, void*)新增 ZNN_*_CALLV(t, expr) —— 关键机制: 未编入
+   分支不引用实参参数, expr 连同其中的 nullptr(args) 被预处理器整体
+   丢弃, 两配置均合法; 编入分支展开为原表达式零变化
+3. 临时量绑非 const 左值引用 —— matmul/conv2d_eigen 回落调用传
+   KernelContext{} 临时给 KernelContext& 形参; 改为先建具名局部
+   ctx(与 randn.cpp 等既有写法一致)
+4. 附带: mnist 例程用 std::string 未含 <string>(MSVC 传递包含放行)
+
+**验证**: clang 严格解析 64/64 全过(排除 .mm/.cu/vulkan 后端, 属各自
+工具链); Windows 三构建全量回归: CPU 22 项 + MNIST 97.16%(与重构前
+逐位一致) + Vulkan 22 项 + 冒烟 + CUDA 全项(含 GPU 对拍)全绿。
+
+**反思**: 可移植性 6→9/10(教训: "三配置全绿"只证明 MSVC 三配置;
+跨编译器验收必须真的用第二个编译器 —— NDK clang -fsyntax-only 是零
+成本的第二意见, 早该进回归)。MSVC 的三类宽容(限定名前置声明、
+nullptr 调用、临时绑非 const 引用)都是"编译过但只在 MSVC 过"的
+定时炸弹, clang 扫描应作为提交门禁。

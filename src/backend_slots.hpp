@@ -16,10 +16,14 @@
   #include "backends/cuda/cuda_backend.hpp"
   #define ZNN_CUDA_K(name)      cuda_backend::name
   #define ZNN_CUDA_CALL(expr)   expr
+  #define ZNN_CUDA_CALLV(t, e)  e
   #define ZNN_CUDA_AVAIL()      cuda_backend::available()
 #else
+  // CALL/CALLV 未编入时丢弃实参表达式(expr 不进入展开, 其中的
+  // K(...) 调用形态不会留下非法代码), 换成抛错的占位
   #define ZNN_CUDA_K(name)      nullptr
   #define ZNN_CUDA_CALL(expr)   znn_backend_unavailable<void>("CUDA")
+  #define ZNN_CUDA_CALLV(t, e)  znn_backend_unavailable<t>("CUDA")
   #define ZNN_CUDA_AVAIL()      false
 #endif
 
@@ -40,10 +44,12 @@
   #include "backends/vulkan/vulkan_backend.hpp"
   #define ZNN_VULKAN_K(name)    vulkan_backend::name
   #define ZNN_VULKAN_CALL(expr) expr
+  #define ZNN_VULKAN_CALLV(t, e) e
   #define ZNN_VULKAN_AVAIL()    vulkan_backend::available()
 #else
   #define ZNN_VULKAN_K(name)    nullptr
   #define ZNN_VULKAN_CALL(expr) znn_backend_unavailable<void>("Vulkan")
+  #define ZNN_VULKAN_CALLV(t, e) znn_backend_unavailable<t>("Vulkan")
   #define ZNN_VULKAN_AVAIL()    false
 #endif
 

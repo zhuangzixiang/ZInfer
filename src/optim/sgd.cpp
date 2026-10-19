@@ -27,10 +27,10 @@ void SgdImpl::step() {
             if (param_.momentum > 0 && !velocity_[i]) {
                 velocity_[i] = Tensor::zeros(p.shape(), DType::F32, Device::CUDA);
             }
-            ZNN_CUDA_K(sgd_step_cuda)(
+            ZNN_CUDA_CALL(ZNN_CUDA_K(sgd_step_cuda)(
                 p.data<float>(), p.grad().data<float>(),
                 param_.momentum > 0 ? velocity_[i].data<float>() : nullptr,
-                n, param_.lr, param_.momentum, param_.weight_decay);
+                n, param_.lr, param_.momentum, param_.weight_decay));
             continue;
         }
         const float* g = p.grad().data<float>();
@@ -56,8 +56,8 @@ void SgdImpl::clear() {
     for (Tensor& p : params_) {
         if (p.grad()) {
             if (p.device() == Device::CUDA) {
-                ZNN_CUDA_K(memset0_cuda)(p.grad().data<float>(),
-                                           static_cast<size_t>(p.numel()) * sizeof(float));
+                ZNN_CUDA_CALL(ZNN_CUDA_K(memset0_cuda)(p.grad().data<float>(),
+                                           static_cast<size_t>(p.numel()) * sizeof(float)));
             } else {
                 std::memset(p.grad().data<float>(), 0,
                             static_cast<size_t>(p.numel()) * sizeof(float));

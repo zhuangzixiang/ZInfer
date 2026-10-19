@@ -46,9 +46,9 @@ static void embedding_grad(BackwardContext& c) {
     Tensor& dw = *c.grad_inputs[0];                       // 已零初始化
     const int64_t D = dw.size(1);
     if (g.device() == Device::CUDA) {       // 原生: 行散射原子累加
-        ZNN_CUDA_K(embedding_grad_cuda)(
+        ZNN_CUDA_CALL(ZNN_CUDA_K(embedding_grad_cuda)(
             g.data<float>(), idx.data<int64_t>(), dw.data<float>(),
-            idx.numel() * D, (int)D);
+            idx.numel() * D, (int)D));
         return;
     }
     const int64_t* ip = idx.data<int64_t>();

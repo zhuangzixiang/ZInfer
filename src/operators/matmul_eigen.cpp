@@ -17,7 +17,8 @@ static void matmul_eigen(KernelContext&, Span<const Tensor*> in,
     Tensor& y = *out[0];
     const bool fast = a.is_contiguous() && b.is_contiguous() && y.is_contiguous();
     if (!fast) {
-        matmul_naive(KernelContext{Device::CPU, nullptr}, in, out, nullptr);
+        KernelContext c{Device::CPU, nullptr};
+        matmul_naive(c, in, out, nullptr);
         return;
     }
     if (onednn::gemm(a.data<float>(), (int)a.size(1), b.data<float>(),

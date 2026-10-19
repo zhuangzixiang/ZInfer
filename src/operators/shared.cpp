@@ -293,8 +293,8 @@ void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
                                     : (keepdim ? d : (d > dim ? d - 1 : d));
             eff[d] = (gd < 0 || g.size(gd) == 1) ? 0 : gs[gd];
         }
-        ZNN_CUDA_K(grad_bcast_cuda)(g.data<float>(), out.data<float>(),
-                                      out.numel(), rank, dims, eff, 1.f);
+        ZNN_CUDA_CALL(ZNN_CUDA_K(grad_bcast_cuda)(g.data<float>(), out.data<float>(),
+                                      out.numel(), rank, dims, eff, 1.f));
         return;
     }
     const float* gp = g.data<float>();

@@ -72,12 +72,12 @@ static void avg_pool2d_grad(BackwardContext& c) {
     const int64_t C = x.size(1), H = x.size(2), W = x.size(3);
     const int64_t HO = g.size(2), WO = g.size(3);
     if (x.device() == Device::CUDA) {       // 原生: 均摊梯度原子散射
-        ZNN_CUDA_K(avg_pool_grad_cuda)(
+        ZNN_CUDA_CALL(ZNN_CUDA_K(avg_pool_grad_cuda)(
             g.data<float>(), dx.data<float>(),
             x.size(0) * C * HO * WO, (int)H, (int)W, (int)HO, (int)WO,
             (int)o->kernel[0], (int)o->kernel[1],
             (int)o->pool.stride[0], (int)o->pool.stride[1],
-            (int)o->pool.pad[0], (int)o->pool.pad[1]);
+            (int)o->pool.pad[0], (int)o->pool.pad[1]));
         return;
     }
     const float* gp = g.data<float>();

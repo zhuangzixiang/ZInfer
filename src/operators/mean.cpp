@@ -48,9 +48,9 @@ static void mean_grad(BackwardContext& c) {
                                      : (a->keepdim ? d : (d > dim ? d - 1 : d));
             eff[d] = (gd < 0 || g.size(gd) == 1) ? 0 : gs[gd];
         }
-        ZNN_CUDA_K(grad_bcast_cuda)(g.data<float>(),
+        ZNN_CUDA_CALL(ZNN_CUDA_K(grad_bcast_cuda)(g.data<float>(),
                                       c.grad_inputs[0]->data<float>(),
-                                      c.grad_inputs[0]->numel(), rank, dims, eff, inv);
+                                      c.grad_inputs[0]->numel(), rank, dims, eff, inv));
         return;
     }
     const float inv = 1.f / static_cast<float>(x.size(dim));

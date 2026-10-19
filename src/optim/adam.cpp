@@ -29,11 +29,11 @@ void AdamImpl::step() {
             moments_[i].v = Tensor::zeros(p.shape(), DType::F32, p.device());
         }
         if (p.device() == Device::CUDA) {         // GPU: 原生内核更新
-            ZNN_CUDA_K(adam_step_cuda)(
+            ZNN_CUDA_CALL(ZNN_CUDA_K(adam_step_cuda)(
                 p.data<float>(), p.grad().data<float>(),
                 moments_[i].m.data<float>(), moments_[i].v.data<float>(),
                 n, param_.lr, b1, b2, param_.eps, param_.weight_decay,
-                bias1, bias2);
+                bias1, bias2));
             continue;
         }
         const float* g = p.grad().data<float>();
@@ -55,8 +55,8 @@ void AdamImpl::clear() {
     for (Tensor& p : params_) {
         if (p.grad()) {
             if (p.device() == Device::CUDA) {
-                ZNN_CUDA_K(memset0_cuda)(p.grad().data<float>(),
-                                           static_cast<size_t>(p.numel()) * sizeof(float));
+                ZNN_CUDA_CALL(ZNN_CUDA_K(memset0_cuda)(p.grad().data<float>(),
+                                           static_cast<size_t>(p.numel()) * sizeof(float)));
             } else {
                 std::memset(p.grad().data<float>(), 0,
                             static_cast<size_t>(p.numel()) * sizeof(float));

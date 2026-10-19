@@ -3,6 +3,7 @@
 #include "znn.hpp"
 #include <cstdio>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 using namespace znn;

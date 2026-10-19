@@ -64,8 +64,8 @@ static void permute_grad(BackwardContext& c) {
             dims[d] = ds.dims[d];
             eff[d] = gs[o->order[d]];       // idx[p] 的步长 = g 第 order[p] 维步长
         }
-        ZNN_CUDA_K(grad_bcast_cuda)(g.data<float>(), dx.data<float>(),
-                                      dx.numel(), (int)ds.rank, dims, eff, 1.f);
+        ZNN_CUDA_CALL(ZNN_CUDA_K(grad_bcast_cuda)(g.data<float>(), dx.data<float>(),
+                                      dx.numel(), (int)ds.rank, dims, eff, 1.f));
         return;
     }
     const float* gp = g.data<float>();

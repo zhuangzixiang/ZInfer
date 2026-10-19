@@ -25,8 +25,8 @@ void copy_view_to(const Tensor& src, Tensor& dst) {
             ds[d] = dst.strides()[d];
             sh[d] = dst.size(d);
         }
-        ZNN_CUDA_K(strided_copy_cuda)(src.data<float>(), dst.data<float>(),
-                                        rank, ss, ds, sh, dst.numel());
+        ZNN_CUDA_CALL(ZNN_CUDA_K(strided_copy_cuda)(src.data<float>(), dst.data<float>(),
+                                        rank, ss, ds, sh, dst.numel()));
         return;
     }
     const int64_t rank = dst.dim_count();
@@ -94,9 +94,9 @@ void Tensor::Impl::copy_elements(const Tensor::Impl* src, Tensor::Impl* dst) {
             sh[d] = dst->shape.dims[d];
             total *= dst->shape.dims[d];
         }
-        ZNN_CUDA_K(strided_copy_cuda)(
+        ZNN_CUDA_CALL(ZNN_CUDA_K(strided_copy_cuda)(
             static_cast<const float*>(src->storage->data()) + src->offset,
-            static_cast<float*>(dst->storage->data()), rank, ss, ds, sh, total);
+            static_cast<float*>(dst->storage->data()), rank, ss, ds, sh, total));
         return;
     }
     const int64_t total = static_cast<int64_t>(dst->nbytes() / dtype_size(dst->dtype));
@@ -178,7 +178,7 @@ Storage* Storage::create(size_t bytes, Device device) {
         }
         Storage* s = new Storage(bytes, device);
         if (bytes > 0) {
-            s->data_ = ZNN_CUDA_K(alloc)(bytes);
+            s->data_ = ZNN_CUDA_CALLV(void*, ZNN_CUDA_K(alloc)(bytes));
         }
         return s;
     }
@@ -188,7 +188,7 @@ Storage* Storage::create(size_t bytes, Device device) {
         }
         Storage* s = new Storage(bytes, device);
         if (bytes > 0) {
-            s->data_ = ZNN_VULKAN_K(alloc)(bytes);
+            s->data_ = ZNN_VULKAN_CALLV(void*, ZNN_VULKAN_K(alloc)(bytes));
         }
         return s;
     }
