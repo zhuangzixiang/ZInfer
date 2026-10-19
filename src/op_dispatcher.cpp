@@ -35,9 +35,8 @@ void print_trace(const char* op, const char* what) {
 
 // CPU 中间结果拷回原设备输出(经 Storage 直写, 保持输出张量身份)
 void Impl_copy_back(const Tensor& cpu_src, Tensor& dst) {
-    ZNN_CUDA_CALL(cuda_backend::copy_host_to_device(dst.data<float>(),
-                                     cpu_src.data<float>(),
-                                     static_cast<size_t>(cpu_src.numel()) * sizeof(float)));
+    device_copy_h2d(dst.device(), dst.data<float>(), cpu_src.data<float>(),
+                    static_cast<size_t>(cpu_src.numel()) * sizeof(float));
 }
 } // namespace
 

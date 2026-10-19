@@ -79,5 +79,10 @@ void copy_view_to(const Tensor& src, Tensor& dst);
 // ---- 内部共用小工具 ----
 size_t dtype_size(DType dtype);       // 元素字节数
 void   check_cpu(Device device);      // GPU 里程碑前统一报错
+// 按设备路由的内存三原语 + 清零(句柄 = 各后端 alloc 返回的裸指针)
+void   device_copy_h2d(Device d, void* dst, const void* src, size_t bytes);
+void   device_copy_d2h(Device d, void* dst, const void* src, size_t bytes);
+void   device_copy_d2d(Device d, void* dst, const void* src, size_t bytes);
+void   device_memset0(Device d, void* p, size_t bytes);
 
 } // namespace znn

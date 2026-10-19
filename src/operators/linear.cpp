@@ -77,7 +77,7 @@ const Operator g_linear_operator = {
     linear_infer,
     linear_grad,
     linear_ref,
-    {linear_cpu_eigen(), ZNN_CUDA_K(linear_cuda), nullptr, ZNN_VULKAN_K(linear_vulkan)},
+    {linear_cpu_eigen(), ZNN_CUDA_K(linear_cuda), ZNN_METAL_K(linear_metal), ZNN_VULKAN_K(linear_vulkan)},
     sizeof(LinearOptions),
 };
 

@@ -30,13 +30,13 @@
 #if defined(ZNN_METAL)
   #include "backends/metal/metal_backend.hpp"
   #define ZNN_METAL_K(name)     metal_backend::name
-#else
-  #define ZNN_METAL_K(name)     nullptr
-  #define ZNN_METAL_AVAIL()     false
-#endif
-#if defined(ZNN_METAL)
+  #define ZNN_METAL_CALL(expr)  expr
+  #define ZNN_METAL_CALLV(t, e) e
   #define ZNN_METAL_AVAIL()     metal_backend::available()
 #else
+  #define ZNN_METAL_K(name)     nullptr
+  #define ZNN_METAL_CALL(expr)  znn_backend_unavailable<void>("Metal")
+  #define ZNN_METAL_CALLV(t, e) znn_backend_unavailable<t>("Metal")
   #define ZNN_METAL_AVAIL()     false
 #endif
 

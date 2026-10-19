@@ -823,3 +823,34 @@ dim ✓); Windows 不编译 .mm, 三构建不受影响(可移植源码本轮零�
 挡不住 API 层笔误(选择器名/绑定号); (b) dispatchThreads 的 grid 语义
 与 CUDA/Vulkan 的 group 数语义不同, 移植数学时最容易漏的是语义层
 而非数学层。
+
+---
+
+## [27] Metal 接线: 18 内核入槽 + 内存路由三原语 + 对拍测试
+
+**内容**(Mac 首编译全绿 22 项后的接线块)
+1. 18 算子 kernels[Metal] 槽位接线(13 逐元素 + matmul/linear/
+   softmax/sum/mean), 每算子一行 ZNN_METAL_K(xxx_metal)
+2. backend_slots.hpp 补 ZNN_METAL_CALL/CALLV(与 CUDA/Vulkan 对称);
+   此前 Metal 只有 K/AVAIL
+3. 内存路由收敛为按设备四原语 device_copy_h2d/d2h/d2d/memset0
+   (znn_internal): from_host/copy_elements/to_device/Impl_copy_back/
+   optimizer clear() 全部改走原语 —— 替换了四处 CUDA 硬编码分支。
+   其中两处是存量暗雷: Impl_copy_back(Vulkan 回落必炸, 从未触发)
+   与 from_host(Vulkan/Metal 张量直接 memcpy 句柄结构体)
+4. to_device 重写: 逐对 if 链 → CPU↔GPU + 跨后端借道 CPU(净 -14 行,
+   Metal/Vulkan/CUDA 对称)
+5. optimizer step() 守卫: 非 CPU/CUDA 参数显式抛错(Metal/Vulkan
+   优化器内核未建, 此前会把 GPU 句柄当 float* 静默 UB)
+6. t23 Metal 对拍: add/mul/relu/gelu/tanh + matmul(60×37×45 非 8
+   倍数专打边界 tile 守卫) + linear×w^T + 广播加 + sum/mean 非末维
+   + softmax; Windows 上自动跳过(device_available=false)
+
+**验证**: clang 严格解析 64/64; Windows 三构建全量回归全绿
+(CPU/Vulkan/CUDA + Vulkan 冒烟); Metal 对拍待 Mac 端 t23 执行。
+
+**反思**: 架构 9/10(四原语消掉了全部后端硬编码分支, 新后端接入
+= 后端实现 + 槽位行 + 原语 case) | 教训: Vulkan 当年只接了一半
+路由(from_host/copy_back 暗雷存活至今) —— "冒烟测试通过"只证明
+被测路径通, 派发器回落这种冷路径需要专项对拍(t23 的 fallback
+广播加即覆盖)。

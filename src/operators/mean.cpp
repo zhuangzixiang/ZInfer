@@ -64,7 +64,7 @@ const Operator g_mean_operator = {
     infer_reduce,
     mean_grad,
     mean_ref,
-    {mean_cpu, ZNN_CUDA_K(mean_cuda), nullptr, ZNN_VULKAN_K(mean_vulkan)},
+    {mean_cpu, ZNN_CUDA_K(mean_cuda), ZNN_METAL_K(mean_metal), ZNN_VULKAN_K(mean_vulkan)},
     sizeof(ReduceAttrs),
 };
 

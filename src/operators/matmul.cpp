@@ -58,7 +58,7 @@ const Operator g_matmul_operator = {
     matmul_infer,
     matmul_grad,
     matmul_ref,
-    {matmul_cpu_kernel(), ZNN_CUDA_K(matmul_cuda), nullptr, ZNN_VULKAN_K(matmul_vulkan)},  // CPU=Eigen, CUDA=朴素GEMM
+    {matmul_cpu_kernel(), ZNN_CUDA_K(matmul_cuda), ZNN_METAL_K(matmul_metal), ZNN_VULKAN_K(matmul_vulkan)},  // CPU=Eigen, CUDA=朴素GEMM
 };
 
 Tensor Tensor::matmul(const Tensor& a, const Tensor& b) {

@@ -24,6 +24,11 @@ void AdamImpl::step() {
             continue;
         }
         const int64_t n = p.numel();
+        if (p.device() != Device::CPU && p.device() != Device::CUDA) {
+            throw std::runtime_error(
+                "znn: optimizer step needs CPU/CUDA params (Metal/Vulkan"
+                " optimizer kernels not built); use to_device(CPU)");
+        }
         if (!moments_[i].m) {                     // 惰性分配(跟随参数设备)
             moments_[i].m = Tensor::zeros(p.shape(), DType::F32, p.device());
             moments_[i].v = Tensor::zeros(p.shape(), DType::F32, p.device());
@@ -54,13 +59,8 @@ void AdamImpl::step() {
 void AdamImpl::clear() {
     for (Tensor& p : params_) {
         if (p.grad()) {
-            if (p.device() == Device::CUDA) {
-                ZNN_CUDA_CALL(ZNN_CUDA_K(memset0_cuda)(p.grad().data<float>(),
-                                           static_cast<size_t>(p.numel()) * sizeof(float)));
-            } else {
-                std::memset(p.grad().data<float>(), 0,
-                            static_cast<size_t>(p.numel()) * sizeof(float));
-            }
+            device_memset0(p.grad().device(), p.grad().data<float>(),
+                           static_cast<size_t>(p.numel()) * sizeof(float));
         }
     }
 }

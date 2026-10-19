@@ -23,6 +23,11 @@ void SgdImpl::step() {
             continue;
         }
         const int64_t n = p.numel();
+        if (p.device() != Device::CPU && p.device() != Device::CUDA) {
+            throw std::runtime_error(
+                "znn: optimizer step needs CPU/CUDA params (Metal/Vulkan"
+                " optimizer kernels not built); use to_device(CPU)");
+        }
         if (p.device() == Device::CUDA) {                 // GPU: 原生内核更新
             if (param_.momentum > 0 && !velocity_[i]) {
                 velocity_[i] = Tensor::zeros(p.shape(), DType::F32, Device::CUDA);
@@ -55,13 +60,8 @@ void SgdImpl::step() {
 void SgdImpl::clear() {
     for (Tensor& p : params_) {
         if (p.grad()) {
-            if (p.device() == Device::CUDA) {
-                ZNN_CUDA_CALL(ZNN_CUDA_K(memset0_cuda)(p.grad().data<float>(),
-                                           static_cast<size_t>(p.numel()) * sizeof(float)));
-            } else {
-                std::memset(p.grad().data<float>(), 0,
-                            static_cast<size_t>(p.numel()) * sizeof(float));
-            }
+            device_memset0(p.grad().device(), p.grad().data<float>(),
+                           static_cast<size_t>(p.numel()) * sizeof(float));
         }
     }
 }

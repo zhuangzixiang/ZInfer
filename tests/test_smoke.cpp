@@ -640,6 +640,54 @@ static void test_cuda_parity() {
     std::printf("CUDA parity tests passed\n");
 }
 
+// t19m: Metal 对拍(18 内核) —— 与 CUDA 对拍同法: 同输入 CPU/Metal 双跑
+static void test_metal_parity() {
+    if (!Runtime::device_available(Device::Metal)) {
+        std::printf("Metal not available, skipping Metal parity tests\n");
+        return;
+    }
+    const auto m = [](const Tensor& t) { return t.to_device(Device::Metal); };
+    const auto back = [](const Tensor& t) { return t.to_device(Device::CPU); };
+    const auto cmp = [](const Tensor& c, const Tensor& g, const char* what, float tol) {
+        float md = 0.f;
+        for (int64_t i = 0; i < c.numel(); ++i) {
+            const float d = fabsf(c.data<float>()[i] - g.data<float>()[i]);
+            md = md < d ? d : md;
+        }
+        check(md < tol, what);
+    };
+    Tensor a = Tensor::randn({64, 48}, 31);
+    Tensor b = Tensor::randn({64, 48}, 32);
+    cmp(Tensor::add(a, b), back(Tensor::add(m(a), m(b))), "metal add parity", 0.f);
+    cmp(Tensor::mul(a, b), back(Tensor::mul(m(a), m(b))), "metal mul parity", 0.f);
+    cmp(Activator::relu(a), back(Activator::relu(m(a))), "metal relu parity", 0.f);
+    cmp(Activator::gelu(a), back(Activator::gelu(m(a))), "metal gelu parity", 1e-5f);
+    cmp(Activator::tanh(a), back(Activator::tanh(m(a))), "metal tanh parity", 1e-5f);
+
+    // GEMM 非 8 倍数形状(60×37×45): 专打边界 tile 守卫(ta按row/tb按col)
+    Tensor m1 = Tensor::randn({60, 37}, 33);
+    Tensor m2 = Tensor::randn({37, 45}, 34);
+    cmp(Tensor::matmul(m1, m2), back(Tensor::matmul(m(m1), m(m2))),
+        "metal matmul parity (boundary tiles)", 1e-4f);
+
+    // linear ×w^T(TB=1 路径, 无偏置) + 广播偏置加(bcast=1 路径)
+    Tensor lx = Tensor::randn({13, 29}, 35);
+    Tensor lw = Tensor::randn({21, 29}, 36);
+    Tensor lb = Tensor::randn({21}, 37);
+    Tensor lcpu = Tensor::linear(lx, lw);
+    Tensor lmet = Tensor::linear(m(lx), m(lw));
+    cmp(lcpu, back(lmet), "metal linear (x@wT) parity", 1e-4f);
+    cmp(Tensor::add(lcpu, lb), back(Tensor::add(lmet, m(lb))),
+        "metal broadcast add parity", 1e-4f);
+
+    // 规约(非末维) + softmax(末维): r[9,14,7] 覆盖三维步长表
+    Tensor r = Tensor::randn({9, 14, 7}, 38);
+    cmp(Tensor::sum(r, 1), back(Tensor::sum(m(r), 1)), "metal sum parity", 1e-4f);
+    cmp(Tensor::mean(r, 0), back(Tensor::mean(m(r), 0)), "metal mean parity", 1e-4f);
+    cmp(Activator::softmax(r), back(Activator::softmax(m(r))), "metal softmax parity", 1e-5f);
+    std::printf("Metal parity tests passed\n");
+}
+
 // t21: GPU 反向全算子对拍 —— 同输入 CPU/GPU 双建图反传, 逐输入比梯度
 // (铁律回归: 任何梯度规则的宿主循环/设备误用在此当场暴露)
 static Tensor sum_all(const Tensor& t) {
@@ -870,6 +918,7 @@ int main() {
     std::fprintf(stderr, "t20\n"); test_grad_scaler();
     std::fprintf(stderr, "t21\n"); test_gpu_backward_parity();
     std::fprintf(stderr, "t22\n"); test_limit_guards();
+    std::fprintf(stderr, "t23\n"); test_metal_parity();
     if (failures == 0) {
         std::printf("ALL BASIC TESTS PASSED\n");
         return 0;

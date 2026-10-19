@@ -30,7 +30,7 @@ const Operator g_relu_operator = {
     infer_same,
     relu_grad,
     relu_ref,
-    {relu_cpu, nullptr, nullptr, ZNN_VULKAN_K(relu_vulkan)},
+    {relu_cpu, nullptr, ZNN_METAL_K(relu_metal), ZNN_VULKAN_K(relu_vulkan)},
 };
 
 Tensor Activator::relu(const Tensor& x) {

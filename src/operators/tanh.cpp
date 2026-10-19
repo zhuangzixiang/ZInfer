@@ -30,7 +30,7 @@ const Operator g_tanh_operator = {
     infer_same,
     tanh_grad,
     tanh_ref,
-    {tanh_cpu, nullptr, nullptr, ZNN_VULKAN_K(tanh_vulkan)},
+    {tanh_cpu, nullptr, ZNN_METAL_K(tanh_metal), ZNN_VULKAN_K(tanh_vulkan)},
 };
 
 Tensor Activator::tanh(const Tensor& x) {

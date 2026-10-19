@@ -30,7 +30,7 @@ const Operator g_sigmoid_operator = {
     infer_same,
     sigmoid_grad,
     sigmoid_ref,
-    {sigmoid_cpu, nullptr, nullptr, ZNN_VULKAN_K(sigmoid_vulkan)},
+    {sigmoid_cpu, nullptr, ZNN_METAL_K(sigmoid_metal), ZNN_VULKAN_K(sigmoid_vulkan)},
 };
 
 Tensor Activator::sigmoid(const Tensor& x) {

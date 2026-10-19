@@ -30,7 +30,7 @@ const Operator g_neg_operator = {
     infer_same,
     neg_grad,
     neg_ref,
-    {neg_cpu, nullptr, nullptr, ZNN_VULKAN_K(neg_vulkan)},
+    {neg_cpu, nullptr, ZNN_METAL_K(neg_metal), ZNN_VULKAN_K(neg_vulkan)},
 };
 
 Tensor Tensor::neg(const Tensor& x) {

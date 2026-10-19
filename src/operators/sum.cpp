@@ -41,7 +41,7 @@ const Operator g_sum_operator = {
     infer_reduce,
     sum_grad,
     sum_ref,
-    {sum_cpu, ZNN_CUDA_K(sum_cuda), nullptr, ZNN_VULKAN_K(sum_vulkan)},
+    {sum_cpu, ZNN_CUDA_K(sum_cuda), ZNN_METAL_K(sum_metal), ZNN_VULKAN_K(sum_vulkan)},
     sizeof(ReduceAttrs),
 };
 

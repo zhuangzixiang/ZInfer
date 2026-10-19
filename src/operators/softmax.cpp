@@ -83,7 +83,7 @@ const Operator g_softmax_operator = {
     softmax_infer,
     softmax_grad,
     softmax_ref,
-    {softmax_cpu, ZNN_CUDA_K(softmax_cuda), nullptr, ZNN_VULKAN_K(softmax_vulkan)},
+    {softmax_cpu, ZNN_CUDA_K(softmax_cuda), ZNN_METAL_K(softmax_metal), ZNN_VULKAN_K(softmax_vulkan)},
     sizeof(SoftmaxOptions),
 };
 

@@ -26,7 +26,7 @@ const Operator g_sub_operator = {
     infer_broadcast,
     binary_grad,
     sub_ref,
-    {sub_cpu, nullptr, nullptr, ZNN_VULKAN_K(sub_vulkan)},
+    {sub_cpu, nullptr, ZNN_METAL_K(sub_metal), ZNN_VULKAN_K(sub_vulkan)},
 };
 
 Tensor Tensor::sub(const Tensor& a, const Tensor& b) {
