@@ -722,6 +722,9 @@ static void grad_parity(const char* name, std::vector<Tensor> inputs,
             md = md < d ? d : md;
         }
         check(md < tol, name);   // 失败时按算子名定位, maxerr 见断言消息
+        if (md >= tol) {
+            std::printf("grad_parity[%s] md=%.3e tol=%.1e\n", name, md, tol);
+        }
     }
 }
 

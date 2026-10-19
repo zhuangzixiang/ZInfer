@@ -37,7 +37,7 @@ static void mean_grad(BackwardContext& c) {
     const Tensor& g = *c.grad_outputs[0];
     const Tensor& x = *c.saved_inputs[0];
     const int64_t dim = a->dim < 0 ? a->dim + x.dim_count() : a->dim;
-    if (g.device() == Device::CUDA) {       // 原生: 广播 × 1/n 一次完成
+    if (g.device() != Device::CPU) {          // 原生: 广播步长 + 1/n 缩放
         const float inv = 1.f / static_cast<float>(x.size(dim));
         long long dims[8], eff[8];
         const int64_t* gs = g.strides();
@@ -48,9 +48,9 @@ static void mean_grad(BackwardContext& c) {
                                      : (a->keepdim ? d : (d > dim ? d - 1 : d));
             eff[d] = (gd < 0 || g.size(gd) == 1) ? 0 : gs[gd];
         }
-        ZNN_CUDA_CALL(ZNN_CUDA_K(grad_bcast_cuda)(g.data<float>(),
-                                      c.grad_inputs[0]->data<float>(),
-                                      c.grad_inputs[0]->numel(), rank, dims, eff, inv));
+        grad_bcast_dispatch(g.device(), g.data<float>(),
+                            c.grad_inputs[0]->data<float>(),
+                            c.grad_inputs[0]->numel(), rank, dims, eff, inv);
         return;
     }
     const float inv = 1.f / static_cast<float>(x.size(dim));

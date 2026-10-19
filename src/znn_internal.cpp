@@ -17,36 +17,15 @@ namespace impl {
 
 // 视图(src 任意 strided) → dst(连续)逐元素紧凑拷贝, 只经公共访问器
 void copy_view_to(const Tensor& src, Tensor& dst) {
-    if (dst.device() == Device::CUDA) {   // 原生: 双步长拷贝(dst 可为非连续视图)
-        long long ss[8], ds[8], sh[8];
-        const int rank = (int)dst.dim_count();
-        for (int d = 0; d < rank; ++d) {
-            ss[d] = src.strides()[d];
-            ds[d] = dst.strides()[d];
-            sh[d] = dst.size(d);
-        }
-        ZNN_CUDA_CALL(ZNN_CUDA_K(strided_copy_cuda)(src.data<float>(), dst.data<float>(),
-                                        rank, ss, ds, sh, dst.numel()));
-        return;
+    long long ss[8], ds[8], sh[8];        // 原生双步长拷贝(dst 可为非连续视图)
+    const int rank = (int)dst.dim_count();
+    for (int d = 0; d < rank; ++d) {
+        ss[d] = src.strides()[d];
+        ds[d] = dst.strides()[d];
+        sh[d] = dst.size(d);
     }
-    const int64_t rank = dst.dim_count();
-    const float* sp = src.data<float>();
-    float* dp = dst.data<float>();
-    const int64_t* ss = src.strides();
-    const int64_t* ds = dst.strides();
-    int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-    for (int64_t i = 0; i < dst.numel(); ++i) {
-        int64_t so = 0, doff = 0;              // 双步长: dst 可为非连续视图(散射)
-        for (int64_t d = 0; d < rank; ++d) {
-            so += idx[d] * ss[d];
-            doff += idx[d] * ds[d];
-        }
-        dp[doff] = sp[so];
-        for (int64_t d = rank - 1; d >= 0; --d) {
-            if (++idx[d] < dst.size(d)) break;
-            idx[d] = 0;
-        }
-    }
+    strided_copy_dispatch(dst.device(), src.data<float>(), dst.data<float>(),
+                          rank, ss, ds, sh, dst.numel());
 }
 
 } // namespace impl
@@ -132,9 +111,6 @@ void Tensor::Impl::copy_elements(const Tensor::Impl* src, Tensor::Impl* dst) {
         if (src->dtype != DType::F32) {
             throw std::runtime_error("znn: clone of non-contiguous non-F32 on GPU");
         }
-        if (src->device != Device::CUDA) {   // 仅 CUDA 有 strided 拷贝内核
-            throw std::runtime_error("znn: non-contiguous GPU clone CUDA-only (v1)");
-        }
         long long ss[8], ds[8], sh[8], total = 1;
         const int rank = (int)dst->shape.rank;
         for (int d = 0; d < rank; ++d) {
@@ -143,9 +119,10 @@ void Tensor::Impl::copy_elements(const Tensor::Impl* src, Tensor::Impl* dst) {
             sh[d] = dst->shape.dims[d];
             total *= dst->shape.dims[d];
         }
-        ZNN_CUDA_CALL(ZNN_CUDA_K(strided_copy_cuda)(
-            static_cast<const float*>(src->storage->data()) + src->offset,
-            static_cast<float*>(dst->storage->data()), rank, ss, ds, sh, total));
+        strided_copy_dispatch(src->device,
+                              static_cast<const float*>(src->storage->data()) + src->offset,
+                              static_cast<float*>(dst->storage->data()),
+                              rank, ss, ds, sh, total);
         return;
     }
     const int64_t total = static_cast<int64_t>(dst->nbytes() / dtype_size(dst->dtype));
@@ -402,11 +379,7 @@ Tensor Tensor::empty(Shape shape, DType dtype, Device device) {
 
 Tensor Tensor::zeros(Shape shape, DType dtype, Device device) {
     Tensor t = Tensor::empty(shape, dtype, device);
-    if (device == Device::CUDA) {
-        ZNN_CUDA_CALL(cuda_backend::memset0(t.impl_->storage->data(), t.impl_->nbytes()));
-    } else {
-        std::memset(t.impl_->storage->data(), 0, t.impl_->nbytes());
-    }
+    device_memset0(device, t.impl_->storage->data(), t.impl_->nbytes());
     return t;
 }
 
@@ -667,9 +640,15 @@ Tensor Tensor::to_device(Device device) const {
 
 Tensor Tensor::clone() const {
     require(impl_, "empty tensor");
-    Tensor t = Tensor::empty(impl_->shape, impl_->dtype, impl_->device);
-    Impl::copy_elements(impl_, t.impl_);
-    return t;
+    if (!Runtime::grad_enabled()) {              // [diag] 反向期内部材料化: 直拷
+        Tensor t = Tensor::empty(impl_->shape, impl_->dtype, impl_->device);
+        Impl::copy_elements(impl_, t.impl_);
+        return t;
+    }
+    // 经派发器: 可微(建图) + 全后端原生拷贝(strided copy 按设备派发)
+    const Tensor* ins[1] = {this};
+    return OpDispatcher::instance().run(&g_clone_operator,
+                                        Span<const Tensor*>(ins, 1), nullptr);
 }
 
 // ============================================================ 数据读取

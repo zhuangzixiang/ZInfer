@@ -27,7 +27,7 @@ id<MTLBuffer> mbuf(const Tensor& t) {
 
 uint32_t rup(uint32_t n, uint32_t a) { return (n + a - 1) / a * a; }  // 向上取整到组宽
 
-// MSL: 通用逐元素(13 算子共用; op/bcast/n 经 constant 缓冲)
+// MSL: 通用逐元素(13 算子共用; 二元全维广播, 右对齐步长表)
 const char* kMslElementwise = R"MSL(
 #include <metal_stdlib>
 using namespace metal;
@@ -36,17 +36,24 @@ kernel void elementwise(device const float* a [[buffer(0)]],
                         device const float* b [[buffer(1)]],
                         device float* y [[buffer(2)]],
                         constant const int* pc [[buffer(3)]]) {
-    // pc[0]=n pc[1]=op pc[2]=bcast
+    // pc[0]=n pc[1]=op pc[2]=rank
+    // pc[10+d]=dims pc[20+d]=sa pc[30+d]=sb(维长 1 → 步长 0)
     const int i = (int)((thread_position_in_grid).x);
     if (i >= pc[0]) return;
-    const float va = a[i];
-    const float vb = (pc[2] == 1) ? b[0] : b[i];
+    int t = i, oa = 0, ob = 0;
+    for (int d = pc[2] - 1; d >= 0; --d) {
+        const int idx = t % pc[10 + d];
+        t /= pc[10 + d];
+        oa += idx * pc[20 + d];
+        ob += idx * pc[30 + d];
+    }
+    const float va = a[oa];
     const int op = pc[1];
     float r;
-    if (op == 0) r = va + vb;
-    else if (op == 1) r = va - vb;
-    else if (op == 2) r = va * vb;
-    else if (op == 3) r = va / vb;
+    if (op == 0) r = va + b[ob];
+    else if (op == 1) r = va - b[ob];
+    else if (op == 2) r = va * b[ob];
+    else if (op == 3) r = va / b[ob];
     else if (op == 4) r = -va;
     else if (op == 5) r = exp(va);
     else if (op == 6) r = log(va);
@@ -162,18 +169,45 @@ void require(bool ok, const char* what) {
     if (!ok) throw std::runtime_error(std::string("znn metal: ") + what);
 }
 
-// 通用逐元素 host 入口(op 编码与 CUDA/Vulkan 一致)
-void elementwise(Span<const Tensor*> in, Span<Tensor*> out, int op, int bcast) {
-    require(in[0]->is_contiguous() && out[0]->is_contiguous(),
-            "elementwise needs contiguous");
-    const Tensor& a = *in[0];
+// 通用逐元素 host 入口(op 编码与 CUDA/Vulkan 一致; 二元全维广播)
+void elementwise(Span<const Tensor*> in, Span<Tensor*> out, int op) {
+    Tensor a = in[0]->is_contiguous() ? *in[0] : in[0]->clone();   // 视图材料化
     Tensor& y = *out[0];
     static id<MTLComputePipelineState> p = nil;   // 管线复用(同源码)
     if (!p) p = device::pipeline(kMslElementwise, "elementwise");
-    const int pc[3] = {(int)y.numel(), op, bcast};
-    id<MTLBuffer> vb = bcast ? mbuf(*in[1]) : mbuf(a);
+    int pc[40] = {0};
+    pc[0] = (int)y.numel();
+    pc[1] = op;
+    if (op <= 3) {                                // 二元: 广播步长图
+        Tensor b = in[1]->is_contiguous() ? *in[1] : in[1]->clone();
+        pc[2] = (int)y.dim_count();
+        int64_t ca = 1, cb = 1;
+        for (int64_t d = y.dim_count() - 1; d >= 0; --d) {
+            const int64_t ad = d - (int64_t)(y.dim_count() - a.dim_count());
+            const int64_t bd = d - (int64_t)(y.dim_count() - b.dim_count());
+            const int64_t av = ad < 0 ? 1 : a.size(ad);
+            const int64_t bv = bd < 0 ? 1 : b.size(bd);
+            if ((av != y.size(d) && av != 1) || (bv != y.size(d) && bv != 1)) {
+                throw std::runtime_error("znn: shapes not broadcastable");
+            }
+            pc[10 + d] = (int)y.size(d);
+            pc[20 + d] = av == 1 ? 0 : (int)ca;
+            pc[30 + d] = bv == 1 ? 0 : (int)cb;
+            ca *= av;
+            cb *= bv;
+        }
+        const uint32_t n = (uint32_t)y.numel();
+        device::dispatch(p, mbuf(a), mbuf(b), mbuf(y), pc, sizeof(pc),
+                         MTLSizeMake(rup(n, 256), 1, 1), MTLSizeMake(256, 1, 1), nil);
+        return;
+    }
+    require(a.is_contiguous() && y.is_contiguous(), "elementwise needs contiguous");
+    pc[2] = 1;                                    // 一元: 平凡图
+    pc[10] = pc[0];
+    pc[20] = 1;
+    pc[30] = 1;
     const uint32_t n = (uint32_t)y.numel();
-    device::dispatch(p, mbuf(a), vb, mbuf(y), pc, sizeof(pc),
+    device::dispatch(p, mbuf(a), mbuf(a), mbuf(y), pc, sizeof(pc),
                      MTLSizeMake(rup(n, 256), 1, 1), MTLSizeMake(256, 1, 1), nil);
 }
 
@@ -181,43 +215,43 @@ void elementwise(Span<const Tensor*> in, Span<Tensor*> out, int op, int bcast) {
 
 // ---- 逐元素 13 算子 ----
 void add_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    elementwise(in, out, 0, in[0]->numel() != in[1]->numel() ? 1 : 0);
+    elementwise(in, out, 0);
 }
 void sub_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    elementwise(in, out, 1, in[0]->numel() != in[1]->numel() ? 1 : 0);
+    elementwise(in, out, 1);
 }
 void mul_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    elementwise(in, out, 2, in[0]->numel() != in[1]->numel() ? 1 : 0);
+    elementwise(in, out, 2);
 }
 void div_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    elementwise(in, out, 3, in[0]->numel() != in[1]->numel() ? 1 : 0);
+    elementwise(in, out, 3);
 }
 void neg_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    elementwise(in, out, 4, 0);
+    elementwise(in, out, 4);
 }
 void exp_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    elementwise(in, out, 5, 0);
+    elementwise(in, out, 5);
 }
 void log_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    elementwise(in, out, 6, 0);
+    elementwise(in, out, 6);
 }
 void sqrt_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    elementwise(in, out, 7, 0);
+    elementwise(in, out, 7);
 }
 void relu_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    elementwise(in, out, 8, 0);
+    elementwise(in, out, 8);
 }
 void gelu_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    elementwise(in, out, 9, 0);
+    elementwise(in, out, 9);
 }
 void sigmoid_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    elementwise(in, out, 10, 0);
+    elementwise(in, out, 10);
 }
 void tanh_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    elementwise(in, out, 11, 0);
+    elementwise(in, out, 11);
 }
 void silu_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
-    elementwise(in, out, 12, 0);
+    elementwise(in, out, 12);
 }
 
 // ---- GEMM / linear ----
@@ -313,6 +347,216 @@ void softmax_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const uint32_t rows = (uint32_t)pc[0];
     device::dispatch(p, mbuf(x), mbuf(x), mbuf(y), pc, sizeof(pc),
                      MTLSizeMake(rup(rows, 256), 1, 1), MTLSizeMake(256, 1, 1), nil);
+}
+
+// ---- 直连内核(unary_bwd 经注册表槽位; 其余经 backend_slots 宏直调) ----
+namespace {
+
+// MSL: 一元反向 gi = g × f'(x, y); FN 0Neg..8Silu(与 CUDA unary_deriv_d 同表)
+const char* kMslUnaryBwd = R"MSL(
+#include <metal_stdlib>
+using namespace metal;
+
+float deriv(int fn, float xv, float yv) {
+    if (fn == 0) return -1.0f;
+    if (fn == 1) return yv;
+    if (fn == 2) return 1.0f / xv;
+    if (fn == 3) return 0.5f / yv;
+    if (fn == 4) return xv > 0.0f ? 1.0f : 0.0f;
+    if (fn == 5) {
+        const float inner = 0.7978845608f * (xv + 0.044715f * xv * xv * xv);
+        const float t = tanh(inner);
+        const float dt = (1.0f - t * t) * 0.7978845608f
+                       * (1.0f + 3.0f * 0.044715f * xv * xv);
+        return 0.5f * (1.0f + t) + 0.5f * xv * dt;
+    }
+    if (fn == 6) return yv * (1.0f - yv);
+    if (fn == 7) return 1.0f - yv * yv;
+    const float sg = 1.0f / (1.0f + exp(-xv));   // Silu
+    return sg + xv * sg * (1.0f - sg);
+}
+
+kernel void unarybwd(device const float* g [[buffer(0)]],
+                     device const float* x [[buffer(1)]],
+                     device const float* yo [[buffer(2)]],
+                     device float* gi [[buffer(3)]],
+                     constant const int* pc [[buffer(8)]]) {
+    const int i = (int)((thread_position_in_grid).x);
+    if (i >= pc[0]) return;
+    gi[i] = g[i] * deriv(pc[1], x[i], yo[i]);
+}
+)MSL";
+
+// MSL: 双步长拷贝(reshape/slice/transpose/permute/cat/stack 底层原语)
+const char* kMslCopy = R"MSL(
+#include <metal_stdlib>
+using namespace metal;
+
+kernel void stridedcopy(device const float* s [[buffer(0)]],
+                        device float* d [[buffer(1)]],
+                        constant const int* pc [[buffer(8)]]) {
+    // pc[0]=total pc[1]=rank pc[10+d]=ss pc[20+d]=ds pc[30+d]=sh
+    const int i = (int)((thread_position_in_grid).x);
+    if (i >= pc[0]) return;
+    int t = i, so = 0, dof = 0;
+    for (int d2 = pc[1] - 1; d2 >= 0; --d2) {
+        const int idx = t % pc[30 + d2];
+        t /= pc[30 + d2];
+        so += idx * pc[10 + d2];
+        dof += idx * pc[20 + d2];
+    }
+    d[dof] = s[so];
+}
+)MSL";
+
+// MSL: 梯度广播/置换 out[i] = scale × g[Σ idx·eff]
+const char* kMslBcastGrad = R"MSL(
+#include <metal_stdlib>
+using namespace metal;
+
+kernel void bcastgrad(device const float* g [[buffer(0)]],
+                      device float* outv [[buffer(1)]],
+                      constant const int* pc [[buffer(8)]]) {
+    // pc[0]=total pc[1]=rank pc[10+d]=dims pc[20+d]=eff; scale 存 pc[30] 位型
+    const int i = (int)((thread_position_in_grid).x);
+    if (i >= pc[0]) return;
+    int t = i, go = 0;
+    for (int d2 = pc[1] - 1; d2 >= 0; --d2) {
+        go += (t % pc[10 + d2]) * pc[20 + d2];
+        t /= pc[10 + d2];
+    }
+    const float scale = *(constant float*)(&pc[30]);
+    outv[i] = scale * g[go];
+}
+)MSL";
+
+// MSL: 优化器步进(0=SGD momentum / 1=Adam, 与 CUDA sgd_k/adam_k 同构)
+const char* kMslOpt = R"MSL(
+#include <metal_stdlib>
+using namespace metal;
+
+kernel void optstep(device float* p [[buffer(0)]],
+                    device const float* g [[buffer(1)]],
+                    device float* u1 [[buffer(2)]],
+                    device float* u2 [[buffer(3)]],
+                    constant const int* pc [[buffer(8)]]) {
+    // pc[0]=n pc[1]=opt; pc[2..] 存 float 位型(lr,p1..p6)
+    const int i = (int)((thread_position_in_grid).x);
+    if (i >= pc[0]) return;
+    const constant float* pf = (constant float*)&pc[2];
+    const float lr = pf[0];
+    if (pc[1] == 0) {
+        if (pf[1] > 0.0f) {
+            u1[i] = pf[1] * u1[i] + g[i] + pf[2] * p[i];
+            p[i] -= lr * u1[i];
+        } else {
+            p[i] -= lr * (g[i] + pf[2] * p[i]);
+        }
+    } else {
+        const float grad = g[i] + pf[4] * p[i];
+        u1[i] = pf[1] * u1[i] + (1.0f - pf[1]) * grad;
+        u2[i] = pf[2] * u2[i] + (1.0f - pf[2]) * grad * grad;
+        const float mh = u1[i] / pf[5];
+        const float vh = u2[i] / pf[6];
+        p[i] -= lr * mh / (sqrt(vh) + pf[3]);
+    }
+}
+)MSL";
+
+} // namespace
+
+void unary_bwd_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                     const void* options) {
+    static id<MTLComputePipelineState> p = nil;
+    if (!p) p = device::pipeline(kMslUnaryBwd, "unarybwd");
+    const int fn = (int)*static_cast<const unsigned char*>(options);
+    const int pc[2] = {(int)out[0]->numel(), fn};
+    id<MTLBuffer> bufs[4] = {mbuf(*in[0]), mbuf(*in[1]), mbuf(*in[2]),
+                             mbuf(*out[0])};
+    const uint32_t n = (uint32_t)pc[0];
+    device::dispatch_bufs(p, bufs, 4, pc, sizeof(pc),
+                          MTLSizeMake(rup(n, 256), 1, 1), MTLSizeMake(256, 1, 1));
+}
+
+namespace {
+void copy_pc_fill(int* pc, long long total, int rank, const long long* ss,
+                  const long long* ds, const long long* sh) {
+    pc[0] = (int)total;
+    pc[1] = rank;
+    for (int d = 0; d < rank; ++d) {
+        pc[10 + d] = (int)ss[d];
+        pc[20 + d] = (int)ds[d];
+        pc[30 + d] = (int)sh[d];
+    }
+}
+} // namespace
+
+void grad_bcast_metal(const float* g, float* out, long long total, int rank,
+                      const long long* dims, const long long* eff, float scale) {
+    static id<MTLComputePipelineState> p = nil;
+    if (!p) p = device::pipeline(kMslBcastGrad, "bcastgrad");
+    int pc[34] = {0};
+    pc[0] = (int)total;
+    pc[1] = rank;
+    for (int d = 0; d < rank; ++d) {
+        pc[10 + d] = (int)dims[d];
+        pc[20 + d] = (int)eff[d];
+    }
+    std::memcpy(&pc[30], &scale, sizeof(scale));   // 尾部 float 位型
+    id<MTLBuffer> bufs[2] = {device::buf_of(const_cast<float*>(g)),
+                             device::buf_of(out)};
+    const uint32_t n = (uint32_t)total;
+    device::dispatch_bufs(p, bufs, 2, pc, sizeof(pc),
+                          MTLSizeMake(rup(n, 256), 1, 1), MTLSizeMake(256, 1, 1));
+}
+
+void strided_copy_metal(const float* src, float* dst, int rank,
+                        const long long* ss, const long long* ds,
+                        const long long* sh, long long total) {
+    static id<MTLComputePipelineState> p = nil;
+    if (!p) p = device::pipeline(kMslCopy, "stridedcopy");
+    int pc[40] = {0};
+    copy_pc_fill(pc, total, rank, ss, ds, sh);
+    id<MTLBuffer> bufs[2] = {device::buf_of(const_cast<float*>(src)),
+                             device::buf_of(dst)};
+    const uint32_t n = (uint32_t)total;
+    device::dispatch_bufs(p, bufs, 2, pc, sizeof(pc),
+                          MTLSizeMake(rup(n, 256), 1, 1), MTLSizeMake(256, 1, 1));
+}
+
+void sgd_step_metal(float* p, const float* g, float* vel, long long n,
+                    float lr, float momentum, float wd) {
+    static id<MTLComputePipelineState> pl = nil;
+    if (!pl) pl = device::pipeline(kMslOpt, "optstep");
+    int pc[9] = {0};
+    pc[0] = (int)n;
+    pc[1] = 0;
+    const float pf[3] = {lr, momentum, wd};
+    std::memcpy(&pc[2], pf, sizeof(pf));
+    id<MTLBuffer> bufs[4] = {device::buf_of(p),
+                             device::buf_of(const_cast<float*>(g)),
+                             device::buf_of(vel), device::buf_of(vel)};
+    device::dispatch_bufs(pl, bufs, 4, pc, sizeof(pc),
+                          MTLSizeMake(rup((uint32_t)n, 256), 1, 1),
+                          MTLSizeMake(256, 1, 1));
+}
+
+void adam_step_metal(float* p, const float* g, float* m, float* v,
+                     long long n, float lr, float b1, float b2, float eps,
+                     float wd, float bias1, float bias2) {
+    static id<MTLComputePipelineState> pl = nil;
+    if (!pl) pl = device::pipeline(kMslOpt, "optstep");
+    int pc[9] = {0};
+    pc[0] = (int)n;
+    pc[1] = 1;
+    const float pf[7] = {lr, b1, b2, eps, wd, bias1, bias2};
+    std::memcpy(&pc[2], pf, sizeof(pf));
+    id<MTLBuffer> bufs[4] = {device::buf_of(p),
+                             device::buf_of(const_cast<float*>(g)),
+                             device::buf_of(m), device::buf_of(v)};
+    device::dispatch_bufs(pl, bufs, 4, pc, sizeof(pc),
+                          MTLSizeMake(rup((uint32_t)n, 256), 1, 1),
+                          MTLSizeMake(256, 1, 1));
 }
 
 } // namespace metal_backend

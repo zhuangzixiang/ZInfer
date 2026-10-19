@@ -3,45 +3,56 @@
 // 约定: 与 CUDA 内核同构 —— 每线程一个输出元素, 一维工作组派发
 
 // ==================================================================
-// 通用逐元素(13 算子共用): op 选择经特化常量注入, 编译期展开
+// 通用逐元素(13 算子共用): op 经特化常量注入; 二元为全维广播
+// (右对齐步长表, 维长 1 → 步长 0 —— 与 CUDA binary_bcast_k 同构)
 // ==================================================================
 layout(local_size_x = 256) in;
 
 layout(constant_id = 0) const int OP = 0;   // 0+ 1- 2* 3/ 4neg 5exp 6log
                                             // 7sqrt 8relu 9gelu 10sigmoid
                                             // 11tanh 12silu
-layout(constant_id = 1) const int BCAST = 0;   // 0 同形, 1 b 广播(步长0)
 layout(binding = 0) buffer A  { float a[]; };
 layout(binding = 1) buffer Bb { float b[]; };
 layout(binding = 2) buffer Y  { float y[]; };
 
-layout(push_constant) uniform Pc { int n; } pc;
+layout(push_constant) uniform Pc {
+    int n;
+    int rank;
+    int dims[8];
+    int sa[8];
+    int sb[8];
+} pc;
 
-float unary_op(float v, int op) {
-    if (op == 4)  return -v;
-    if (op == 5)  return exp(v);
-    if (op == 6)  return log(v);
-    if (op == 7)  return sqrt(v);
-    if (op == 8)  return v > 0.0 ? v : 0.0;
-    if (op == 9)  { float k = 0.7978845608 * (v + 0.044715 * v * v * v);
+float unary_op(float v) {
+    if (OP == 4)  return -v;
+    if (OP == 5)  return exp(v);
+    if (OP == 6)  return log(v);
+    if (OP == 7)  return sqrt(v);
+    if (OP == 8)  return v > 0.0 ? v : 0.0;
+    if (OP == 9)  { float k = 0.7978845608 * (v + 0.044715 * v * v * v);
                     return 0.5 * v * (1.0 + tanh(k)); }
-    if (op == 10) return 1.0 / (1.0 + exp(-v));
-    if (op == 11) return tanh(v);
-    if (op == 12) return v / (1.0 + exp(-v));
+    if (OP == 10) return 1.0 / (1.0 + exp(-v));
+    if (OP == 11) return tanh(v);
+    if (OP == 12) return v / (1.0 + exp(-v));
     return v;
 }
 
 void main() {
     const uint i = gl_GlobalInvocationID.x;
     if (i >= uint(pc.n)) return;
-    const float va = a[i];
-    const float vb = (BCAST == 1) ? b[0] : b[i];
-    float r;
-    if (OP <= 3) {
-        r = (OP == 0) ? va + vb : (OP == 1) ? va - vb
-          : (OP == 2) ? va * vb : va / vb;
-    } else {
-        r = unary_op(va, OP);   // 一元: B 输出忽略
+    int t = int(i), oa = 0, ob = 0;
+    for (int d = pc.rank - 1; d >= 0; --d) {
+        const int idx = t % pc.dims[d];
+        t /= pc.dims[d];
+        oa += idx * pc.sa[d];
+        ob += idx * pc.sb[d];
     }
-    y[i] = r;
+    const float va = a[oa];
+    if (OP <= 3) {
+        const float vb = b[ob];
+        y[i] = (OP == 0) ? va + vb : (OP == 1) ? va - vb
+             : (OP == 2) ? va * vb : va / vb;
+    } else {
+        y[i] = unary_op(va);   // 一元: B 占位
+    }
 }

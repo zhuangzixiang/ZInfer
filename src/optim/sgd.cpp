@@ -23,19 +23,30 @@ void SgdImpl::step() {
             continue;
         }
         const int64_t n = p.numel();
-        if (p.device() != Device::CPU && p.device() != Device::CUDA) {
-            throw std::runtime_error(
-                "znn: optimizer step needs CPU/CUDA params (Metal/Vulkan"
-                " optimizer kernels not built); use to_device(CPU)");
-        }
-        if (p.device() == Device::CUDA) {                 // GPU: 原生内核更新
+        if (p.device() != Device::CPU) {                 // GPU: 原生内核更新
             if (param_.momentum > 0 && !velocity_[i]) {
-                velocity_[i] = Tensor::zeros(p.shape(), DType::F32, Device::CUDA);
+                velocity_[i] = Tensor::zeros(p.shape(), DType::F32, p.device());
             }
-            ZNN_CUDA_CALL(ZNN_CUDA_K(sgd_step_cuda)(
-                p.data<float>(), p.grad().data<float>(),
-                param_.momentum > 0 ? velocity_[i].data<float>() : nullptr,
-                n, param_.lr, param_.momentum, param_.weight_decay));
+            float* vel = param_.momentum > 0 && velocity_[i]
+                           ? velocity_[i].data<float>() : p.data<float>();  // 占位
+            switch (p.device()) {
+            case Device::CUDA:
+                ZNN_CUDA_CALL(ZNN_CUDA_K(sgd_step_cuda)(
+                    p.data<float>(), p.grad().data<float>(), vel, n,
+                    param_.lr, param_.momentum, param_.weight_decay));
+                break;
+            case Device::Vulkan:
+                ZNN_VULKAN_CALL(vulkan_backend::sgd_step_vulkan(
+                    p.data<float>(), p.grad().data<float>(), vel, n,
+                    param_.lr, param_.momentum, param_.weight_decay));
+                break;
+            case Device::Metal:
+                ZNN_METAL_CALL(metal_backend::sgd_step_metal(
+                    p.data<float>(), p.grad().data<float>(), vel, n,
+                    param_.lr, param_.momentum, param_.weight_decay));
+                break;
+            default: break;
+            }
             continue;
         }
         const float* g = p.grad().data<float>();

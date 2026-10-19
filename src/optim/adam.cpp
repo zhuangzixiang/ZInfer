@@ -24,21 +24,35 @@ void AdamImpl::step() {
             continue;
         }
         const int64_t n = p.numel();
-        if (p.device() != Device::CPU && p.device() != Device::CUDA) {
-            throw std::runtime_error(
-                "znn: optimizer step needs CPU/CUDA params (Metal/Vulkan"
-                " optimizer kernels not built); use to_device(CPU)");
-        }
-        if (!moments_[i].m) {                     // 惰性分配(跟随参数设备)
+        if (!moments_[i].m) {                         // 惰性分配(跟随参数设备)
             moments_[i].m = Tensor::zeros(p.shape(), DType::F32, p.device());
             moments_[i].v = Tensor::zeros(p.shape(), DType::F32, p.device());
         }
-        if (p.device() == Device::CUDA) {         // GPU: 原生内核更新
-            ZNN_CUDA_CALL(ZNN_CUDA_K(adam_step_cuda)(
-                p.data<float>(), p.grad().data<float>(),
-                moments_[i].m.data<float>(), moments_[i].v.data<float>(),
-                n, param_.lr, b1, b2, param_.eps, param_.weight_decay,
-                bias1, bias2));
+        if (p.device() != Device::CPU) {              // GPU: 原生内核更新
+            switch (p.device()) {
+            case Device::CUDA:
+                ZNN_CUDA_CALL(ZNN_CUDA_K(adam_step_cuda)(
+                    p.data<float>(), p.grad().data<float>(),
+                    moments_[i].m.data<float>(), moments_[i].v.data<float>(),
+                    n, param_.lr, b1, b2, param_.eps, param_.weight_decay,
+                    bias1, bias2));
+                break;
+            case Device::Vulkan:
+                ZNN_VULKAN_CALL(vulkan_backend::adam_step_vulkan(
+                    p.data<float>(), p.grad().data<float>(),
+                    moments_[i].m.data<float>(), moments_[i].v.data<float>(),
+                    n, param_.lr, b1, b2, param_.eps, param_.weight_decay,
+                    bias1, bias2));
+                break;
+            case Device::Metal:
+                ZNN_METAL_CALL(metal_backend::adam_step_metal(
+                    p.data<float>(), p.grad().data<float>(),
+                    moments_[i].m.data<float>(), moments_[i].v.data<float>(),
+                    n, param_.lr, b1, b2, param_.eps, param_.weight_decay,
+                    bias1, bias2));
+                break;
+            default: break;
+            }
             continue;
         }
         const float* g = p.grad().data<float>();

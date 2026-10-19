@@ -32,6 +32,9 @@ void binary_kernel_fast(Span<const Tensor*> in, Span<Tensor*> out, float (*fn)(f
 enum class UnaryBwd : uint8_t { Neg, Exp, Log, Sqrt, ReLU, GELU, Sigmoid, Tanh, Silu };
 extern const Operator g_unary_bwd_operator;
 
+// 可微深拷贝算子(Tensor::clone 经派发器走此: 建图 + 全后端原生拷贝)
+extern const Operator g_clone_operator;
+
 // ---- 梯度规则帮手(输入连续假设, MNIST 路径成立; 非连续留待 contiguous 处理) ----
 // 二元逐元素: 两输入梯度 = grad_out 规约回各自形状
 void binary_grad(BackwardContext& context);
@@ -51,6 +54,16 @@ Tensor sum_along(const Tensor& x, int64_t dim, bool keepdim);
 // sum 的梯度: 把 g 沿 dim 广播回 in_shape 写入 out(mean 梯度再除以 n)
 void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
                    const Shape& in_shape, Tensor& out);
+
+// 设备无关内核派发(GPU 原生 / CPU 宿主循环; eff 由调用方按语义预计算)
+// 梯度广播/置换: out[i] = scale × g[Σ idx·eff]
+void grad_bcast_dispatch(Device dev, const float* g, float* out,
+                         long long total, int rank, const long long* dims,
+                         const long long* eff, float scale);
+// 双步长拷贝(dst 可散射): dp[Σ idx·ds] = sp[Σ idx·ss]
+void strided_copy_dispatch(Device dev, const float* src, float* dst, int rank,
+                           const long long* ss, const long long* ds,
+                           const long long* sh, long long total);
 
 // conv2d 朴素参考(对拍与回退共用)
 void conv2d_naive(KernelContext& ctx, Span<const Tensor*> in,

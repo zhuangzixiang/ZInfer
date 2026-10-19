@@ -1,0 +1,29 @@
+#version 450
+// 双步长拷贝(dst 可散射视图): dp[Σ idx·ds] = sp[Σ idx·ss]
+// 与 CUDA strided_copy_cuda 同构 —— reshape/slice/transpose/permute/
+// cat/stack 的底层原语
+layout(local_size_x = 256) in;
+
+layout(binding = 0) buffer S { float s[]; };
+layout(binding = 1) buffer D { float d[]; };
+
+layout(push_constant) uniform Pc {
+    int total;
+    int rank;
+    int ss[8];
+    int ds[8];
+    int sh[8];
+} pc;
+
+void main() {
+    const uint i = gl_GlobalInvocationID.x;
+    if (i >= uint(pc.total)) return;
+    int t = int(i), so = 0, dof = 0;
+    for (int d2 = pc.rank - 1; d2 >= 0; --d2) {
+        const int idx = t % pc.sh[d2];
+        t /= pc.sh[d2];
+        so += idx * pc.ss[d2];
+        dof += idx * pc.ds[d2];
+    }
+    d[dof] = s[so];
+}

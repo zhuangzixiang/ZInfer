@@ -34,13 +34,16 @@ struct PipeKey {
     const uint32_t* code;
     size_t bytes;
     uint32_t c0, c1;
+    uint32_t nbind;      // 存储缓冲绑定数(2..8; 0 视为 3, 兼容旧调用)
     bool operator==(const PipeKey& o) const {
-        return code == o.code && bytes == o.bytes && c0 == o.c0 && c1 == o.c1;
+        return code == o.code && bytes == o.bytes && c0 == o.c0 && c1 == o.c1
+               && nbind == o.nbind;
     }
 };
 struct PipeKeyHash {
     size_t operator()(const PipeKey& k) const {
-        return std::hash<const void*>()(k.code) ^ (k.c0 * 31) ^ (k.c1 << 8);
+        return std::hash<const void*>()(k.code) ^ (k.c0 * 31) ^ (k.c1 << 8)
+               ^ (k.nbind << 16);
     }
 };
 } // namespace device
@@ -365,8 +368,11 @@ void submit_wait(VkCommandBuffer cb) {
     si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     si.commandBufferCount = 1;
     si.pCommandBuffers = &cb;
-    vkQueueSubmit(v->queue, 1, &si, VK_NULL_HANDLE);
-    vkQueueWaitIdle(v->queue);
+    const VkResult rs = vkQueueSubmit(v->queue, 1, &si, VK_NULL_HANDLE);
+    const VkResult rw = vkQueueWaitIdle(v->queue);
+    if (rs != VK_SUCCESS || rw != VK_SUCCESS) {   // [诊断] 设备丢失/提交失败
+        std::fprintf(stderr, "[vk] submit st=%d wait st=%d\n", (int)rs, (int)rw);
+    }
     vkFreeCommandBuffers(v->dev, v->pool, 1, &cb);
 }
 
@@ -397,9 +403,10 @@ bool get_pipeline(PipeKey key, const size_t* push_sizes,   // [storage, push]
         *out = it->second;
         return true;
     }
-    // 3 storage buffer 绑定(通用形态: a/b/y; 用不到的绑空)
-    VkDescriptorSetLayoutBinding lb[3];
-    for (int i = 0; i < 3; ++i) {
+    // 存储缓冲绑定(通用形态: 按内核需要 2..8 个)
+    const uint32_t nb = key.nbind == 0 ? 3 : key.nbind;
+    VkDescriptorSetLayoutBinding lb[8];
+    for (uint32_t i = 0; i < nb; ++i) {
         lb[i].binding = i;
         lb[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         lb[i].descriptorCount = 1;
@@ -407,7 +414,7 @@ bool get_pipeline(PipeKey key, const size_t* push_sizes,   // [storage, push]
     }
     VkDescriptorSetLayoutCreateInfo dli{};
     dli.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    dli.bindingCount = 3;
+    dli.bindingCount = nb;
     dli.pBindings = lb;
     VkDescriptorSetLayout dsl;
     if (vkCreateDescriptorSetLayout(v->dev, &dli, nullptr, &dsl) != VK_SUCCESS) {
@@ -486,16 +493,15 @@ bool get_pipeline(PipeKey key, const size_t* push_sizes,   // [storage, push]
     return true;
 }
 
-// 绑定 3 缓冲 + 推送常量 + 派发(同步等待)
-bool dispatch(const Pipeline& p, VkBuffer a, VkBuffer b, VkBuffer y,
-              const void* push, size_t push_size,
-              uint32_t gx, uint32_t gy, uint32_t gz) {
+// 绑定 N 缓冲 + 推送常量 + 派发(同步等待)
+bool dispatch_bufs(const Pipeline& p, const VkBuffer* bufs, uint32_t nbuf,
+                   const void* push, size_t push_size,
+                   uint32_t gx, uint32_t gy, uint32_t gz) {
     VkState* v = st();
-    VkDescriptorBufferInfo bi[3] = {{a, 0, VK_WHOLE_SIZE},
-                                    {b, 0, VK_WHOLE_SIZE},
-                                    {y, 0, VK_WHOLE_SIZE}};
-    VkWriteDescriptorSet w[3] = {};   // pNext 未清零曾致驱动崩溃
-    for (int i = 0; i < 3; ++i) {
+    VkDescriptorBufferInfo bi[8] = {};
+    VkWriteDescriptorSet w[8] = {};   // pNext 未清零曾致驱动崩溃
+    for (uint32_t i = 0; i < nbuf; ++i) {
+        bi[i] = VkDescriptorBufferInfo{bufs[i], 0, VK_WHOLE_SIZE};
         w[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         w[i].dstSet = p.ds;
         w[i].dstBinding = i;
@@ -503,7 +509,7 @@ bool dispatch(const Pipeline& p, VkBuffer a, VkBuffer b, VkBuffer y,
         w[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         w[i].pBufferInfo = &bi[i];
     }
-    vkUpdateDescriptorSets(v->dev, 3, w, 0, nullptr);
+    vkUpdateDescriptorSets(v->dev, nbuf, w, 0, nullptr);
     VkCommandBuffer cb = begin_cmd();
     vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, p.pipe);
     vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, p.layout, 0, 1,
@@ -515,6 +521,14 @@ bool dispatch(const Pipeline& p, VkBuffer a, VkBuffer b, VkBuffer y,
     vkCmdDispatch(cb, gx, gy, gz);
     submit_wait(cb);
     return true;
+}
+
+// 绑定 3 缓冲(a/b/y)的常用形态
+bool dispatch(const Pipeline& p, VkBuffer a, VkBuffer b, VkBuffer y,
+              const void* push, size_t push_size,
+              uint32_t gx, uint32_t gy, uint32_t gz) {
+    const VkBuffer bufs[3] = {a, b, y};
+    return dispatch_bufs(p, bufs, 3, push, push_size, gx, gy, gz);
 }
 
 VkBuffer buf_of(void* p) { return static_cast<VkBuf*>(p)->buf; }
@@ -532,14 +546,16 @@ void memset0(void* p, size_t bytes) {
 // ---- 内核桥(隐藏 Vk* 类型; kernels 文件经不透明句柄使用) ----
 namespace device_bridge {
 
-void* get_pipeline(const void* code, size_t bytes, unsigned c0, unsigned c1) {
+void* get_pipeline(const void* code, size_t bytes, unsigned c0, unsigned c1,
+                   unsigned nbind) {
     static std::unordered_map<uint64_t, void*> bridge_cache;   // 指针+常量→管线
     const uint64_t key = (uint64_t)(uintptr_t)code ^ ((uint64_t)c0 << 40)
-                         ^ ((uint64_t)c1 << 48);
+                         ^ ((uint64_t)c1 << 48) ^ ((uint64_t)nbind << 56);
     auto it = bridge_cache.find(key);
     if (it != bridge_cache.end()) return it->second;
     device::Pipeline p;
-    if (!device::get_pipeline({(const uint32_t*)code, bytes, c0, c1}, nullptr, &p)) {
+    if (!device::get_pipeline({(const uint32_t*)code, bytes, c0, c1, nbind},
+                              nullptr, &p)) {
         return nullptr;
     }
     // Pipeline 是缓存值拷贝(句柄型字段), 堆上驻留一份供桥使用
@@ -554,6 +570,18 @@ bool dispatch(void* pipe, void* a, void* b, void* y,
     device::Pipeline* p = static_cast<device::Pipeline*>(pipe);
     return device::dispatch(*p, device::buf_of(a), device::buf_of(b),
                             device::buf_of(y), push, push_size, gx, gy, gz);
+}
+
+bool dispatch_bufs(void* pipe, void* const* bufs, int nbuf,
+                   const void* push, size_t push_size,
+                   unsigned gx, unsigned gy, unsigned gz) {
+    device::Pipeline* p = static_cast<device::Pipeline*>(pipe);
+    VkBuffer bs[8];
+    for (int i = 0; i < nbuf; ++i) {
+        bs[i] = device::buf_of(bufs[i]);
+    }
+    return device::dispatch_bufs(*p, bs, (uint32_t)nbuf, push, push_size,
+                                 gx, gy, gz);
 }
 
 } // namespace device_bridge

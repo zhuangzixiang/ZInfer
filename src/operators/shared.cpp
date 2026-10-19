@@ -155,8 +155,27 @@ const Operator g_unary_bwd_operator = {
     unary_bwd_infer,
     nullptr,                                   // 内部算子, 无二次反向
     unary_bwd_ref,
-    {nullptr, ZNN_CUDA_K(unary_bwd_cuda), nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(unary_bwd_cuda), ZNN_METAL_K(unary_bwd_metal), ZNN_VULKAN_K(unary_bwd_vulkan)},
     sizeof(UnaryBwd),
+};
+
+// ---- 可微深拷贝(Tensor::clone 经派发器: 建图 + 全后端原生拷贝) ----
+namespace {
+void clone_run(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const void*) {
+    impl::copy_view_to(*in[0], *out[0]);       // 内部按设备派发 strided copy
+}
+void clone_grad(BackwardContext& c) {
+    *c.grad_inputs[0] = *c.grad_outputs[0];    // 恒等: 梯度原样回传(句柄共享)
+}
+} // namespace
+
+const Operator g_clone_operator = {
+    "clone",
+    infer_same,
+    clone_grad,
+    clone_run,
+    {clone_run, clone_run, clone_run, clone_run},   // 同一 host 入口, 内部按设备派发
+    0,
 };
 
 void unary_grad(BackwardContext& context, UnaryBwd fn) {
@@ -283,35 +302,81 @@ Tensor sum_along(const Tensor& x, int64_t dim, bool keepdim) {
 
 void sum_grad_into(const Tensor& g, int64_t dim, bool keepdim,
                    const Shape& in_shape, Tensor& out) {
-    if (g.device() == Device::CUDA) {       // 原生: 广播维(g 尺寸 1)步长置 0
-        long long dims[8], eff[8];
-        const int64_t* gs = g.strides();
-        const int rank = (int)in_shape.rank;
-        for (int d = 0; d < rank; ++d) {
-            dims[d] = in_shape.dims[d];
-            const int64_t gd = (d == dim && !keepdim) ? -1
-                                    : (keepdim ? d : (d > dim ? d - 1 : d));
-            eff[d] = (gd < 0 || g.size(gd) == 1) ? 0 : gs[gd];
-        }
-        ZNN_CUDA_CALL(ZNN_CUDA_K(grad_bcast_cuda)(g.data<float>(), out.data<float>(),
-                                      out.numel(), rank, dims, eff, 1.f));
-        return;
-    }
-    const float* gp = g.data<float>();
-    float* op = out.data<float>();
+    // 原生: 广播维(g 尺寸 1)步长置 0; CPU 走通用宿主循环
+    long long dims[8], eff[8];
     const int64_t* gs = g.strides();
+    const int rank = (int)in_shape.rank;
+    for (int d = 0; d < rank; ++d) {
+        dims[d] = in_shape.dims[d];
+        const int64_t gd = (d == dim && !keepdim) ? -1
+                                : (keepdim ? d : (d > dim ? d - 1 : d));
+        eff[d] = (gd < 0 || g.size(gd) == 1) ? 0 : gs[gd];
+    }
+    grad_bcast_dispatch(g.device(), g.data<float>(), out.data<float>(),
+                        out.numel(), rank, dims, eff, 1.f);
+}
+
+// ---- 设备无关内核派发(GPU 原生 / CPU 宿主循环) ----
+void grad_bcast_dispatch(Device dev, const float* g, float* out,
+                         long long total, int rank, const long long* dims,
+                         const long long* eff, float scale) {
+    switch (dev) {
+    case Device::CUDA:
+        ZNN_CUDA_CALL(ZNN_CUDA_K(grad_bcast_cuda)(g, out, total, rank, dims,
+                                                  eff, scale));
+        return;
+    case Device::Vulkan:
+        ZNN_VULKAN_CALL(vulkan_backend::grad_bcast_vulkan(g, out, total, rank,
+                                                          dims, eff, scale));
+        return;
+    case Device::Metal:
+        ZNN_METAL_CALL(metal_backend::grad_bcast_metal(g, out, total, rank,
+                                                       dims, eff, scale));
+        return;
+    default: break;
+    }
     int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-    for (int64_t i = 0; i < out.numel(); ++i) {
+    for (int64_t i = 0; i < total; ++i) {
         int64_t go = 0;
-        for (int64_t d = 0; d < in_shape.rank; ++d) {
-            if (d == dim && !keepdim) continue;   // 被求和维不贡献梯度偏移
-            const int64_t gd = keepdim ? d : (d > dim ? d - 1 : d);
-            // keepdim 的 g 被规约维长 1: 广播步长取 0(否则越界读)
-            go += (g.size(gd) == 1) ? 0 : idx[d] * gs[gd];
+        for (int64_t d = 0; d < rank; ++d) {
+            go += idx[d] * eff[d];
         }
-        op[i] = gp[go];
-        for (int64_t d = in_shape.rank - 1; d >= 0; --d) {
-            if (++idx[d] < in_shape.dims[d]) break;
+        out[i] = scale * g[go];
+        for (int64_t d = rank - 1; d >= 0; --d) {
+            if (++idx[d] < dims[d]) break;
+            idx[d] = 0;
+        }
+    }
+}
+
+void strided_copy_dispatch(Device dev, const float* src, float* dst, int rank,
+                           const long long* ss, const long long* ds,
+                           const long long* sh, long long total) {
+    switch (dev) {
+    case Device::CUDA:
+        ZNN_CUDA_CALL(ZNN_CUDA_K(strided_copy_cuda)(src, dst, rank, ss, ds, sh,
+                                                    total));
+        return;
+    case Device::Vulkan:
+        ZNN_VULKAN_CALL(vulkan_backend::strided_copy_vulkan(src, dst, rank, ss,
+                                                            ds, sh, total));
+        return;
+    case Device::Metal:
+        ZNN_METAL_CALL(metal_backend::strided_copy_metal(src, dst, rank, ss, ds,
+                                                         sh, total));
+        return;
+    default: break;
+    }
+    int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    for (int64_t i = 0; i < total; ++i) {
+        int64_t so = 0, doff = 0;              // 双步长: dst 可为非连续视图(散射)
+        for (int64_t d = 0; d < rank; ++d) {
+            so += idx[d] * ss[d];
+            doff += idx[d] * ds[d];
+        }
+        dst[doff] = src[so];
+        for (int64_t d = rank - 1; d >= 0; --d) {
+            if (++idx[d] < sh[d]) break;
             idx[d] = 0;
         }
     }

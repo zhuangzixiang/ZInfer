@@ -145,6 +145,25 @@ void dispatch(id<MTLComputePipelineState> p, id<MTLBuffer> a, id<MTLBuffer> b,
     [cb waitUntilCompleted];
 }
 
+void dispatch_bufs(id<MTLComputePipelineState> p, id<MTLBuffer> const* bufs,
+                   int nbuf, const void* push, size_t push_size,
+                   MTLSize grid, MTLSize tg) {
+    MtlState* v = st();
+    id<MTLCommandBuffer> cb = [v->queue commandBuffer];
+    id<MTLComputeCommandEncoder> enc = [cb computeCommandEncoder];
+    [enc setComputePipelineState:p];
+    for (int i = 0; i < nbuf; ++i) {
+        [enc setBuffer:bufs[i] offset:0 atIndex:(NSUInteger)i];
+    }
+    if (push) {
+        [enc setBytes:push length:push_size atIndex:8];   // 推送常量=缓冲8
+    }
+    [enc dispatchThreads:grid threadsPerThreadgroup:tg];
+    [enc endEncoding];
+    [cb commit];
+    [cb waitUntilCompleted];
+}
+
 } // namespace device
 
 } // namespace metal_backend

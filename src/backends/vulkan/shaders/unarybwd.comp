@@ -1,0 +1,38 @@
+#version 450
+// 一元反向内部算子: gi[i] = g[i] × f'(x[i], y[i])
+// FN 经特化常量注入(0Neg 1Exp 2Log 3Sqrt 4ReLU 5GELU 6Sigmoid 7Tanh 8Silu)
+// 与 CUDA unary_deriv_d 表逐行对应
+layout(local_size_x = 256) in;
+
+layout(constant_id = 0) const int FN = 0;
+
+layout(binding = 0) buffer G  { float g[]; };
+layout(binding = 1) buffer X  { float x[]; };
+layout(binding = 2) buffer Yo { float yo[]; };
+layout(binding = 3) buffer Gi { float gi[]; };
+
+layout(push_constant) uniform Pc { int n; } pc;
+
+float deriv(float xv, float yv) {
+    if (FN == 0) return -1.0;
+    if (FN == 1) return yv;
+    if (FN == 2) return 1.0 / xv;
+    if (FN == 3) return 0.5 / yv;
+    if (FN == 4) return xv > 0.0 ? 1.0 : 0.0;
+    if (FN == 5) {
+        const float inner = 0.7978845608 * (xv + 0.044715 * xv * xv * xv);
+        const float t = tanh(inner);
+        const float dt = (1.0 - t * t) * 0.7978845608 * (1.0 + 3.0 * 0.044715 * xv * xv);
+        return 0.5 * (1.0 + t) + 0.5 * xv * dt;
+    }
+    if (FN == 6) return yv * (1.0 - yv);
+    if (FN == 7) return 1.0 - yv * yv;
+    const float sg = 1.0 / (1.0 + exp(-xv));   // Silu
+    return sg + xv * sg * (1.0 - sg);
+}
+
+void main() {
+    const uint i = gl_GlobalInvocationID.x;
+    if (i >= uint(pc.n)) return;
+    gi[i] = g[i] * deriv(x[i], yo[i]);
+}

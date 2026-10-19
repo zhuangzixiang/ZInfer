@@ -49,40 +49,17 @@ static void permute_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> ou
 
 static void permute_grad(BackwardContext& c) {
     const PermuteOptions* o = static_cast<const PermuteOptions*>(c.options);
-    // 逆排列: 梯度直接按逆排列做材料化拷贝
-    int64_t inv[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-    for (int64_t d = 0; d < o->rank; ++d) {
-        inv[o->order[d]] = d;
-    }
     const Tensor& g = *c.grad_outputs[0];
     Tensor& dx = *c.grad_inputs[0];
     const int64_t* gs = g.strides();
     const Shape& ds = dx.shape();
-    if (g.device() == Device::CUDA) {       // 原生: 逆置换步长收集
-        long long dims[8], eff[8];
-        for (int64_t d = 0; d < ds.rank; ++d) {
-            dims[d] = ds.dims[d];
-            eff[d] = gs[o->order[d]];       // idx[p] 的步长 = g 第 order[p] 维步长
-        }
-        ZNN_CUDA_CALL(ZNN_CUDA_K(grad_bcast_cuda)(g.data<float>(), dx.data<float>(),
-                                      dx.numel(), (int)ds.rank, dims, eff, 1.f));
-        return;
+    long long dims[8], eff[8];                // 逆置换步长收集(各后端原生)
+    for (int64_t d = 0; d < ds.rank; ++d) {
+        dims[d] = ds.dims[d];
+        eff[d] = gs[o->order[d]];             // idx[p] 的步长 = g 第 order[p] 维步长
     }
-    const float* gp = g.data<float>();
-    float* dp = dx.data<float>();
-    // 遍历输出(=输入形状)多下标, 按逆排列算梯度源偏移
-    int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-    for (int64_t i = 0; i < dx.numel(); ++i) {
-        int64_t go = 0;
-        for (int64_t d = 0; d < ds.rank; ++d) {
-            go += idx[inv[d]] * gs[d];
-        }
-        dp[i] = gp[go];
-        for (int64_t d = ds.rank - 1; d >= 0; --d) {
-            if (++idx[d] < ds.dims[d]) break;
-            idx[d] = 0;
-        }
-    }
+    grad_bcast_dispatch(g.device(), g.data<float>(), dx.data<float>(),
+                        dx.numel(), (int)ds.rank, dims, eff, 1.f);
 }
 
 const Operator g_permute_operator = {

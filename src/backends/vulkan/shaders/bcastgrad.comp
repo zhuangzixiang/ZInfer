@@ -1,0 +1,27 @@
+#version 450
+// 梯度广播/置换: out[i] = scale × g[Σ idx·eff]
+// eff 由宿主按语义预计算(sum: 被求和维 eff=0; mean: 再乘 1/n;
+// permute: 逆置换步长) —— 与 CUDA grad_bcast_k 同构
+layout(local_size_x = 256) in;
+
+layout(binding = 0) buffer Gin { float gin[]; };
+layout(binding = 1) buffer OutBuf { float outv[]; };
+
+layout(push_constant) uniform Pc {
+    int total;
+    int rank;
+    int dims[8];
+    int eff[8];
+    float scale;
+} pc;
+
+void main() {
+    const uint i = gl_GlobalInvocationID.x;
+    if (i >= uint(pc.total)) return;
+    int t = int(i), go = 0;
+    for (int d2 = pc.rank - 1; d2 >= 0; --d2) {
+        go += (t % pc.dims[d2]) * pc.eff[d2];
+        t /= pc.dims[d2];
+    }
+    outv[i] = pc.scale * gin[go];
+}

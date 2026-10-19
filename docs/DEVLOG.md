@@ -854,3 +854,44 @@ dim ✓); Windows 不编译 .mm, 三构建不受影响(可移植源码本轮零�
 路由(from_host/copy_back 暗雷存活至今) —— "冒烟测试通过"只证明
 被测路径通, 派发器回落这种冷路径需要专项对拍(t23 的 fallback
 广播加即覆盖)。
+
+---
+
+## [28] 铁律整改 SB1: GPU 梯度基础设施(Vulkan/Metal 对齐 CUDA)
+
+**背景**: 用户裁定"18 算子原生,其余回落 CPU"违反"全算子原生"铁律。
+盘点: CUDA 35/35; Vulkan/Metal 各缺 17 算子+优化器+层迁移。分五子块,
+本块(SB1)= 梯度与优化器基础设施。
+
+**内容**
+1. 多缓冲派发桥: Vulkan 管线绑定数入缓存键(2..8) + dispatch_bufs;
+   Metal dispatch_bufs(缓冲 0..n-1, 推送常量 buffer(8))
+2. 逐元素升级全维广播(右对齐步长表, 维长 1→步长 0)—— 与 CUDA
+   binary_bcast_k 同构; 原版仅标量 b[0] 广播, [M,N]+[N] 类是错的
+   (又一个"数学对应了、语义层没对应"案例)。GLSL+MSL 双实现
+3. 新内核 ×2 后端: unary_bwd(9 导数表)/grad_bcast(步长收集)/
+   strided_copy(双步长)/opt(SGD+Adam 合一, 特化常量切换)
+4. 设备无关助手 grad_bcast_dispatch/strided_copy_dispatch(shared.cpp):
+   消掉 sum/mean/permute/copy_view_to 四处"CUDA 分支+宿主循环"重复
+5. 优化器设备通用: sgd/adam step 按设备切原生内核, moments/velocity
+   惰性分配跟随参数设备; 撤掉"仅 CPU/CUDA"守卫
+6. 存量 bug ×3: (a) Tensor::zeros 对 GPU 设备 std::memset 句柄结构体
+   = 堆损坏(引擎反向首步即触发), 改走 device_memset0; (b) clone()
+   头文件注释称"仍参与建图"但实现丢 requires_grad—— 注册可微 clone
+   算子 + 反向期(建图关)直拷的分裂语义; (c) Adam moments 惰性分配
+   误入 GPU 分支(本块自查自纠)
+7. gpu_vulkan 冒烟扩展: 全维广播/逐元素反向(unary_bwd+grad_bcast)/
+   matmul+clone+views 整链反向(双端对解析梯度 0 误差, CPU↔VK 逐位
+   一致)/Adam 步进 CPU↔VK 对拍
+
+**验证**: Windows 三构建全绿(CUDA t21 含全算子梯度对拍; Vulkan 冒烟
+9 段全过 EXIT=0; CPU 22 项 + MNIST 97.16%); clang 严格解析 64/64。
+Metal 侧 MSL 与 host 全镜像(待 Mac 端验证)。
+
+**反思**: 质量 6/10(首发即踩 3 个存量雷, 调试链路 длинная) | 教训:
+(a) **tape 遍历中派发器插节点 = 迭代器失效 UB**—— 内核内部材料化
+   不得走公共 clone(分裂语义); (b) 测试复用张量 impl 会跨 backward
+   叠加梯度污染(7a 残留进 7b, 伪装成 0.22"泄漏"追了整轮); (c)
+   item()/data() 在 GPU 张量上是句柄裸读(文档化限制)—— 测试须先
+   to_device(CPU); (d) python heredoc 改 C++ 源码第三次炸(\n 实体
+   化)—— 已全面回到 Edit 工具。

@@ -22,6 +22,10 @@ void dispatch(id<MTLComputePipelineState> p, id<MTLBuffer> a, id<MTLBuffer> b,
               id<MTLBuffer> y, const void* push, size_t push_size,
               MTLSize grid, MTLSize tg,
               void (^config)(id<MTLComputeCommandEncoder>));
+// N 缓冲派发(多输入/优化器内核): 缓冲绑 0..n-1, push 走 buffer(8)
+void dispatch_bufs(id<MTLComputePipelineState> p, id<MTLBuffer> const* bufs,
+                   int nbuf, const void* push, size_t push_size,
+                   MTLSize grid, MTLSize tg);
 
 } // namespace device
 } // namespace metal_backend
