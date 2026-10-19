@@ -1,0 +1,116 @@
+#version 450
+// 行主序 C[M,N] = A[M,K] × op(B); TB=1 时 B 为 [N,K](× w^T)
+// 64×64 分块, K 步 16, 256 线程(16×16), 每线程 4×4 寄存器累加器。
+// 双缓冲: 计算当前块的同时从全局寄存器预取下一块(隐藏装载延迟)。
+// 算术强度 ~32 FLOP/装载元素, B 装载摊销 64 行(32×32 版的两倍)。
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(constant_id = 0) const int TB = 0;
+
+layout(binding = 0) readonly buffer Abuf { float a[]; };
+layout(binding = 1) readonly buffer Bbuf { float b[]; };
+layout(binding = 2) writeonly buffer Ybuf { float y[]; };
+
+layout(push_constant) uniform Pc {
+    int M; int N; int K;
+    int lda; int ldb; int ldc;
+} pc;
+
+shared float sA[2][64][16];
+shared float sB[2][16][64];
+
+void main() {
+    const int i0 = int(gl_WorkGroupID.y) * 64;
+    const int j0 = int(gl_WorkGroupID.x) * 64;
+    const int lr = int(gl_LocalInvocationID.y);
+    const int lc = int(gl_LocalInvocationID.x);
+
+    float acc[4][4];
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j) acc[i][j] = 0.0;
+
+    const int tiles = (pc.K + 15) / 16;
+
+    // ---- 预取第 0 块到寄存器 ----
+    float ra0 = 0.0, ra1 = 0.0, ra2 = 0.0, ra3 = 0.0;
+    float rb0 = 0.0, rb1 = 0.0, rb2 = 0.0, rb3 = 0.0;
+    {
+        const int kA = 0 + lc;          // A 的列
+        const int kB = 0 + lr;          // B 的行(此前误用 lc —— ones 测试不可见)
+        const int r = i0 + 4 * lr;
+        ra0 = (r < pc.M && kA < pc.K) ? a[r * pc.lda + kA] : 0.0;
+        ra1 = (r + 1 < pc.M && kA < pc.K) ? a[(r + 1) * pc.lda + kA] : 0.0;
+        ra2 = (r + 2 < pc.M && kA < pc.K) ? a[(r + 2) * pc.lda + kA] : 0.0;
+        ra3 = (r + 3 < pc.M && kA < pc.K) ? a[(r + 3) * pc.lda + kA] : 0.0;
+        const int j = j0 + 4 * lc;
+        if (TB == 0) {
+            rb0 = (kB < pc.K && j < pc.N) ? b[kB * pc.ldb + j] : 0.0;
+            rb1 = (kB < pc.K && j + 1 < pc.N) ? b[kB * pc.ldb + j + 1] : 0.0;
+            rb2 = (kB < pc.K && j + 2 < pc.N) ? b[kB * pc.ldb + j + 2] : 0.0;
+            rb3 = (kB < pc.K && j + 3 < pc.N) ? b[kB * pc.ldb + j + 3] : 0.0;
+        } else {
+            rb0 = (j < pc.N && kB < pc.K) ? b[j * pc.ldb + kB] : 0.0;
+            rb1 = (j + 1 < pc.N && kB < pc.K) ? b[(j + 1) * pc.ldb + kB] : 0.0;
+            rb2 = (j + 2 < pc.N && kB < pc.K) ? b[(j + 2) * pc.ldb + kB] : 0.0;
+            rb3 = (j + 3 < pc.N && kB < pc.K) ? b[(j + 3) * pc.ldb + kB] : 0.0;
+        }
+    }
+
+    int cur = 0;
+    for (int t = 0; t < tiles; ++t) {
+        const int k0 = t * 16;
+        // ---- 寄存器 → 共享[cur](第 t 块) ----
+        const int rA = 4 * lr;
+        sA[cur][rA][lc] = ra0;
+        sA[cur][rA + 1][lc] = ra1;
+        sA[cur][rA + 2][lc] = ra2;
+        sA[cur][rA + 3][lc] = ra3;
+        const int cB = 4 * lc;
+        sB[cur][lr][cB] = rb0;
+        sB[cur][lr][cB + 1] = rb1;
+        sB[cur][lr][cB + 2] = rb2;
+        sB[cur][lr][cB + 3] = rb3;
+        barrier();
+        // ---- 预取第 t+1 块到寄存器(与计算重叠) ----
+        if (t + 1 < tiles) {
+            const int kA = k0 + 16 + lc;
+            const int kB = k0 + 16 + lr;
+            const int r = i0 + 4 * lr;
+            ra0 = (r < pc.M && kA < pc.K) ? a[r * pc.lda + kA] : 0.0;
+            ra1 = (r + 1 < pc.M && kA < pc.K) ? a[(r + 1) * pc.lda + kA] : 0.0;
+            ra2 = (r + 2 < pc.M && kA < pc.K) ? a[(r + 2) * pc.lda + kA] : 0.0;
+            ra3 = (r + 3 < pc.M && kA < pc.K) ? a[(r + 3) * pc.lda + kA] : 0.0;
+            const int j = j0 + 4 * lc;
+            if (TB == 0) {
+                rb0 = (kB < pc.K && j < pc.N) ? b[kB * pc.ldb + j] : 0.0;
+                rb1 = (kB < pc.K && j + 1 < pc.N) ? b[kB * pc.ldb + j + 1] : 0.0;
+                rb2 = (kB < pc.K && j + 2 < pc.N) ? b[kB * pc.ldb + j + 2] : 0.0;
+                rb3 = (kB < pc.K && j + 3 < pc.N) ? b[kB * pc.ldb + j + 3] : 0.0;
+            } else {
+                rb0 = (j < pc.N && kB < pc.K) ? b[j * pc.ldb + kB] : 0.0;
+                rb1 = (j + 1 < pc.N && kB < pc.K) ? b[(j + 1) * pc.ldb + kB] : 0.0;
+                rb2 = (j + 2 < pc.N && kB < pc.K) ? b[(j + 2) * pc.ldb + kB] : 0.0;
+                rb3 = (j + 3 < pc.N && kB < pc.K) ? b[(j + 3) * pc.ldb + kB] : 0.0;
+            }
+        }
+        // ---- 从共享[cur] 计算 ----
+        for (int k = 0; k < 16; ++k) {
+            const float av[4] = float[4](sA[cur][4 * lr][k], sA[cur][4 * lr + 1][k],
+                                         sA[cur][4 * lr + 2][k], sA[cur][4 * lr + 3][k]);
+            const float bv[4] = float[4](sB[cur][k][4 * lc], sB[cur][k][4 * lc + 1],
+                                         sB[cur][k][4 * lc + 2], sB[cur][k][4 * lc + 3]);
+            for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 4; ++j)
+                    acc[i][j] += av[i] * bv[j];
+        }
+        barrier();   // 全线程读毕 shared[cur] 才可被 t+1 覆盖
+        cur = 1 - cur;
+    }
+    const int r0 = i0 + 4 * lr;
+    const int c0 = j0 + 4 * lc;
+    for (int i = 0; i < 4; ++i)
+        for (int j = 0; j < 4; ++j) {
+            const int r = r0 + i, c = c0 + j;
+            if (r < pc.M && c < pc.N) y[r * pc.ldc + c] = acc[i][j];
+        }
+}

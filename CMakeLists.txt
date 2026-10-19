@@ -158,9 +158,11 @@ if(ZNN_METAL)
 endif()
 
 # Eigen 多线程 GEMM 走 OpenMP(MSVC /openmp; gcc/clang -fopenmp 由下方统一)
+# Apple Clang 不自带 libomp —— Mac 上跳过(单线程 Eigen + Metal/oneDNN 路径不受影响;
+# 需要时 brew install libomp 后删 APPLE 条件即可)
 if(MSVC AND NOT ZNN_CUDA)
     target_compile_options(znn PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:/openmp>")
-else()
+elseif(NOT APPLE)
     find_package(OpenMP REQUIRED)
     target_link_libraries(znn PRIVATE OpenMP::OpenMP_CXX)
 endif()

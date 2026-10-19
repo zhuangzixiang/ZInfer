@@ -14,6 +14,7 @@
 #include "vulkan/vulkan.h"
 #include "backends/vulkan/gen/common.h"
 #include "backends/vulkan/gen/gemm.h"
+#include "backends/vulkan/gen/gemm_big.h"
 #include "backends/vulkan/gen/reduce.h"
 #include "backends/vulkan/gen/softmax.h"
 #include <stdexcept>
@@ -110,6 +111,17 @@ bool gemm(const float* A, int lda, const float* Bp, int ldb,
 }
 } // namespace
 
+// 内核选择(cuBLAS 同做法): 小中规模 32×32(占用高), 大规模 64×64
+// (B 装载摊销翻倍, 大工作集不崩塌); 交叉点 ~50 GFLOP(实测)
+namespace {
+void* gemm_pipeline(int64_t flops, int big_c0) {
+    if (flops >= (int64_t)50 << 30) {   // ≥50 GFLOP → 64×64 大内核
+        return bridge::get_pipeline(spirv::gemm_big, spirv::gemm_big_bytes, big_c0, 0);
+    }
+    return bridge::get_pipeline(spirv::gemm, spirv::gemm_bytes, big_c0, 0);
+}
+} // namespace
+
 void matmul_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                    const void*) {
     const Tensor& a = *in[0];
@@ -118,11 +130,14 @@ void matmul_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     require(a.is_contiguous() && b.is_contiguous() && y.is_contiguous(),
             "matmul needs contiguous");
     const int M = (int)a.size(0), K = (int)a.size(1), N = (int)b.size(1);
-    void* p = bridge::get_pipeline(spirv::gemm, spirv::gemm_bytes, 0, 0);
+    const int64_t flops = (int64_t)M * N * K * 2;
+    const bool big = flops >= (int64_t)50 << 30;
+    const int tile = big ? 64 : 32;
+    void* p = gemm_pipeline(flops, 0);
     require(p, "gemm pipeline");
     struct { int32_t M, N, K, lda, ldb, ldc; } pc{M, N, K, K, N, N};
-    const uint32_t gx = (uint32_t)((N + 31) / 32);
-    const uint32_t gy = (uint32_t)((M + 31) / 32);
+    const uint32_t gx = (uint32_t)((N + tile - 1) / tile);
+    const uint32_t gy = (uint32_t)((M + tile - 1) / tile);
     bridge::dispatch(p, vhandle(a), vhandle(b), vhandle(y), &pc, sizeof(pc), gx, gy, 1);
 }
 
@@ -135,11 +150,13 @@ void linear_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     require(x.is_contiguous() && w.is_contiguous() && y.is_contiguous(),
             "linear needs contiguous");
     const int M = (int)x.size(0), K = (int)x.size(1), N = (int)w.size(0);
-    void* p = bridge::get_pipeline(spirv::gemm, spirv::gemm_bytes, 1, 0);
+    const int64_t flops = (int64_t)M * N * K * 2;
+    const int tile = flops >= (int64_t)50 << 30 ? 64 : 32;
+    void* p = gemm_pipeline(flops, 1);
     require(p, "gemm-t pipeline");
     struct { int32_t M, N, K, lda, ldb, ldc; } pc{M, N, K, K, K, N};
-    const uint32_t gx = (uint32_t)((N + 31) / 32);
-    const uint32_t gy = (uint32_t)((M + 31) / 32);
+    const uint32_t gx = (uint32_t)((N + tile - 1) / tile);
+    const uint32_t gy = (uint32_t)((M + tile - 1) / tile);
     bridge::dispatch(p, vhandle(x), vhandle(w), vhandle(y), &pc, sizeof(pc), gx, gy, 1);
     // bias: in[2] 存在时逐行广播加(复用 elementwise 广播通道)
     if (in.size() > 2 && in[2]) {

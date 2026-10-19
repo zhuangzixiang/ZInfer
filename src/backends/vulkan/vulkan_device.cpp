@@ -105,12 +105,13 @@ struct VkState {
     uint32_t qfamily = 0;
     VkCommandPool pool = VK_NULL_HANDLE;
     VkDescriptorPool dpool = VK_NULL_HANDLE;
-    uint32_t host_mem_idx = UINT32_MAX;
+    uint32_t host_mem_idx = UINT32_MAX;    // 系统内存(小分配: CPU 写缓存 + L2 吸收)
+    uint32_t local_mem_idx = UINT32_MAX;  // BAR 显存(大分配: GPU 直读 VRAM)
     bool ok = false;
     std::mutex mu;                       // 提交串行化(v1 单队列)
     // 缓冲池: 尺寸桶(2^n)空闲链表 —— 每调用 vkCreateBuffer+AllocateMemory
     // 是毫秒级开销, 复用免分配(与 CUDA 驱动池同动机; 归还而非销毁)
-    std::unordered_map<size_t, std::vector<void*>> buf_pool;
+    std::unordered_map<uint64_t, std::vector<void*>> buf_pool;   // key=(类型<<48|桶)
 };
 VkState* st() {
     static VkState s;
@@ -183,16 +184,22 @@ bool init_vulkan() {
     VK_FOREACH_DEVICE_FN(VK_LOAD_DEV)
 #undef VK_LOAD_DEV
     vkGetDeviceQueue(v->dev, v->qfamily, 0, &v->queue);
-    // 主机可见内存类型
+    // 内存类型选择: 优先 DEVICE_LOCAL+HOST_VISIBLE(BAR 显存, 680GB/s);
+    // 兜底首个 HOST_VISIBLE。此前取首个可见类型(常为系统内存堆) ——
+    // GPU 经 PCIe 读取(~25GB/s), 大矩阵 L2 失效后崩塌(存量缺口, 本块修复)
     VkPhysicalDeviceMemoryProperties mp;
     vkGetPhysicalDeviceMemoryProperties(v->pdev, &mp);
     for (uint32_t i = 0; i < mp.memoryTypeCount; ++i) {
-        if (mp.memoryTypes[i].propertyFlags
-            & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
-            v->host_mem_idx = i;
-            break;
+        const VkMemoryPropertyFlags f = mp.memoryTypes[i].propertyFlags;
+        if ((f & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) == 0) continue;
+        if ((f & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) continue;
+        if (f & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
+            v->local_mem_idx = i;         // BAR 显存(大矩阵: GPU 直读 VRAM)
+        } else if (v->host_mem_idx == UINT32_MAX) {
+            v->host_mem_idx = i;          // 系统内存(小矩阵实测更快)
         }
     }
+    if (v->host_mem_idx == UINT32_MAX) v->host_mem_idx = v->local_mem_idx;
     if (v->host_mem_idx == UINT32_MAX) return false;
 
     VkCommandPoolCreateInfo pci{};
@@ -220,6 +227,7 @@ struct VkBuf {
     VkDeviceMemory mem;
     void* mapped;          // 主机可见: 常驻映射
     size_t cap;
+    uint32_t mem_idx;
 };
 
 } // namespace
@@ -240,18 +248,22 @@ size_t bucket_of(size_t bytes) {          // 桶 = ≥256 的下一个 2^n
 void* alloc(size_t bytes) {
     VkState* v = st();
     if (!v->ok || bytes == 0) return nullptr;
-    {   // 池命中(桶内有等容块直接复用; 容量由桶保证; 超大块不池化
-        //  —— 64MB+ 主机可见块复用表现异常, 直接驱动分配)
-        if (bytes <= (size_t)32 << 20) {
-        const size_t bk = bucket_of(bytes);
+    // 内存类型: ≥64MB(4096 级矩阵)走 BAR 显存, 其余系统内存
+    // (实测: ≤2048 工作集系统内存+L2 更快; 8MB 阈值曾把 2048 推上显存反而 2.6× 慢)
+    const uint32_t mem_idx = (bytes >= ((size_t)64 << 20)
+                              && v->local_mem_idx != UINT32_MAX)
+                                 ? v->local_mem_idx : v->host_mem_idx;
+    {   // 池命中(key = 类型<<48|桶; 超大块不池化)
+        if (bytes <= (size_t)256 << 20) {
+        const uint64_t key = ((uint64_t)mem_idx << 48) | bucket_of(bytes);
         std::lock_guard<std::mutex> lk(v->mu);
-        auto it = v->buf_pool.find(bk);
+        auto it = v->buf_pool.find(key);
         if (it != v->buf_pool.end() && !it->second.empty()) {
             void* p = it->second.back();
             it->second.pop_back();
             return p;
         }
-        bytes = bk;                       // 新建也按桶容量(下次可复用)
+        bytes = key & 0xFFFFFFFFFFFFULL;  // 新建按桶容量(下次可复用)
         }
     }
     VkBufferCreateInfo bci{};
@@ -264,21 +276,7 @@ void* alloc(size_t bytes) {
     VkMemoryRequirements mr;
     vkGetBufferMemoryRequirements(v->dev, buf, &mr);
     // 内存类型须同时满足: 主机可见 且 缓冲区需求位掩码
-    uint32_t idx = UINT32_MAX;
-    for (uint32_t i = 0; i < 32; ++i) {
-        if ((mr.memoryTypeBits >> i) & 1) {
-            VkPhysicalDeviceMemoryProperties mp;
-            vkGetPhysicalDeviceMemoryProperties(v->pdev, &mp);
-            if (i < mp.memoryTypeCount
-                && (mp.memoryTypes[i].propertyFlags
-                    & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-                       | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))) {
-                idx = i;
-                break;
-            }
-        }
-    }
-    if (idx == UINT32_MAX) {
+    if (((mr.memoryTypeBits >> mem_idx) & 1) == 0) {   // 类型与缓冲不兼容
         std::fprintf(stderr, "[vk] alloc: no compatible host memory\n");
         vkDestroyBuffer(v->dev, buf, nullptr);
         return nullptr;
@@ -286,7 +284,7 @@ void* alloc(size_t bytes) {
     VkMemoryAllocateInfo mai{};
     mai.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     mai.allocationSize = mr.size;
-    mai.memoryTypeIndex = idx;
+    mai.memoryTypeIndex = mem_idx;
     VkDeviceMemory mem;
     const VkResult ram = vkAllocateMemory(v->dev, &mai, nullptr, &mem);
     if (ram != VK_SUCCESS) {
@@ -309,7 +307,7 @@ void* alloc(size_t bytes) {
         vkDestroyBuffer(v->dev, buf, nullptr);
         return nullptr;
     }
-    return new VkBuf{buf, mem, mapped, bytes};
+    return new VkBuf{buf, mem, mapped, bytes, mem_idx};
 }
 
 void free(void* p) {
@@ -317,9 +315,9 @@ void free(void* p) {
     if (!p) return;
     if (v->ok) {
         VkBuf* b = static_cast<VkBuf*>(p);
-        if (b->cap <= (size_t)32 << 20) {  // 池内块归还复用; 超大块真销毁
+        if (b->cap <= (size_t)256 << 20) {  // 池内块归还复用; 超大块真销毁
             std::lock_guard<std::mutex> lk(v->mu);
-            v->buf_pool[bucket_of(b->cap)].push_back(p);
+            v->buf_pool[((uint64_t)b->mem_idx << 48) | bucket_of(b->cap)].push_back(p);
             return;
         }
         vkUnmapMemory(v->dev, b->mem);
