@@ -493,15 +493,17 @@ bool get_pipeline(PipeKey key, const size_t* push_sizes,   // [storage, push]
     return true;
 }
 
-// 绑定 N 缓冲 + 推送常量 + 派发(同步等待)
-bool dispatch_bufs(const Pipeline& p, const VkBuffer* bufs, uint32_t nbuf,
+// 绑定 N 缓冲 + 推送常量 + 派发(同步等待); 偏移在绑定处折叠
+bool dispatch_bufs(const Pipeline& p, const VkBuffer* bufs,
+                   const uint64_t* offs, uint32_t nbuf,
                    const void* push, size_t push_size,
                    uint32_t gx, uint32_t gy, uint32_t gz) {
     VkState* v = st();
     VkDescriptorBufferInfo bi[8] = {};
     VkWriteDescriptorSet w[8] = {};   // pNext 未清零曾致驱动崩溃
     for (uint32_t i = 0; i < nbuf; ++i) {
-        bi[i] = VkDescriptorBufferInfo{bufs[i], 0, VK_WHOLE_SIZE};
+        bi[i] = VkDescriptorBufferInfo{bufs[i], offs ? offs[i] : 0,
+                                       VK_WHOLE_SIZE};
         w[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         w[i].dstSet = p.ds;
         w[i].dstBinding = i;
@@ -524,11 +526,13 @@ bool dispatch_bufs(const Pipeline& p, const VkBuffer* bufs, uint32_t nbuf,
 }
 
 // 绑定 3 缓冲(a/b/y)的常用形态
-bool dispatch(const Pipeline& p, VkBuffer a, VkBuffer b, VkBuffer y,
+bool dispatch(const Pipeline& p, VkBuffer a, uint64_t aoff, VkBuffer b,
+              uint64_t boff, VkBuffer y, uint64_t yoff,
               const void* push, size_t push_size,
               uint32_t gx, uint32_t gy, uint32_t gz) {
     const VkBuffer bufs[3] = {a, b, y};
-    return dispatch_bufs(p, bufs, 3, push, push_size, gx, gy, gz);
+    const uint64_t offs[3] = {aoff, boff, yoff};
+    return dispatch_bufs(p, bufs, offs, 3, push, push_size, gx, gy, gz);
 }
 
 VkBuffer buf_of(void* p) { return static_cast<VkBuf*>(p)->buf; }
@@ -564,23 +568,27 @@ void* get_pipeline(const void* code, size_t bytes, unsigned c0, unsigned c1,
     return held;
 }
 
-bool dispatch(void* pipe, void* a, void* b, void* y,
+bool dispatch(void* pipe, VBuf a, VBuf b, VBuf y,
               const void* push, size_t push_size,
               unsigned gx, unsigned gy, unsigned gz) {
     device::Pipeline* p = static_cast<device::Pipeline*>(pipe);
-    return device::dispatch(*p, device::buf_of(a), device::buf_of(b),
-                            device::buf_of(y), push, push_size, gx, gy, gz);
+    return device::dispatch(*p, device::buf_of(a.h), a.off,
+                            device::buf_of(b.h), b.off,
+                            device::buf_of(y.h), y.off,
+                            push, push_size, gx, gy, gz);
 }
 
-bool dispatch_bufs(void* pipe, void* const* bufs, int nbuf,
+bool dispatch_bufs(void* pipe, const VBuf* bufs, int nbuf,
                    const void* push, size_t push_size,
                    unsigned gx, unsigned gy, unsigned gz) {
     device::Pipeline* p = static_cast<device::Pipeline*>(pipe);
     VkBuffer bs[8];
+    uint64_t offs[8];
     for (int i = 0; i < nbuf; ++i) {
-        bs[i] = device::buf_of(bufs[i]);
+        bs[i] = device::buf_of(bufs[i].h);
+        offs[i] = bufs[i].off;
     }
-    return device::dispatch_bufs(*p, bs, (uint32_t)nbuf, push, push_size,
+    return device::dispatch_bufs(*p, bs, offs, (uint32_t)nbuf, push, push_size,
                                  gx, gy, gz);
 }
 

@@ -638,6 +638,10 @@ Tensor Tensor::to_device(Device device) const {
     return t;
 }
 
+int64_t Tensor::storage_offset() const {
+    return impl_ ? impl_->offset : 0;
+}
+
 Tensor Tensor::clone() const {
     require(impl_, "empty tensor");
     if (!Runtime::grad_enabled()) {              // [diag] 反向期内部材料化: 直拷

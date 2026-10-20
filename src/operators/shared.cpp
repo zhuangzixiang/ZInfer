@@ -395,18 +395,14 @@ void strided_copy_raw(Device dev, const void* src, int64_t soff, void* dst,
             rank, ss, ds, sh, total));
         return;
     case Device::Vulkan:
-        if (soff || doff) {
-            throw std::runtime_error("znn: vulkan strided copy offset unsupported");
-        }
-        ZNN_VULKAN_CALL(vulkan_backend::strided_copy_raw_vk(src, dst, rank, ss,
-                                                            ds, sh, total));
+        ZNN_VULKAN_CALL(vulkan_backend::strided_copy_raw_vk(
+            src, (uint64_t)soff * 4, dst, (uint64_t)doff * 4,
+            rank, ss, ds, sh, total));
         return;
     case Device::Metal:
-        if (soff || doff) {
-            throw std::runtime_error("znn: metal strided copy offset unsupported");
-        }
-        ZNN_METAL_CALL(metal_backend::strided_copy_raw_mt(src, dst, rank, ss, ds,
-                                                          sh, total));
+        ZNN_METAL_CALL(metal_backend::strided_copy_raw_mt(
+            src, (uint64_t)soff * 4, dst, (uint64_t)doff * 4,
+            rank, ss, ds, sh, total));
         return;
     default: break;
     }

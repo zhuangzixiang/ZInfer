@@ -9,6 +9,7 @@
 // ============================================================================
 #pragma once
 #include <cstddef>
+#include <cstdint>
 
 namespace znn {
 class Tensor;
@@ -53,14 +54,14 @@ void grad_bcast_metal(const Tensor& g, Tensor& out, long long total, int rank,
 void strided_copy_metal(const Tensor& src, Tensor& dst, int rank,
                         const long long* ss, const long long* ds,
                         const long long* sh, long long total);
-void strided_copy_raw_mt(const void* src, void* dst, int rank,
-                         const long long* ss, const long long* ds,
+void strided_copy_raw_mt(const void* src, uint64_t soff, void* dst, uint64_t doff,
+                         int rank, const long long* ss, const long long* ds,
                          const long long* sh, long long total);
-void sgd_step_metal(void* p, const void* g, void* vel, long long n,
-                    float lr, float momentum, float wd);
-void adam_step_metal(void* p, const void* g, void* m, void* v,
-                     long long n, float lr, float b1, float b2, float eps,
-                     float wd, float bias1, float bias2);
+void sgd_step_metal(const Tensor& p, const Tensor& g, const Tensor& vel,
+                    long long n, float lr, float momentum, float wd);
+void adam_step_metal(const Tensor& p, const Tensor& g, const Tensor& m,
+                     const Tensor& v, long long n, float lr, float b1,
+                     float b2, float eps, float wd, float bias1, float bias2);
 
 } // namespace metal_backend
 } // namespace znn

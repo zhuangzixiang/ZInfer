@@ -124,17 +124,17 @@ id<MTLComputePipelineState> pipeline(const char* msl, const char* name) {
     return p;
 }
 
-void dispatch(id<MTLComputePipelineState> p, id<MTLBuffer> a, id<MTLBuffer> b,
-              id<MTLBuffer> y, const void* push, size_t push_size,
+void dispatch(id<MTLComputePipelineState> p, MBuf a, MBuf b, MBuf y,
+              const void* push, size_t push_size,
               MTLSize grid, MTLSize tg,
               void (^config)(id<MTLComputeCommandEncoder>)) {
     MtlState* v = st();
     id<MTLCommandBuffer> cb = [v->queue commandBuffer];
     id<MTLComputeCommandEncoder> enc = [cb computeCommandEncoder];
     [enc setComputePipelineState:p];
-    [enc setBuffer:a offset:0 atIndex:0];
-    [enc setBuffer:b offset:0 atIndex:1];
-    [enc setBuffer:y offset:0 atIndex:2];
+    [enc setBuffer:a.buf offset:a.off atIndex:0];   // 视图偏移在绑定折叠
+    [enc setBuffer:b.buf offset:b.off atIndex:1];
+    [enc setBuffer:y.buf offset:y.off atIndex:2];
     if (push) {
         [enc setBytes:push length:push_size atIndex:3];   // 推送常量=缓冲3
     }
@@ -145,7 +145,7 @@ void dispatch(id<MTLComputePipelineState> p, id<MTLBuffer> a, id<MTLBuffer> b,
     [cb waitUntilCompleted];
 }
 
-void dispatch_bufs(id<MTLComputePipelineState> p, id<MTLBuffer> const* bufs,
+void dispatch_bufs(id<MTLComputePipelineState> p, const MBuf* bufs,
                    int nbuf, const void* push, size_t push_size,
                    MTLSize grid, MTLSize tg) {
     MtlState* v = st();
@@ -153,7 +153,7 @@ void dispatch_bufs(id<MTLComputePipelineState> p, id<MTLBuffer> const* bufs,
     id<MTLComputeCommandEncoder> enc = [cb computeCommandEncoder];
     [enc setComputePipelineState:p];
     for (int i = 0; i < nbuf; ++i) {
-        [enc setBuffer:bufs[i] offset:0 atIndex:(NSUInteger)i];
+        [enc setBuffer:bufs[i].buf offset:bufs[i].off atIndex:(NSUInteger)i];
     }
     if (push) {
         [enc setBytes:push length:push_size atIndex:8];   // 推送常量=缓冲8

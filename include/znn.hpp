@@ -140,6 +140,7 @@ public:
     // ---- 设备/拷贝 ----
     Tensor to_device(Device dev) const;      // 跨设备同步拷贝; 同设备则共享返回
     Tensor clone() const;                    // 同设备深拷贝(存储独立, 仍参与建图)
+    int64_t storage_offset() const;          // 视图元素级偏移(共享存储内)
 
     // ---- 数据读取 ----
     // 数据指针按需取型: 设备与请求类型匹配才返回非空, 否则 nullptr

@@ -37,18 +37,12 @@ void SgdImpl::step() {
                 break;
             case Device::Vulkan:
                 ZNN_VULKAN_CALL(vulkan_backend::sgd_step_vulkan(
-                    p.data<Tensor::VulkanDataPtr>(),
-                    p.grad().data<Tensor::VulkanDataPtr>(),
-                    param_.momentum > 0 ? velv.data<Tensor::VulkanDataPtr>()
-                                        : p.data<Tensor::VulkanDataPtr>(), n,
+                    p, p.grad(), param_.momentum > 0 ? velv : p, n,
                     param_.lr, param_.momentum, param_.weight_decay));
                 break;
             case Device::Metal:
                 ZNN_METAL_CALL(metal_backend::sgd_step_metal(
-                    p.data<Tensor::MetalDataPtr>(),
-                    p.grad().data<Tensor::MetalDataPtr>(),
-                    param_.momentum > 0 ? velv.data<Tensor::MetalDataPtr>()
-                                        : p.data<Tensor::MetalDataPtr>(), n,
+                    p, p.grad(), param_.momentum > 0 ? velv : p, n,
                     param_.lr, param_.momentum, param_.weight_decay));
                 break;
             default: break;

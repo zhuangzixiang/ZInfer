@@ -39,19 +39,13 @@ void AdamImpl::step() {
                 break;
             case Device::Vulkan:
                 ZNN_VULKAN_CALL(vulkan_backend::adam_step_vulkan(
-                    p.data<Tensor::VulkanDataPtr>(),
-                    p.grad().data<Tensor::VulkanDataPtr>(),
-                    moments_[i].m.data<Tensor::VulkanDataPtr>(),
-                    moments_[i].v.data<Tensor::VulkanDataPtr>(),
+                    p, p.grad(), moments_[i].m, moments_[i].v,
                     n, param_.lr, b1, b2, param_.eps, param_.weight_decay,
                     bias1, bias2));
                 break;
             case Device::Metal:
                 ZNN_METAL_CALL(metal_backend::adam_step_metal(
-                    p.data<Tensor::MetalDataPtr>(),
-                    p.grad().data<Tensor::MetalDataPtr>(),
-                    moments_[i].m.data<Tensor::MetalDataPtr>(),
-                    moments_[i].v.data<Tensor::MetalDataPtr>(),
+                    p, p.grad(), moments_[i].m, moments_[i].v,
                     n, param_.lr, b1, b2, param_.eps, param_.weight_decay,
                     bias1, bias2));
                 break;
