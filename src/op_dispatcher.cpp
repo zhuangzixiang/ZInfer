@@ -107,7 +107,13 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
         kernel(ctx, inputs, Span<Tensor*>(outs, 1), options);
     } else {
         // 透明降级: 拷回 CPU 执行 ref, 结果拷回原设备(带一次性告警)
+        // ZNN_STRICT_NATIVE=1: 降级即抛错(ztestkit 铁律验证用 —— 全算子原生)
+        static const bool strict = std::getenv("ZNN_STRICT_NATIVE") != nullptr;
         static bool warned = false;
+        if (strict) {
+            throw std::runtime_error(std::string("znn: op '") + op->name
+                                     + "' has no native kernel (STRICT_NATIVE)");
+        }
         if (!warned) {
             std::fprintf(stderr, "znn: op '%s' has no native kernel, falling back to CPU",
                          op->name);
