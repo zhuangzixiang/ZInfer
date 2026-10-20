@@ -178,7 +178,7 @@ void cross_entropy_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> ou
     require_contiguous2c(*in[0], *in[1], *out[0]);
     const Tensor& x = *in[0];
     cross_entropy_k<<<1, kBlock, kBlock * sizeof(float)>>>(
-        dptr(x), in[1]->data<int64_t>(), dptr(*out[0]),
+        dptr(x), dptr_i64(*in[1]), dptr(*out[0]),
         x.size(0), x.size(1));
 }
 

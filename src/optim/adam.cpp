@@ -73,7 +73,10 @@ void AdamImpl::clear() {
     for (Tensor& p : params_) {
         if (p.grad()) {
             const Tensor& gr = p.grad();
-            device_memset0(gr.device(), gpu_handle(gr),
+            void* gh = gr.device() == Device::CPU
+                         ? static_cast<void*>(gr.data<float>())   // CPU: 宿主缓冲
+                         : gpu_handle(gr);                        // GPU: 裸句柄
+            device_memset0(gr.device(), gh,
                            static_cast<size_t>(p.numel()) * sizeof(float));
         }
     }

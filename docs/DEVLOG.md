@@ -951,3 +951,28 @@ znn_test CPU 全过; MNIST 97.16%。CUDA 构建 kit 待下轮(其 znn_test
 
 **反思**: 工具 8/10 | 教训: 测试代码同样是代码(三笔误), 但矩阵框架
 让每处笔误在数十秒内暴露而非数小时调试 —— 这正是它存在的意义。
+
+---
+
+## [31] 灭 t10/t21 GPU 崩溃: 崩溃自打印栈工具化 + 两处迁移漏网
+
+**工具**(ztestkit 常备): SetUnhandledExceptionFilter + dbghelp 符号化
+栈打印 + /Zi —— 崩溃即出函数名, 不再依赖探针-构建-重跑循环
+(本轮两案均一次定位; 此前同难度问题耗时整轮)。stdout 无缓冲。
+
+**bug×2**(9d4f76a 迁移漏网, 均为新契约"错型即空"的暴露案例):
+1. AdamImpl/SgdImpl::clear(): gpu_handle() 对 CPU 梯度返回 nullptr
+   → memset(nullptr) 段错误(t10 训练循环首步即崩)。修复: CPU 走
+   宿主 data<float>(), GPU 走 gpu_handle。教训: 此前"CPU 构建全绿"
+   跑的是陈旧二进制 —— 构建输出必须可见、时间戳必须核对
+2. cross_entropy_cuda: 标签仍用 in[1]->data<int64_t>()(CUDA 上
+   返空) → 内核读 nullptr 异步非法访问, 在 t21 反向种子同步点浮出
+   (崩溃点≠犯罪点)。修复: dptr_i64
+
+**验证**: 三构建 znn_test 全过 + ztestkit 全绿(CUDA 88/VK 88/CPU 50
+检查) + Vulkan 冒烟 EXIT=0 + MNIST 97.16%。kit 新增 t10 训练循环与
+CE 反向链两条回归用例。
+
+**反思**: 工具 9/10(崩溃栈=一次定位) | 教训×2: (a) 机械迁移后必须
+全库 grep 残留形态(本轮 `->data<int64_t>` 漏扫); (b) 构建命令输出
+不可吞(>/dev/null 掩盖失败跑了多轮旧二进制, 假绿比红更毒)。

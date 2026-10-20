@@ -259,3 +259,57 @@ ZTK_CASE(grad_mean, true) {
 }
 
 } // namespace
+
+// t21-losses 复现: CE 反向链(CUDA 非法访问定位用)
+ZTK_CASE(repro_t21_ce, true) {
+    auto run = [](Device d) {
+        Tensor lg = Tensor::randn({5, 4}, 89);
+        int64_t tg[5] = {0, 1, 2, 3, 0};
+        Tensor x = Tensor::from_host(lg.to_device(Device::CPU).data<float>(), {5, 4}).to_device(d);
+        Tensor t = Tensor::from_host(tg, {5}, DType::I64).to_device(d);
+        x.requires_grad(true);
+        Tensor loss = Loss::cross_entropy(x, t);
+        loss.backward();
+        return back(x.grad());
+    };
+    Tensor gcpu = run(Device::CPU);
+    Tensor gdev = run(ztk_dev);
+    check(max_diff(gcpu, gdev) < 5e-3f, "ce grad parity");
+}
+
+// t10 复现: 纯 CPU Adam 线性回归训练循环(GPU 构建崩点定位用)
+ZTK_CASE(repro_t10_training, false) {
+    if (ztk_dev != Device::CPU) {
+        return;   // 本体是 CPU 训练; GPU 构建下同代码段崩溃
+    }
+    const int64_t N = 32;
+    float xs[32], ys[32];
+    for (int64_t i = 0; i < N; ++i) {
+        xs[i] = static_cast<float>(i) / N - 0.5f;
+        ys[i] = 2.f * xs[i] + 1.f;
+    }
+    Tensor X = Tensor::from_host(xs, {N, 1});
+    Tensor Y = Tensor::from_host(ys, {N, 1});
+    std::vector<Layer*> net = {Layer::create(LayerType::Linear, LayerParam{1, 1})};
+    Optimizer* opt = Optimizer::create(OptimType::Adam, net, OptimParam{0.05});
+    float first = 0.f, last = 0.f;
+    for (int step = 0; step < 400; ++step) {
+        Tensor h = X;
+        for (Layer* l : net) h = l->forward(h);
+        std::printf("      %d fwd\n", step);
+        Tensor loss = Loss::mse(h, Y);
+        if (step == 0) first = loss.item<float>();
+        last = loss.item<float>();
+        opt->clear();
+        std::printf("      %d CLEAR\n", step);
+        loss.backward();
+        std::printf("      step %d bwd done\n", step);
+        opt->step();
+        std::printf("      step %d opt done\n", step);
+    }
+    Tensor h = X;
+    for (Layer* l : net) h = l->forward(h);
+    check(last < first / 100.f, "t10 repro loss drops");
+    Layer::destroy(net[0]);
+    Optimizer::destroy(opt);
+}
