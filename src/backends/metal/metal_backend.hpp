@@ -65,5 +65,32 @@ void adam_step_metal(const Tensor& p, const Tensor& g, const Tensor& m,
                      const Tensor& v, long long n, float lr, float b1,
                      float b2, float eps, float wd, float bias1, float bias2);
 
+// ---- SB2-SB4: 布局/生成/归一化/损失/卷积/池化/注意力 ----
+void reshape_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void transpose_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void permute_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void slice_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void cat_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void stack_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void arange_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void randn_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void embedding_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void layer_norm_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void batch_norm2d_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void cross_entropy_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void mse_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void conv2d_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void max_pool2d_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void avg_pool2d_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void attention_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+// 梯度直连(梯度规则经 backend_slots 宏调用)
+void conv2d_grad_metal(const Tensor& x, const Tensor& w, const Tensor& g,
+                       Tensor& dx, Tensor& dw, const void* options);
+void max_pool_grad_metal(const Tensor& x, const Tensor& g, Tensor& dx,
+                         const void* options);
+void avg_pool_grad_metal(const Tensor& x, const Tensor& g, Tensor& dx,
+                         const void* options);
+void embedding_grad_metal(const Tensor& g, const Tensor& idx, Tensor& dw);
+
 } // namespace metal_backend
 } // namespace znn

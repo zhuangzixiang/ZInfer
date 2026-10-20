@@ -164,6 +164,30 @@ void dispatch_bufs(id<MTLComputePipelineState> p, const MBuf* bufs,
     if (push) {
         [enc setBytes:push length:push_size atIndex:8];   // 推送常量=缓冲8
     }
+    if (tg0_bytes > 0) [enc setThreadgroupMemoryLength:tg0_bytes atIndex:0];
+    if (tg1_bytes > 0) [enc setThreadgroupMemoryLength:tg1_bytes atIndex:1];
+    [enc dispatchThreads:grid threadsPerThreadgroup:tg];
+    [enc endEncoding];
+    [cb commit];
+    [cb waitUntilCompleted];
+}
+
+void dispatch_bufs_tg(id<MTLComputePipelineState> p, const MBuf* bufs,
+                      int nbuf, const void* push, size_t push_size,
+                      MTLSize grid, MTLSize tg,
+                      NSUInteger tg0_bytes, NSUInteger tg1_bytes) {
+    MtlState* v = st();
+    id<MTLCommandBuffer> cb = [v->queue commandBuffer];
+    id<MTLComputeCommandEncoder> enc = [cb computeCommandEncoder];
+    [enc setComputePipelineState:p];
+    for (int i = 0; i < nbuf; ++i) {
+        [enc setBuffer:bufs[i].buf offset:bufs[i].off atIndex:(NSUInteger)i];
+    }
+    if (push) {
+        [enc setBytes:push length:push_size atIndex:8];
+    }
+    if (tg0_bytes > 0) [enc setThreadgroupMemoryLength:tg0_bytes atIndex:0];
+    if (tg1_bytes > 0) [enc setThreadgroupMemoryLength:tg1_bytes atIndex:1];
     [enc dispatchThreads:grid threadsPerThreadgroup:tg];
     [enc endEncoding];
     [cb commit];

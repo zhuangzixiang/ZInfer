@@ -30,6 +30,11 @@ void dispatch(id<MTLComputePipelineState> p, MBuf a, MBuf b, MBuf y,
 void dispatch_bufs(id<MTLComputePipelineState> p, const MBuf* bufs,
                    int nbuf, const void* push, size_t push_size,
                    MTLSize grid, MTLSize tg);
+// 带 threadgroup 内存(归约内核用): 分配 tg0/tg1 两块
+void dispatch_bufs_tg(id<MTLComputePipelineState> p, const MBuf* bufs,
+                      int nbuf, const void* push, size_t push_size,
+                      MTLSize grid, MTLSize tg,
+                      NSUInteger tg0_bytes, NSUInteger tg1_bytes);
 
 } // namespace device
 } // namespace metal_backend

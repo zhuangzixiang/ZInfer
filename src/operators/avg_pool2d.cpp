@@ -86,7 +86,7 @@ static void avg_pool2d_grad(BackwardContext& c) {
                                                                  c.options));
             break;
         case Device::Metal:
-            ZNN_METAL_CALL(metal_backend::avg_pool_grad_metal(g, dx,
+            ZNN_METAL_CALL(metal_backend::avg_pool_grad_metal(x, g, dx,
                                                               c.options));
             break;
         default: break;
