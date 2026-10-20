@@ -2,6 +2,7 @@
 #include "optim.hpp"
 #include "znn_internal.hpp"
 #include "backend_slots.hpp"
+#include "operators/shared.hpp"
 
 namespace znn {
 
@@ -71,7 +72,8 @@ void SgdImpl::step() {
 void SgdImpl::clear() {
     for (Tensor& p : params_) {
         if (p.grad()) {
-            device_memset0(p.grad().device(), p.grad().data<float>(),
+            const Tensor& gr = p.grad();
+            device_memset0(gr.device(), gpu_handle(gr),
                            static_cast<size_t>(p.numel()) * sizeof(float));
         }
     }

@@ -11,6 +11,17 @@
 namespace znn {
 namespace cuda_backend {
 
+// 显存地址取回(标记类型; 头文件内 Tensor 不完整, 定义置此)
+float* dptr(const Tensor& t) {
+    return reinterpret_cast<float*>(t.data<Tensor::CudaDataPtr>());
+}
+const float* dptr_const(const Tensor& t) {
+    return reinterpret_cast<const float*>(t.data<Tensor::CudaDataPtr>());
+}
+int64_t* dptr_i64(const Tensor& t) {
+    return reinterpret_cast<int64_t*>(t.data<Tensor::CudaDataPtr>());
+}
+
 namespace {
 
 constexpr int kBlock = 256;
@@ -170,7 +181,7 @@ void div_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const v
                const void*) {                                                 \
         require_contiguous1(*in[0], *out[0]);                                 \
         const long long n = out[0]->numel();                                  \
-        kname<<<blocks(n), kBlock>>>dptr(*in[0]),                    \
+        kname<<<blocks(n), kBlock>>>(dptr(*in[0]),                   \
                                      dptr(*out[0]), n);               \
     }
 
@@ -254,7 +265,7 @@ void unary_bwd_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                     const void* options) {
     const int fn = static_cast<int>(*static_cast<const unsigned char*>(options));
     const long long n = out[0]->numel();
-    unary_bwd_k<<<blocks(n), kBlock>>>dptr(*in[0]), dptr(*in[1]),
+    unary_bwd_k<<<blocks(n), kBlock>>>(dptr(*in[0]), dptr(*in[1]),
                                        dptr(*in[2]), dptr(*out[0]),
                                        n, fn);
 }

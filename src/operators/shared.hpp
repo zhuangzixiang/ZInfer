@@ -68,6 +68,16 @@ void strided_copy_dispatch(const Tensor& src, Tensor& dst, int rank,
 void strided_copy_raw(Device dev, const void* src, int64_t soff, void* dst,
                       int64_t doff, int rank, const long long* ss,
                       const long long* ds, const long long* sh, long long total);
+// 任意 GPU 设备的裸句柄(CPU 返回 nullptr) —— device_* 原语/d2d 等用
+inline void* gpu_handle(const Tensor& t) {
+    switch (t.device()) {
+    case Device::CUDA:   return t.data<Tensor::CudaDataPtr>();
+    case Device::Vulkan: return t.data<Tensor::VulkanDataPtr>();
+    case Device::Metal:  return t.data<Tensor::MetalDataPtr>();
+    default:             return nullptr;
+    }
+}
+
 // CUDA 显存地址(经标记类型取回; 非 CUDA 张量返回 nullptr)
 inline float* cuda_ptr(const Tensor& t) {
     return reinterpret_cast<float*>(t.data<Tensor::CudaDataPtr>());
