@@ -73,6 +73,7 @@ void device_copy_d2h(Device d, void* dst, const void* src, size_t bytes) {
     }
 }
 void device_copy_d2d(Device d, void* dst, const void* src, size_t bytes) {
+    // 注意: 本原语不做视图偏移(基址到基址); 视图拷贝由调用方折算
     switch (d) {
     case Device::CUDA:
         ZNN_CUDA_CALL(cuda_backend::copy_device_to_device(dst, src, bytes)); return;
@@ -102,8 +103,26 @@ void Tensor::Impl::copy_elements(const Tensor::Impl* src, Tensor::Impl* dst) {
             throw std::runtime_error("znn: cross-device copy must go through to_device");
         }
         if (src->is_contiguous()) {
-            device_copy_d2d(dst->device, dst->storage->data(),
-                            src->storage->data(), dst->nbytes());
+            if (src->device == Device::CUDA) {   // 设备指针可算术
+                device_copy_d2d(Device::CUDA, dst->storage->data(),
+                                static_cast<const char*>(src->storage->data())
+                                    + src->offset * dtype_size(src->dtype),
+                                dst->nbytes());
+                return;
+            }
+            // Metal/Vulkan: 偏移经双步长拷贝的 raw 形态折叠(绑定层偏移)
+            long long total = 1;
+            const int rank = (int)dst->shape.rank;
+            long long ss[8], ds[8], sh[8];
+            for (int d = 0; d < rank; ++d) {
+                ss[d] = src->strides[d];
+                ds[d] = dst->strides[d];
+                sh[d] = dst->shape.dims[d];
+                total *= dst->shape.dims[d];
+            }
+            strided_copy_raw(src->device, src->storage->data(), src->offset,
+                             dst->storage->data(), dst->offset,
+                             rank, ss, ds, sh, total);
             return;
         }
         // 非连续视图(转置/切片): 按步长收集(此前扁平 memcpy 静默拷错 —— 存量 bug)
@@ -627,13 +646,19 @@ Tensor Tensor::to_device(Device device) const {
         return to_device(Device::CPU).to_device(device);
     }
     Tensor t = Tensor::empty(impl_->shape, impl_->dtype, device);
+    const size_t esz = dtype_size(impl_->dtype);
     if (from == Device::CPU) {
         Tensor src = impl_->is_contiguous() ? *this : clone();
+        // 视图: 源取 基址+元素偏移(宿主指针合法), 目标新存储偏移 0
         device_copy_h2d(device, t.impl_->storage->data(),
-                        src.impl_->storage->data(), t.impl_->nbytes());
+                        static_cast<const char*>(src.impl_->storage->data())
+                            + src.impl_->offset * esz,
+                        t.impl_->nbytes());
     } else {
         device_copy_d2h(from, t.impl_->storage->data(),
-                        impl_->storage->data(), impl_->nbytes());
+                        static_cast<const char*>(impl_->storage->data())
+                            + impl_->offset * esz,
+                        impl_->nbytes());
     }
     return t;
 }

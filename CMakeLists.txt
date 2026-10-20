@@ -169,6 +169,11 @@ endif()
 
 # Eigen: 唯一三方依赖(header-only), kernels[CPU] 快速内核使用
 
+option(ZNN_BUILD_TESTKIT "Build ztestkit matrix runner" ON)
+if(ZNN_BUILD_TESTKIT)
+    add_subdirectory(ztestkit)
+endif()
+
 if(ZNN_BUILD_TESTS)
     enable_testing()
     add_executable(znn_test tests/test_smoke.cpp)

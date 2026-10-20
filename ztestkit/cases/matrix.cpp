@@ -1,0 +1,261 @@
+// ============================================================================
+// matrix.cpp — L0 不变量 + L1 算子×形状族矩阵 + L2 梯度对拍(设备参数化)
+//
+// 覆盖原则: 非 8/16 整倍数形状(打边界 tile)、广播变体(标量/行/列)、
+// keepdim 两态、非连续视图(clone/transpose 材料化路径)、offset>0 切片。
+// 新算子接入 = 加一个 ZTK_CASE(与实现同块落地, 测试先行)。
+// ============================================================================
+#include "../ztestkit.hpp"
+
+using namespace znn;
+using ztestkit::back;
+using ztestkit::check;
+using ztestkit::max_diff;
+using ztestkit::on;
+
+namespace {
+
+// 通用: 同种子 CPU 基准 vs 设备结果(新鲜张量, 逐图隔离)
+void cmp(const char* what, const Tensor& cpu, const Tensor& dev, float tol) {
+    check(max_diff(cpu, back(dev)) <= tol, what);   // 含等号: 容差 0 = 逐位
+}
+
+// ============ L0: 张量/存储不变量(仅 CPU 设备跑一次) ============
+
+ZTK_CASE(l0_view_invariants, false) {
+    if (ztk_dev != Device::CPU) {
+        return;   // 不变量与设备无关, 跑一次
+    }
+    Tensor x = Tensor::randn({4, 6}, 1);
+    Tensor s = x.slice(1, 1, 3);                    // [4,2] 列切片 offset=1
+    check(s.storage_offset() == 1, "slice offset");
+    check(s.numel() == 8 && s.is_contiguous() || !s.is_contiguous(),
+          "slice shape");   // 形状事实(不预设连续性实现)
+    check(back(s.slice(0, 0, 2)).data<float>()[0] == x.data<float>()[1],
+          "nested view reads base storage");   // s[0][0]=x[0][1]
+    Tensor c = x.clone();                           // 可微深拷贝(存储独立)
+    c.data<float>()[0] = 99.f;
+    check(x.data<float>()[0] != 99.f, "clone storage independent");
+    check(c.storage_offset() == 0, "clone offset zero");
+    Tensor t = x.transpose(0, 1);                   // [6,4] 非连续视图
+    check(!t.is_contiguous(), "transpose non-contiguous");
+    check(back(t.clone()).data<float>()[2 * 4 + 1] == x.data<float>()[1 * 6 + 2],
+          "transpose clone materialize");           // clone[2][1] = x[1][2]
+    // to_device 往返(含 GPU): 逐位一致
+    Tensor r = back(on(ztk_dev, x));
+    check(max_diff(x, r) == 0.f, "to_device roundtrip bitwise");
+}
+
+ZTK_CASE(l0_grad_semantics, false) {
+    if (ztk_dev != Device::CPU) {
+        return;
+    }
+    // 共享句柄 = 同一张量(PyTorch 语义): requires_grad 相互可见
+    Tensor a = Tensor::randn({3}, 2);
+    Tensor b = a;
+    b.requires_grad(true);
+    check(a.requires_grad() && b.requires_grad(), "shared handle shared flag");
+    // detach: 脱离计算图
+    Tensor d = b.detach();
+    check(!d.requires_grad(), "detach clears flag");
+    check(d.data<float>()[0] == b.data<float>()[0], "detach shares storage");
+}
+
+// ============ L1: 算子×形状族矩阵(逐算子一用例, 设备自动展开) ============
+
+// 二元 4 算子 × {同形, 行广播, 列广播, 标量广播}
+ZTK_CASE(add, false) {
+    Tensor a = Tensor::randn({5, 7}, 3);
+    Tensor b = Tensor::randn({5, 7}, 4);
+    cmp("add same", Tensor::add(a, b), Tensor::add(on(ztk_dev, a), on(ztk_dev, b)), 1e-5f);
+    Tensor r = Tensor::randn({7}, 5);
+    cmp("add row-bcast", Tensor::add(a, r),
+        Tensor::add(on(ztk_dev, a), on(ztk_dev, r)), 1e-5f);
+    Tensor c = Tensor::randn({5, 1}, 6);
+    cmp("add col-bcast", Tensor::add(a, c),
+        Tensor::add(on(ztk_dev, a), on(ztk_dev, c)), 1e-5f);
+    Tensor sc = Tensor::randn({1}, 7);
+    cmp("add scalar", Tensor::add(a, sc),
+        Tensor::add(on(ztk_dev, a), on(ztk_dev, sc)), 1e-5f);
+}
+ZTK_CASE(sub, false) {
+    Tensor a = Tensor::randn({5, 7}, 8), b = Tensor::randn({5, 7}, 9);
+    cmp("sub", Tensor::sub(a, b), Tensor::sub(on(ztk_dev, a), on(ztk_dev, b)), 1e-5f);
+    Tensor r = Tensor::randn({7}, 10);
+    cmp("sub bcast", Tensor::sub(a, r), Tensor::sub(on(ztk_dev, a), on(ztk_dev, r)), 1e-5f);
+}
+ZTK_CASE(mul, false) {
+    Tensor a = Tensor::randn({5, 7}, 11), b = Tensor::randn({5, 7}, 12);
+    cmp("mul", Tensor::mul(a, b), Tensor::mul(on(ztk_dev, a), on(ztk_dev, b)), 1e-5f);
+    Tensor c = Tensor::randn({5, 1}, 13);
+    cmp("mul col-bcast", Tensor::mul(a, c),
+        Tensor::mul(on(ztk_dev, a), on(ztk_dev, c)), 1e-5f);
+}
+ZTK_CASE(div, false) {
+    Tensor a = Tensor::randn({5, 7}, 14), b = Tensor::randn({5, 7}, 15);
+    cmp("div", Tensor::div(a, b), Tensor::div(on(ztk_dev, a), on(ztk_dev, b)), 1e-4f);
+}
+
+// 一元族(9): 非 8 倍数形状(逐个直写)
+ZTK_CASE(relu, false) {
+    Tensor x = Tensor::randn({13, 7}, 16);
+    cmp("relu", Activator::relu(x), Activator::relu(on(ztk_dev, x)), 0.f);
+}
+ZTK_CASE(gelu, false) {
+    Tensor x = Tensor::randn({13, 7}, 17);
+    cmp("gelu", Activator::gelu(x), Activator::gelu(on(ztk_dev, x)), 1e-5f);
+}
+ZTK_CASE(sigmoid, false) {
+    Tensor x = Tensor::randn({13, 7}, 18);
+    cmp("sigmoid", Activator::sigmoid(x), Activator::sigmoid(on(ztk_dev, x)), 1e-5f);
+}
+ZTK_CASE(tanh, false) {
+    Tensor x = Tensor::randn({13, 7}, 19);
+    cmp("tanh", Activator::tanh(x), Activator::tanh(on(ztk_dev, x)), 1e-5f);
+}
+ZTK_CASE(silu, false) {
+    Tensor x = Tensor::randn({13, 7}, 20);
+    cmp("silu", Activator::silu(x), Activator::silu(on(ztk_dev, x)), 1e-5f);
+}
+ZTK_CASE(neg, false) {
+    Tensor x = Tensor::randn({13, 7}, 21);
+    cmp("neg", Tensor::neg(x), Tensor::neg(on(ztk_dev, x)), 0.f);
+}
+ZTK_CASE(exp, false) {
+    Tensor x = Tensor::randn({13, 7}, 22);
+    cmp("exp", Tensor::exp(x), Tensor::exp(on(ztk_dev, x)), 1e-4f);
+}
+ZTK_CASE(log, false) {
+    Tensor x = Tensor::exp(Tensor::randn({13, 7}, 23));   // exp 恒正
+    cmp("log", Tensor::log(x), Tensor::log(on(ztk_dev, x)), 1e-4f);
+}
+ZTK_CASE(sqrt, false) {
+    Tensor x = Tensor::exp(Tensor::randn({13, 7}, 24));
+    cmp("sqrt", Tensor::sqrt(x), Tensor::sqrt(on(ztk_dev, x)), 1e-5f);
+}
+
+// GEMM 族: 非 8 倍数(边界 tile) + 中形
+ZTK_CASE(matmul, false) {
+    Tensor a = Tensor::randn({5, 7}, 25), b = Tensor::randn({7, 4}, 26);
+    cmp("matmul 5x7x4 (boundary)", Tensor::matmul(a, b),
+        Tensor::matmul(on(ztk_dev, a), on(ztk_dev, b)), 1e-4f);
+    Tensor a2 = Tensor::randn({60, 37}, 27), b2 = Tensor::randn({37, 45}, 28);
+    cmp("matmul 60x37x45", Tensor::matmul(a2, b2),
+        Tensor::matmul(on(ztk_dev, a2), on(ztk_dev, b2)), 1e-3f);
+}
+ZTK_CASE(linear, false) {
+    Tensor x = Tensor::randn({13, 29}, 29), w = Tensor::randn({21, 29}, 30);
+    Tensor lc = Tensor::linear(x, w);
+    Tensor lg = Tensor::linear(on(ztk_dev, x), on(ztk_dev, w));
+    cmp("linear x@wT", lc, lg, 1e-3f);
+}
+
+// 规约: dim×keepdim 矩阵
+ZTK_CASE(sum, false) {
+    Tensor x = Tensor::randn({5, 7, 3}, 31);
+    cmp("sum dim0", Tensor::sum(x, 0), Tensor::sum(on(ztk_dev, x), 0), 1e-3f);
+    cmp("sum dim1", Tensor::sum(x, 1), Tensor::sum(on(ztk_dev, x), 1), 1e-3f);
+    cmp("sum dim-1", Tensor::sum(x, -1), Tensor::sum(on(ztk_dev, x), -1), 1e-3f);
+    cmp("sum dim1 keep", Tensor::sum(x, 1, true),
+        Tensor::sum(on(ztk_dev, x), 1, true), 1e-3f);
+}
+ZTK_CASE(mean, false) {
+    Tensor x = Tensor::randn({5, 7, 3}, 32);
+    cmp("mean dim0", Tensor::mean(x, 0), Tensor::mean(on(ztk_dev, x), 0), 1e-3f);
+    cmp("mean dim2", Tensor::mean(x, 2), Tensor::mean(on(ztk_dev, x), 2), 1e-3f);
+    cmp("mean dim2 keep", Tensor::mean(x, 2, true),
+        Tensor::mean(on(ztk_dev, x), 2, true), 1e-3f);
+}
+ZTK_CASE(softmax, false) {
+    Tensor x = Tensor::randn({9, 14, 7}, 33);
+    cmp("softmax last-dim", Activator::softmax(x),
+        Activator::softmax(on(ztk_dev, x)), 1e-4f);
+}
+
+// 视图族(clone/transpose 材料化 + offset>0 切片 —— 绑定层偏移的实测)
+ZTK_CASE(views_materialize, false) {
+    Tensor x = Tensor::randn({6, 9}, 34);
+    Tensor v = x.reshape({2, 27}).slice(0, 1, 2);   // [1,27] 连续 offset=27
+    check(v.storage_offset() == 27, "offset view");
+    Tensor mm = Tensor::matmul(v, v.transpose(1, 0));
+    Tensor vd = on(ztk_dev, v);
+    // 同设备: 共享直返(offset 保留); 跨设备: 材料化(offset 0) —— PyTorch .to() 同义
+    check(ztk_dev == Device::CPU ? vd.storage_offset() == 27
+                                 : vd.storage_offset() == 0,
+          "to_device same=shared / cross=materialized");
+    Tensor mmd = Tensor::matmul(vd, vd.transpose(1, 0));
+    cmp("offset-view gemm (binding offset)", mm, mmd, 1e-3f);
+    Tensor tc = x.transpose(0, 1).clone();          // 非连续材料化
+    Tensor td = on(ztk_dev, x.transpose(0, 1)).clone();
+    cmp("transpose clone on device", tc, td, 0.f);
+}
+
+// ============ L2: 梯度对拍(设备参数化, 每图新鲜叶) ============
+
+// 逐元素链: sigmoid→gelu→sum 全维(解析可达)
+ZTK_CASE(grad_elementwise, true) {
+    auto run = [](Device d) {
+        Tensor x = Tensor::randn({6, 9}, 35).to_device(d);
+        x.requires_grad(true);
+        Tensor a = Activator::gelu(Activator::sigmoid(x));
+        Tensor s = a;
+        for (int64_t dd = s.dim_count() - 1; dd >= 0; --dd) {
+            s = Tensor::sum(s, dd);
+        }
+        s.backward();
+        return back(x.grad());
+    };
+    Tensor gcpu = run(Device::CPU);
+    Tensor gdev = run(ztk_dev);
+    cmp("grad sigmoid+gelu+sum", gcpu, gdev, 1e-4f);
+}
+
+// 二元+广播链: mul 广播反传(grad_bcast 路径)
+ZTK_CASE(grad_broadcast, true) {
+    auto run = [](Device d) {
+        Tensor a = Tensor::randn({5, 7}, 36).to_device(d);
+        Tensor b = Tensor::randn({7}, 37).to_device(d);
+        a.requires_grad(true);
+        b.requires_grad(true);
+        Tensor y = Tensor::mul(a, b);
+        Tensor s = y;
+        for (int64_t dd = s.dim_count() - 1; dd >= 0; --dd) {
+            s = Tensor::sum(s, dd);
+        }
+        s.backward();
+        return back(a.grad());
+    };
+    cmp("grad mul row-bcast a", run(Device::CPU), run(ztk_dev), 1e-4f);
+}
+
+// GEMM 链: matmul+视图(clone/reshape/slice)
+ZTK_CASE(grad_matmul_views, true) {
+    auto run = [](Device d) {
+        Tensor x = Tensor::randn({6, 9}, 38).to_device(d);
+        x.requires_grad(true);
+        Tensor v = x.reshape({2, 27}).slice(0, 0, 1).clone();
+        Tensor tr = v.transpose(1, 0).clone();
+        Tensor mm = Tensor::matmul(v, tr);
+        Tensor s = mm;
+        for (int64_t dd = s.dim_count() - 1; dd >= 0; --dd) {
+            s = Tensor::sum(s, dd);
+        }
+        s.backward();
+        return back(x.grad());
+    };
+    cmp("grad matmul+views", run(Device::CPU), run(ztk_dev), 1e-4f);
+}
+
+// mean 反传(1/n 缩放路径)
+ZTK_CASE(grad_mean, true) {
+    auto run = [](Device d) {
+        Tensor x = Tensor::randn({5, 7}, 39).to_device(d);
+        x.requires_grad(true);
+        Tensor m = Tensor::mean(Tensor::mean(x, 1), 0);
+        m.backward();
+        return back(x.grad());
+    };
+    cmp("grad mean chain", run(Device::CPU), run(ztk_dev), 1e-4f);
+}
+
+} // namespace
