@@ -169,11 +169,18 @@ void clone_grad(BackwardContext& c) {
 }
 } // namespace
 
+namespace {
+void clone_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+               const void*) {
+    impl::copy_view_to(*in[0], *out[0]);   // 与 clone_run 同实现(独立地址:
+}                                          // 派发器以 kernel==ref 判回落)
+}
+
 const Operator g_clone_operator = {
     "clone",
     infer_same,
     clone_grad,
-    clone_run,
+    clone_ref,
     {clone_run, clone_run, clone_run, clone_run},   // 同一 host 入口, 内部按设备派发
     0,
 };

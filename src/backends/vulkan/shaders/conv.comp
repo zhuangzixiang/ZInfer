@@ -1,0 +1,119 @@
+#version 450
+// conv2d: OP=0 前向 / OP=1 dw 梯度 / OP=2 dx 梯度
+// (直接朴素法, 与 CUDA conv2d_k/conv2d_dw_k/conv2d_dx_k 逐行同构, 无原子)
+layout(local_size_x = 256) in;
+
+layout(constant_id = 0) const int OP = 0;
+
+layout(binding = 0) readonly buffer X { float x[]; };
+layout(binding = 1) readonly buffer Wt { float wt[]; };
+layout(binding = 2) readonly buffer G { float g[]; };      // 梯度(OP1/2)
+layout(binding = 3) buffer Y { float y[]; };               // 前向输出 / dx
+
+layout(push_constant) uniform Pc {
+    int n, c, h, w, o, kh, kw, ho, wo;
+    int sh, sw, ph, pw, dh, dwd, g;                        // dwd=dilation_w(dw 与名字冲突)
+} pc;
+
+void conv_fwd() {
+    const uint i = gl_GlobalInvocationID.x;
+    const int total = pc.n * pc.o * pc.ho * pc.wo;
+    if (int(i) >= total) return;
+    const int wo = int(i) % pc.wo;
+    const int t0 = int(i) / pc.wo;
+    const int ho = t0 % pc.ho;
+    const int t1 = t0 / pc.ho;
+    const int oc = t1 % pc.o;
+    const int n = t1 / pc.o;
+    const int cg = pc.c / pc.g;
+    const int og = pc.o / pc.g;
+    const int grp = oc / og;
+    float acc = 0.0;
+    for (int c = grp * cg; c < (grp + 1) * cg; ++c) {
+        for (int ki = 0; ki < pc.kh; ++ki) {
+            const int ii = ho * pc.sh + ki * pc.dh - pc.ph;
+            if (ii < 0 || ii >= pc.h) continue;
+            for (int kj = 0; kj < pc.kw; ++kj) {
+                const int jj = wo * pc.sw + kj * pc.dwd - pc.pw;
+                if (jj < 0 || jj >= pc.w) continue;
+                acc += x[((n * pc.c + c) * pc.h + ii) * pc.w + jj]
+                     * wt[(((oc * cg) + (c - grp * cg)) * pc.kh + ki) * pc.kw + kj];
+            }
+        }
+    }
+    y[i] = acc;
+}
+
+void conv_dw() {
+    const uint i = gl_GlobalInvocationID.x;
+    const int total = pc.o * (pc.c / pc.g) * pc.kh * pc.kw;
+    if (int(i) >= total) return;
+    const int kj = int(i) % pc.kw;
+    const int t0 = int(i) / pc.kw;
+    const int ki = t0 % pc.kh;
+    const int t1 = t0 / pc.kh;
+    const int cg = pc.c / pc.g;
+    const int og = pc.o / pc.g;
+    const int cg_in = t1 % cg;
+    const int oc = t1 / cg;
+    const int grp = oc / og;
+    const int c = grp * cg + cg_in;
+    float acc = 0.0;
+    for (int n = 0; n < pc.n; ++n) {
+        for (int ho = 0; ho < pc.ho; ++ho) {
+            const int ii = ho * pc.sh + ki * pc.dh - pc.ph;
+            if (ii < 0 || ii >= pc.h) continue;
+            for (int wo = 0; wo < pc.wo; ++wo) {
+                const int jj = wo * pc.sw + kj * pc.dwd - pc.pw;
+                if (jj < 0 || jj >= pc.w) continue;
+                acc += g[((n * pc.o + oc) * pc.ho + ho) * pc.wo + wo]
+                     * x[((n * pc.c + c) * pc.h + ii) * pc.w + jj];
+            }
+        }
+    }
+    y[i] = acc;                                            // y 此路作 dw 输出
+}
+
+void conv_dx() {
+    const uint i = gl_GlobalInvocationID.x;
+    const int total = pc.n * pc.c * pc.h * pc.w;
+    if (int(i) >= total) return;
+    const int j = int(i) % pc.w;
+    const int t0 = int(i) / pc.w;
+    const int ii = t0 % pc.h;
+    const int t1 = t0 / pc.h;
+    const int c = t1 % pc.c;
+    const int n = t1 / pc.c;
+    const int cg = pc.c / pc.g;
+    const int og = pc.o / pc.g;
+    const int grp = c / cg;
+    float acc = 0.0;
+    for (int oc = grp * og; oc < (grp + 1) * og; ++oc) {
+        for (int ki = 0; ki < pc.kh; ++ki) {
+            const int ho_num = ii + pc.ph - ki * pc.dh;
+            if (ho_num < 0 || ho_num % pc.sh != 0) continue;
+            const int ho = ho_num / pc.sh;
+            if (ho >= pc.ho) continue;
+            for (int kj = 0; kj < pc.kw; ++kj) {
+                const int wo_num = j + pc.pw - kj * pc.dwd;
+                if (wo_num < 0 || wo_num % pc.sw != 0) continue;
+                const int wo = wo_num / pc.sw;
+                if (wo >= pc.wo) continue;
+                const int cg_in = c - grp * cg;
+                acc += g[((n * pc.o + oc) * pc.ho + ho) * pc.wo + wo]
+                     * wt[(((oc * cg) + cg_in) * pc.kh + ki) * pc.kw + kj];
+            }
+        }
+    }
+    y[i] = acc;                                            // dx
+}
+
+void main() {
+    if (OP == 0) {
+        conv_fwd();
+    } else if (OP == 1) {
+        conv_dw();
+    } else {
+        conv_dx();
+    }
+}

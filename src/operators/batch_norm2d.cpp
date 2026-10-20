@@ -126,7 +126,7 @@ const Operator g_batch_norm2d_operator = {
     batch_norm2d_infer,
     batch_norm2d_grad,
     batch_norm2d_ref,
-    {batch_norm2d_cpu, nullptr, nullptr},
+    {batch_norm2d_cpu, ZNN_CUDA_K(batch_norm2d_cuda), ZNN_METAL_K(batch_norm2d_metal), ZNN_VULKAN_K(batch_norm2d_vulkan)},
     sizeof(BatchNormOptions),
 };
 

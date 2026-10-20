@@ -16,8 +16,24 @@ using ztestkit::on;
 namespace {
 
 // 通用: 同种子 CPU 基准 vs 设备结果(新鲜张量, 逐图隔离)
+// 先印检查名再执行 —— 崩溃时最后一条即罪魁; 失败时倾倒首错现场
 void cmp(const char* what, const Tensor& cpu, const Tensor& dev, float tol) {
-    check(max_diff(cpu, back(dev)) <= tol, what);   // 含等号: 容差 0 = 逐位
+    std::printf("      > %s\n", what);
+    const float m = max_diff(cpu, back(dev));
+    if (m > tol) {
+        std::printf("    FAIL-DETAIL %s: md=%.3e tol=%.1e cpu=[%lld] dev=[%lld]\n",
+                    what, m, tol, (long long)cpu.numel(), (long long)dev.numel());
+        int64_t wi = 0;
+        float wm = -1.f;
+        for (int64_t i = 0; i < cpu.numel(); ++i) {
+            const float d = std::fabs(cpu.data<float>()[i]
+                                      - back(dev).data<float>()[i]);
+            if (d > wm) { wm = d; wi = i; }
+        }
+        std::printf("      worst i=%lld cpu=%g dev=%g\n", (long long)wi,
+                    cpu.data<float>()[wi], back(dev).data<float>()[wi]);
+    }
+    check(m <= tol, what);
 }
 
 // ============ L0: 张量/存储不变量(仅 CPU 设备跑一次) ============
@@ -312,4 +328,133 @@ ZTK_CASE(repro_t10_training, false) {
     check(last < first / 100.f, "t10 repro loss drops");
     Layer::destroy(net[0]);
     Optimizer::destroy(opt);
+}
+
+// ============ SB2-SB4: 布局/生成/卷积/池化/嵌入/归一化/损失/注意力 ============
+
+ZTK_CASE(layout_ops, false) {
+    Tensor x = Tensor::randn({4, 6}, 40);
+    Tensor sc = x.slice(1, 1, 4);        // 具名(隔离临时生命周期)
+    Tensor xd = on(ztk_dev, x);
+    Tensor sd = xd.slice(1, 1, 4);
+    std::printf("      (sd dev=%d numel=%lld)\n", (int)sd.device(),
+                (long long)sd.numel());
+    cmp("slice", sc, sd, 0.f);
+    cmp("reshape", x.reshape({2, 12}), on(ztk_dev, x).reshape({2, 12}), 0.f);
+    cmp("transpose", x.transpose(0, 1), on(ztk_dev, x).transpose(0, 1), 0.f);
+    cmp("permute", x.permute({1, 0}), on(ztk_dev, x).permute({1, 0}), 0.f);
+    Tensor a = Tensor::randn({3, 4}, 41), b = Tensor::randn({2, 4}, 42);
+    Tensor c = Tensor::randn({3, 4}, 43);   // stack 要求同形
+    cmp("cat", Tensor::cat(a, b, 0),
+        Tensor::cat(on(ztk_dev, a), on(ztk_dev, b), 0), 0.f);
+    cmp("stack", Tensor::stack(std::vector<Tensor>{a, c}, 0),
+        Tensor::stack(std::vector<Tensor>{on(ztk_dev, a), on(ztk_dev, c)}, 0), 0.f);
+    cmp("arange", Tensor::arange(37),
+        Tensor::arange(37, DType::F32, ztk_dev), 0.f);
+    Tensor r1 = Tensor::randn({5, 9}, 44), r2 = Tensor::randn({5, 9}, 44);
+    cmp("randn same seed", r1, on(ztk_dev, r2), 0.f);
+}
+
+ZTK_CASE(conv2d_op, false) {
+    Tensor x = Tensor::randn({2, 3, 9, 9}, 44);
+    Tensor w = Tensor::randn({4, 3, 3, 3}, 45);
+    Conv2dOptions o;
+    cmp("conv2d", Tensor::conv2d(x, w, o),
+        Tensor::conv2d(on(ztk_dev, x), on(ztk_dev, w), o), 1e-3f);
+    o.stride = {2, 2};
+    o.pad = {1, 1};
+    cmp("conv2d s2p1", Tensor::conv2d(x, w, o),
+        Tensor::conv2d(on(ztk_dev, x), on(ztk_dev, w), o), 1e-3f);
+    o.stride = {1, 1};
+    o.pad = {0, 0};
+    o.groups = 3;
+    Tensor wg = Tensor::randn({6, 1, 3, 3}, 46);
+    cmp("conv2d groups", Tensor::conv2d(x, wg, o),
+        Tensor::conv2d(on(ztk_dev, x), on(ztk_dev, wg), o), 1e-3f);
+}
+
+ZTK_CASE(pools, false) {
+    Tensor x = Tensor::randn({2, 3, 8, 8}, 47);
+    Pool2dOptions o;
+    cmp("max_pool", Tensor::max_pool2d(x, {3, 3}, o),
+        Tensor::max_pool2d(on(ztk_dev, x), {3, 3}, o), 0.f);
+    cmp("avg_pool", Tensor::avg_pool2d(x, {3, 3}, o),
+        Tensor::avg_pool2d(on(ztk_dev, x), {3, 3}, o), 1e-5f);
+}
+
+ZTK_CASE(grad_conv_pool, true) {
+    auto run_c = [](Device d) {   // 纯 conv 梯度(隔离)
+        Tensor x = Tensor::randn({2, 3, 8, 8}, 48).to_device(d);
+        Tensor w = Tensor::randn({4, 3, 3, 3}, 49).to_device(d);
+        x.requires_grad(true);
+        w.requires_grad(true);
+        Tensor y = Tensor::conv2d(x, w);
+        Tensor s = y;
+        for (int64_t dd = s.dim_count() - 1; dd >= 0; --dd) {
+            s = Tensor::sum(s, dd);
+        }
+        s.backward();
+        return back(x.grad());
+    };
+    Tensor gc = run_c(Device::CPU);
+    Tensor gd = run_c(ztk_dev);
+    cmp("grad conv x", gc, gd, 1e-3f);
+    auto run_p = [](Device d) {   // 纯 max_pool 梯度(隔离 CAS 路径)
+        Tensor x = Tensor::randn({2, 3, 8, 8}, 52).to_device(d);
+        x.requires_grad(true);
+        Tensor y = Tensor::max_pool2d(x, {2, 2});
+        Tensor s = y;
+        for (int64_t dd = s.dim_count() - 1; dd >= 0; --dd) {
+            s = Tensor::sum(s, dd);
+        }
+        s.backward();
+        return back(x.grad());
+    };
+    Tensor pc2 = run_p(Device::CPU);
+    Tensor pd2 = run_p(ztk_dev);
+    cmp("grad max_pool x", pc2, pd2, 1e-3f);
+}
+
+ZTK_CASE(embedding_op, false) {
+    Tensor w = Tensor::randn({7, 5}, 50);
+    int64_t ids[6] = {0, 3, 6, 2, 2, 5};
+    Tensor idx = Tensor::from_host(ids, {6}, DType::I64);
+    cmp("embedding fwd", Tensor::embedding(w, idx),
+        Tensor::embedding(on(ztk_dev, w), on(ztk_dev, idx)), 0.f);
+    auto run = [&ids](Device d) {
+        Tensor wt = Tensor::randn({7, 5}, 51).to_device(d);
+        Tensor ix = Tensor::from_host(ids, {6}, DType::I64).to_device(d);
+        wt.requires_grad(true);
+        Tensor y = Tensor::embedding(wt, ix);
+        Tensor s = y;
+        for (int64_t dd = s.dim_count() - 1; dd >= 0; --dd) {
+            s = Tensor::sum(s, dd);
+        }
+        s.backward();
+        return back(wt.grad());
+    };
+    Tensor gc = run(Device::CPU);
+    Tensor gd = run(ztk_dev);
+    cmp("embedding grad (dup rows)", gc, gd, 1e-4f);
+}
+
+ZTK_CASE(losses, false) {
+    Tensor x = Tensor::randn({5, 7}, 58);
+    int64_t tg[5] = {0, 1, 2, 3, 0};
+    Tensor t = Tensor::from_host(tg, {5}, DType::I64);
+    cmp("cross_entropy", Loss::cross_entropy(x, t),
+        Loss::cross_entropy(on(ztk_dev, x), on(ztk_dev, t)), 1e-4f);
+    Tensor p = Tensor::randn({6, 5}, 59), q = Tensor::randn({6, 5}, 60);
+    cmp("mse", Loss::mse(p, q),
+        Loss::mse(on(ztk_dev, p), on(ztk_dev, q)), 1e-4f);
+}
+
+ZTK_CASE(attention_op, false) {
+    Tensor q = Tensor::randn({1, 2, 6, 5}, 61);
+    Tensor k = Tensor::randn({1, 2, 6, 5}, 62);
+    Tensor v = Tensor::randn({1, 2, 6, 5}, 63);
+    // Vulkan attention 锁定中(验证未过) —— 回落路径数值仍须正确
+    cmp("attention", Tensor::attention(q, k, v),
+        Tensor::attention(on(ztk_dev, q), on(ztk_dev, k),
+                          on(ztk_dev, v)), 1e-3f);
 }

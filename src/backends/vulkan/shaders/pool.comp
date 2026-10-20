@@ -1,0 +1,132 @@
+#version 450
+// 池化: OP=0 max 前向 / OP=1 avg 前向 / OP=2 max 梯度 / OP=3 avg 梯度
+// (与 CUDA max_pool_k/avg_pool_k/max_pool_grad_k/avg_pool_grad_k 同构;
+//  max 梯度散射累加用 uint 位视图 + CAS 循环模拟 float 原子加)
+layout(local_size_x = 256) in;
+
+layout(constant_id = 0) const int OP = 0;
+
+layout(binding = 0) readonly buffer X { float x[]; };      // 前向: x / 梯度: g
+layout(binding = 1) readonly buffer X2 { float x2[]; };    // max 梯度: 前向 x(重找最大)
+layout(binding = 2) buffer Y { float y[]; };               // 前向: y / 梯度: dx
+layout(binding = 3) buffer YU { uint yu[]; };              // dx 的 uint 位视图(OP2)
+
+layout(push_constant) uniform Pc {
+    int total;    // 前向: N*C*HO*WO / 梯度: 同(每输出元素一线程)
+    int h, w, ho, wo, kh, kw, sh, sw, ph, pw;
+} pc;
+
+void fwd(bool is_max) {
+    const uint i = gl_GlobalInvocationID.x;
+    if (int(i) >= pc.total) return;
+    const int wo = int(i) % pc.wo;
+    const int t0 = int(i) / pc.wo;
+    const int ho = t0 % pc.ho;
+    const int nchw = t0 / pc.ho;                // n*c
+    const int base = nchw * pc.h * pc.w;
+    float m = -3.4e38;
+    float acc = 0.0;
+    int cnt = 0;
+    for (int ki = 0; ki < pc.kh; ++ki) {
+        const int ii = ho * pc.sh + ki - pc.ph;
+        if (ii < 0 || ii >= pc.h) continue;
+        for (int kj = 0; kj < pc.kw; ++kj) {
+            const int jj = wo * pc.sw + kj - pc.pw;
+            if (jj < 0 || jj >= pc.w) continue;
+            const float v = x[base + ii * pc.w + jj];
+            if (is_max) {
+                m = max(m, v);
+            } else {
+                acc += v;
+                ++cnt;
+            }
+        }
+    }
+    y[i] = is_max ? m : (cnt > 0 ? acc / float(cnt) : 0.0);
+}
+
+void max_grad() {
+    const uint i = gl_GlobalInvocationID.x;
+    if (int(i) >= pc.total) return;
+    const int wo = int(i) % pc.wo;
+    const int t0 = int(i) / pc.wo;
+    const int ho = t0 % pc.ho;
+    const int nchw = t0 / pc.ho;
+    const float gv = x[i];                      // g 经 binding0
+    int bmax = -1;
+    float m = -3.4e38;
+    for (int ki = 0; ki < pc.kh; ++ki) {
+        const int ii = ho * pc.sh + ki - pc.ph;
+        if (ii < 0 || ii >= pc.h) continue;
+        for (int kj = 0; kj < pc.kw; ++kj) {
+            const int jj = wo * pc.sw + kj - pc.pw;
+            if (jj < 0 || jj >= pc.w) continue;
+            const float v = x2[nchw * pc.h * pc.w + ii * pc.w + jj];
+            if (v > m) {
+                m = v;
+                bmax = ii * pc.w + jj;
+            }
+        }
+    }
+    if (bmax < 0) return;
+    const uint slot = uint(nchw * pc.h * pc.w + bmax);
+    uint old = atomicCompSwap(yu[slot], yu[slot], yu[slot]);
+    for (;;) {
+        const float cur = uintBitsToFloat(old);
+        const uint neu = floatBitsToUint(cur + gv);
+        const uint got = atomicCompSwap(yu[slot], old, neu);
+        if (got == old) break;
+        old = got;
+    }
+}
+
+void avg_grad() {
+    const uint i = gl_GlobalInvocationID.x;
+    if (int(i) >= pc.total) return;
+    const int wo = int(i) % pc.wo;
+    const int t0 = int(i) / pc.wo;
+    const int ho = t0 % pc.ho;
+    const int nchw = t0 / pc.ho;
+    const float gv = x[i];
+    int cnt = 0;
+    for (int ki = 0; ki < pc.kh; ++ki) {
+        const int ii = ho * pc.sh + ki - pc.ph;
+        if (ii < 0 || ii >= pc.h) continue;
+        for (int kj = 0; kj < pc.kw; ++kj) {
+            const int jj = wo * pc.sw + kj - pc.pw;
+            if (jj < 0 || jj >= pc.w) continue;
+            ++cnt;
+        }
+    }
+    if (cnt == 0) return;
+    const float add = gv / float(cnt);
+    for (int ki = 0; ki < pc.kh; ++ki) {
+        const int ii = ho * pc.sh + ki - pc.ph;
+        if (ii < 0 || ii >= pc.h) continue;
+        for (int kj = 0; kj < pc.kw; ++kj) {
+            const int jj = wo * pc.sw + kj - pc.pw;
+            if (jj < 0 || jj >= pc.w) continue;
+            const uint slot = uint(nchw * pc.h * pc.w + ii * pc.w + jj);
+            uint old = atomicCompSwap(yu[slot], yu[slot], yu[slot]);
+            for (;;) {
+                const float cur = uintBitsToFloat(old);
+                const uint neu = floatBitsToUint(cur + add);
+                const uint got = atomicCompSwap(yu[slot], old, neu);
+                if (got == old) break;
+                old = got;
+            }
+        }
+    }
+}
+
+void main() {
+    if (OP == 0) {
+        fwd(true);
+    } else if (OP == 1) {
+        fwd(false);
+    } else if (OP == 2) {
+        max_grad();
+    } else {
+        avg_grad();
+    }
+}

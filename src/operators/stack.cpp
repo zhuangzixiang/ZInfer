@@ -15,6 +15,19 @@ struct StackOptions {
 static void stack_infer(Span<const TensorMeta*> in, const void* options,
                         std::vector<Shape>& outs) {
     const Shape& first = *in[0]->shape;
+    for (size_t i = 1; i < in.size(); ++i) {   // stack 要求同形(否则输出有洞)
+        const Shape& s = *in[i]->shape;
+        const bool same = s.rank == first.rank
+                          && [&] {
+                                 for (int64_t d = 0; d < s.rank; ++d) {
+                                     if (s[d] != first[d]) return false;
+                                 }
+                                 return true;
+                             }();
+        if (!same) {
+            throw std::runtime_error("znn: stack inputs must share shape");
+        }
+    }
     const int64_t dim = static_cast<const StackOptions*>(options)->dim < 0
         ? static_cast<const StackOptions*>(options)->dim + first.rank + 1
         : static_cast<const StackOptions*>(options)->dim;
@@ -73,7 +86,7 @@ const Operator g_stack_operator = {
     stack_infer,
     stack_grad,
     stack_ref,
-    {nullptr, ZNN_CUDA_K(stack_cuda), nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(stack_cuda), ZNN_METAL_K(stack_metal), ZNN_VULKAN_K(stack_vulkan)},
     sizeof(StackOptions),
 };
 

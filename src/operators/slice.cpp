@@ -55,7 +55,7 @@ const Operator g_slice_operator = {
     slice_infer,
     slice_grad,
     slice_ref,
-    {nullptr, ZNN_CUDA_K(slice_cuda), nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(slice_cuda), ZNN_METAL_K(slice_metal), ZNN_VULKAN_K(slice_vulkan)},
     sizeof(SliceOptions),
 };
 

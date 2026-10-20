@@ -25,6 +25,8 @@ void   free(void* p);
 void   memset0(void* p, size_t bytes);
 void   copy_host_to_device(void* dst, const void* src, size_t bytes);
 void   copy_device_to_host(void* dst, const void* src, size_t bytes);
+void   copy_device_to_host_off(void* dst, const void* src, size_t soff,
+                               size_t bytes);
 void   copy_device_to_device(void* dst, const void* src, size_t bytes);
 
 // ---- 算子内核(MSL 见 metal_kernels.mm 内嵌字符串) ----

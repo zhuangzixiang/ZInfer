@@ -76,6 +76,12 @@ void copy_device_to_host(void* dst, const void* src, size_t bytes) {
     memcpy(dst, static_cast<const MtlBuf*>(src)->mapped, bytes);
 }
 
+void copy_device_to_host_off(void* dst, const void* src, size_t soff,
+                             size_t bytes) {
+    memcpy(dst, static_cast<const char*>(static_cast<const MtlBuf*>(src)->mapped)
+               + soff, bytes);
+}
+
 void copy_device_to_device(void* dst, const void* src, size_t bytes) {
     MtlState* v = st();
     id<MTLCommandBuffer> cb = [v->queue commandBuffer];

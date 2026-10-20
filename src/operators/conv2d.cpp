@@ -79,14 +79,27 @@ static void conv2d_grad(BackwardContext& c) {
     const int64_t N = x.size(0), C = x.size(1), H = x.size(2), W = x.size(3);
     const int64_t O = w.size(0), KH = w.size(2), KW = w.size(3);
     const int64_t HO = g.size(2), WO = g.size(3);
-    if (x.device() == Device::CUDA) {          // 专用 CUDA 梯度内核(原生)
-        ZNN_CUDA_CALL(ZNN_CUDA_K(conv2d_grad_cuda)(
-            cuda_ptr(x), cuda_ptr(w), cuda_ptr(g),
-            cuda_ptr(dx), cuda_ptr(dw),
-            (int)N, (int)C, (int)H, (int)W, (int)O, (int)KH, (int)KW,
-            (int)HO, (int)WO, (int)o->stride[0], (int)o->stride[1],
-            (int)o->pad[0], (int)o->pad[1], (int)o->dilation[0],
-            (int)o->dilation[1], (int)o->groups));
+    if (x.device() != Device::CPU) {             // 专用梯度内核(各后端原生)
+        switch (x.device()) {
+        case Device::CUDA:
+            ZNN_CUDA_CALL(ZNN_CUDA_K(conv2d_grad_cuda)(
+                cuda_ptr(x), cuda_ptr(w), cuda_ptr(g),
+                cuda_ptr(dx), cuda_ptr(dw),
+                (int)N, (int)C, (int)H, (int)W, (int)O, (int)KH, (int)KW,
+                (int)HO, (int)WO, (int)o->stride[0], (int)o->stride[1],
+                (int)o->pad[0], (int)o->pad[1], (int)o->dilation[0],
+                (int)o->dilation[1], (int)o->groups));
+            break;
+        case Device::Vulkan:
+            ZNN_VULKAN_CALL(vulkan_backend::conv2d_grad_vulkan(x, w, g, dx, dw,
+                                                               c.options));
+            break;
+        case Device::Metal:
+            ZNN_METAL_CALL(metal_backend::conv2d_grad_metal(x, w, g, dx, dw,
+                                                            c.options));
+            break;
+        default: break;
+        }
         return;
     }
     const float* xp = x.data<float>();
@@ -130,7 +143,7 @@ const Operator g_conv2d_operator = {
     conv2d_infer,
     conv2d_grad,
     conv2d_ref,
-    {conv2d_cpu_kernel(), ZNN_CUDA_K(conv2d_cuda), nullptr, nullptr},
+    {conv2d_cpu_kernel(), ZNN_CUDA_K(conv2d_cuda), ZNN_METAL_K(conv2d_metal), ZNN_VULKAN_K(conv2d_vulkan)},
     sizeof(Conv2dOptions),
 };
 

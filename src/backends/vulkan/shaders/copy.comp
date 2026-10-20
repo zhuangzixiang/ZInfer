@@ -1,7 +1,7 @@
 #version 450
-// 双步长拷贝(dst 可散射视图): dp[Σ idx·ds] = sp[Σ idx·ss]
-// 与 CUDA strided_copy_cuda 同构 —— reshape/slice/transpose/permute/
-// cat/stack 的底层原语
+// 双步长拷贝(dst 可散射视图): dp[doff + Σ idx·ds] = sp[soff + Σ idx·ss]
+// 元素偏移走推送常量(绑定层偏移受 minStorageBufferOffsetAlignment 限制,
+// 不可用) —— 与 CUDA strided_copy_cuda 同构
 layout(local_size_x = 256) in;
 
 layout(binding = 0) buffer S { float s[]; };
@@ -13,12 +13,14 @@ layout(push_constant) uniform Pc {
     int ss[8];
     int ds[8];
     int sh[8];
+    int soff;
+    int doff;
 } pc;
 
 void main() {
     const uint i = gl_GlobalInvocationID.x;
     if (i >= uint(pc.total)) return;
-    int t = int(i), so = 0, dof = 0;
+    int t = int(i), so = pc.soff, dof = pc.doff;
     for (int d2 = pc.rank - 1; d2 >= 0; --d2) {
         const int idx = t % pc.sh[d2];
         t /= pc.sh[d2];

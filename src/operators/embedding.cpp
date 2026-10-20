@@ -45,10 +45,21 @@ static void embedding_grad(BackwardContext& c) {
     const Tensor& g = *c.grad_outputs[0];
     Tensor& dw = *c.grad_inputs[0];                       // 已零初始化
     const int64_t D = dw.size(1);
-    if (g.device() == Device::CUDA) {       // 原生: 行散射原子累加
-        ZNN_CUDA_CALL(ZNN_CUDA_K(embedding_grad_cuda)(
-            cuda_ptr(g), reinterpret_cast<int64_t*>(cuda_ptr(idx)), cuda_ptr(dw),
-            idx.numel() * D, (int)D));
+    if (g.device() != Device::CPU) {       // 原生: 行散射原子累加
+        switch (g.device()) {
+        case Device::CUDA:
+            ZNN_CUDA_CALL(ZNN_CUDA_K(embedding_grad_cuda)(
+                cuda_ptr(g), reinterpret_cast<int64_t*>(cuda_ptr(idx)),
+                cuda_ptr(dw), idx.numel() * D, (int)D));
+            break;
+        case Device::Vulkan:
+            ZNN_VULKAN_CALL(vulkan_backend::embedding_grad_vulkan(g, idx, dw));
+            break;
+        case Device::Metal:
+            ZNN_METAL_CALL(metal_backend::embedding_grad_metal(g, idx, dw));
+            break;
+        default: break;
+        }
         return;
     }
     const int64_t* ip = idx.data<int64_t>();
@@ -67,7 +78,7 @@ const Operator g_embedding_operator = {
     embedding_infer,
     embedding_grad,
     embedding_ref,
-    {nullptr, ZNN_CUDA_K(embedding_cuda), nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(embedding_cuda), ZNN_METAL_K(embedding_metal), ZNN_VULKAN_K(embedding_vulkan)},
 };
 
 Tensor Tensor::embedding(const Tensor& weight, const Tensor& indices) {

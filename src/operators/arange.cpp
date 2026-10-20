@@ -17,7 +17,7 @@ const Operator g_arange_operator = {
     nullptr,   // 前端直接构造, 不经派发
     nullptr,   // 无需求导
     arange_ref,
-    {nullptr, ZNN_CUDA_K(arange_cuda), nullptr, nullptr},        // kernels[CPU/CUDA/Metal/Vulkan]
+    {nullptr, ZNN_CUDA_K(arange_cuda), ZNN_METAL_K(arange_metal), ZNN_VULKAN_K(arange_vulkan)},
 };
 
 Tensor Tensor::arange(int64_t n, DType dtype, Device device) {
@@ -28,6 +28,12 @@ Tensor Tensor::arange(int64_t n, DType dtype, Device device) {
     if (device == Device::CUDA) {
         ZNN_CUDA_CALL(ZNN_CUDA_K(arange_cuda)(ctx, Span<const Tensor*>(nullptr, 0),
                                   Span<Tensor*>(outs, 1), nullptr));
+    } else if (device == Device::Vulkan) {
+        ZNN_VULKAN_CALL(vulkan_backend::arange_vulkan(
+            ctx, Span<const Tensor*>(nullptr, 0), Span<Tensor*>(outs, 1), nullptr));
+    } else if (device == Device::Metal) {
+        ZNN_METAL_CALL(metal_backend::arange_metal(
+            ctx, Span<const Tensor*>(nullptr, 0), Span<Tensor*>(outs, 1), nullptr));
     } else {
         float* p = t.data<float>();
         for (int64_t i = 0; i < n; ++i) p[i] = static_cast<float>(i);

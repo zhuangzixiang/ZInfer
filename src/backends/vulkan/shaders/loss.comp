@@ -1,0 +1,60 @@
+#version 450
+// 损失(单工作组两遍归约, 与 CUDA cross_entropy_k/mse_k 同构):
+// OP=0 CE: mean(lse_i - x[i, t[i]])   OP=1 MSE: mean((p-t)^2)
+// I64 标签以 uint 低字读(CE; 值 < 2^31)
+layout(local_size_x = 256) in;
+
+layout(constant_id = 0) const int OP = 0;
+
+layout(binding = 0) readonly buffer A { float a[]; };      // CE: x / MSE: p
+layout(binding = 1) readonly buffer Bb { float bb[]; };    // MSE: t(OP0 占位)
+layout(binding = 2) readonly buffer Idx2 { uint idx2[]; }; // CE: 标签低字
+layout(binding = 3) buffer Y { float y[]; };
+
+layout(push_constant) uniform Pc { int n; int c; } pc;     // n 样本/元素, c 类数
+
+shared float acc[256];
+
+void ce() {
+    const int lid = int(gl_LocalInvocationID.x);
+    float l = 0.0;
+    for (int i = lid; i < pc.n; i += 256) {
+        const int base = i * pc.c;
+        float m = a[base];
+        for (int j = 1; j < pc.c; ++j) m = max(m, a[base + j]);
+        float s = 0.0;
+        for (int j = 0; j < pc.c; ++j) s += exp(a[base + j] - m);
+        l += m + log(s) - a[base + int(idx2[2u * uint(i)])];
+    }
+    acc[lid] = l;
+    barrier();
+    if (lid == 0) {
+        float s = 0.0;
+        for (int i = 0; i < 256; ++i) s += acc[i];
+        y[0] = s / float(pc.n);
+    }
+}
+
+void mse() {
+    const int lid = int(gl_LocalInvocationID.x);
+    float l = 0.0;
+    for (int i = lid; i < pc.n; i += 256) {
+        const float d = a[i] - bb[i];
+        l += d * d;
+    }
+    acc[lid] = l;
+    barrier();
+    if (lid == 0) {
+        float s = 0.0;
+        for (int i = 0; i < 256; ++i) s += acc[i];
+        y[0] = s / float(pc.n);
+    }
+}
+
+void main() {
+    if (OP == 0) {
+        ce();
+    } else {
+        mse();
+    }
+}

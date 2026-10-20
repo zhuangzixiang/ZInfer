@@ -139,6 +139,26 @@ bool init_vulkan() {
     VkInstanceCreateInfo ci{};
     ci.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     ci.pApplicationInfo = &app;
+    // 校验层(若装了 SDK): 每次非法 API 用法直接打印 —— GPU 问题的权威诊断
+    if (std::getenv("ZNN_VK_VALIDATE")) {
+        auto enumLayers = (PFN_vkEnumerateInstanceLayerProperties)
+            gipa(VK_NULL_HANDLE, "vkEnumerateInstanceLayerProperties");
+        if (enumLayers) {
+            uint32_t nl = 0;
+            enumLayers(&nl, nullptr);
+            std::vector<VkLayerProperties> props(nl);
+            enumLayers(&nl, props.data());
+            for (const auto& p : props) {
+                if (std::strcmp(p.layerName, "VK_LAYER_KHRONOS_validation") == 0) {
+                    static const char* layers[] = {"VK_LAYER_KHRONOS_validation"};
+                    ci.enabledLayerCount = 1;
+                    ci.ppEnabledLayerNames = layers;
+                    std::fprintf(stderr, "[vk] validation layer ON\n");
+                    break;
+                }
+            }
+        }
+    }
     const VkResult rci = vkCreateInstance(&ci, nullptr, &v->inst);
     if (rci != VK_SUCCESS) return false;
 #define VK_LOAD_I2(name)                                                   \
@@ -320,7 +340,15 @@ void free(void* p) {
         VkBuf* b = static_cast<VkBuf*>(p);
         if (b->cap <= (size_t)256 << 20) {  // 池内块归还复用; 超大块真销毁
             std::lock_guard<std::mutex> lk(v->mu);
-            v->buf_pool[((uint64_t)b->mem_idx << 48) | bucket_of(b->cap)].push_back(p);
+            auto& bucket =
+                v->buf_pool[((uint64_t)b->mem_idx << 48) | bucket_of(b->cap)];
+            for (void* q : bucket) {   // [diag] 双重入池 = 双重释放
+                if (q == p) {
+                    std::fprintf(stderr, "[vk] POOL DOUBLE-FREE %p!\n", p);
+                    break;
+                }
+            }
+            bucket.push_back(p);
             return;
         }
         vkUnmapMemory(v->dev, b->mem);
@@ -338,6 +366,13 @@ void copy_host_to_device(void* dst, const void* src, size_t bytes) {
 }
 void copy_device_to_host(void* dst, const void* src, size_t bytes) {
     memcpy(dst, static_cast<const VkBuf*>(src)->mapped, bytes);
+}
+
+void copy_device_to_host_off(void* dst, const void* src, size_t soff,
+                             size_t bytes) {
+    // 偏移折算在 mapped 指针上(句柄不可算术)
+    memcpy(dst, static_cast<const char*>(static_cast<const VkBuf*>(src)->mapped)
+               + soff, bytes);
 }
 
 // ---- 计算派发入口(内核文件使用) ----
@@ -376,10 +411,13 @@ void submit_wait(VkCommandBuffer cb) {
     vkFreeCommandBuffers(v->dev, v->pool, 1, &cb);
 }
 
-void d2d(VkBuffer dst, VkBuffer src, size_t bytes) {
+void d2d(VkBuffer dst, VkBuffer src, size_t bytes,
+         VkDeviceSize doff, VkDeviceSize soff) {
     VkCommandBuffer cb = begin_cmd();
     VkBufferCopy c{};
     c.size = bytes;
+    c.dstOffset = doff;   // VkBufferCopy 偏移无对齐限制(绑定层才有)
+    c.srcOffset = soff;
     vkCmdCopyBuffer(cb, src, dst, 1, &c);
     submit_wait(cb);
 }
@@ -540,7 +578,14 @@ VkBuffer buf_of(void* p) { return static_cast<VkBuf*>(p)->buf; }
 } // namespace device
 
 void copy_device_to_device(void* dst, const void* src, size_t bytes) {
-    device::d2d(device::buf_of(dst), device::buf_of(const_cast<void*>(src)), bytes);
+    device::d2d(device::buf_of(dst), device::buf_of(const_cast<void*>(src)),
+                bytes, 0, 0);
+}
+
+void copy_device_to_device_off(void* dst, uint64_t doff, const void* src,
+                               uint64_t soff, size_t bytes) {
+    device::d2d(device::buf_of(dst), device::buf_of(const_cast<void*>(src)),
+                bytes, (VkDeviceSize)doff, (VkDeviceSize)soff);
 }
 
 void memset0(void* p, size_t bytes) {

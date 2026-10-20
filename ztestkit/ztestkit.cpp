@@ -16,6 +16,12 @@ LONG crash_stack(EXCEPTION_POINTERS* ep) {
     std::printf("==== CRASH code=0x%08X addr=%p stack: ====",
                 (unsigned)ep->ExceptionRecord->ExceptionCode,
                 ep->ExceptionRecord->ExceptionAddress);
+    if (ep->ExceptionRecord->ExceptionCode == 0xC0000005) {   // AV: 读/写 + 目标
+        std::printf(" [AV %s target=%p]",
+                    ep->ExceptionRecord->ExceptionInformation[0] ? "WRITE" : "READ",
+                    (void*)ep->ExceptionRecord->ExceptionInformation[1]);
+    }
+    std::fflush(stdout);
     char buf[sizeof(SYMBOL_INFO) + 128] = {};
     for (USHORT i = 0; i < n; ++i) {
         SYMBOL_INFO* si = reinterpret_cast<SYMBOL_INFO*>(buf);

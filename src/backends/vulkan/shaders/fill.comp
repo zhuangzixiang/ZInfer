@@ -1,0 +1,12 @@
+#version 450
+// 填充: y[i] = i (arange; 与 CUDA arange_k 同构)
+layout(local_size_x = 256) in;
+
+layout(binding = 0) buffer Y { float y[]; };
+layout(push_constant) uniform Pc { int n; } pc;
+
+void main() {
+    const uint i = gl_GlobalInvocationID.x;
+    if (i >= uint(pc.n)) return;
+    y[i] = float(i);
+}

@@ -87,6 +87,9 @@ void   check_cpu(Device device);      // GPU 里程碑前统一报错
 // 按设备路由的内存三原语 + 清零(句柄 = 各后端 alloc 返回的裸指针)
 void   device_copy_h2d(Device d, void* dst, const void* src, size_t bytes);
 void   device_copy_d2h(Device d, void* dst, const void* src, size_t bytes);
+// 带字节偏移的 d2h: 偏移在 mapped/设备指针上折算 —— GPU 句柄不可算术
+void   device_copy_d2h_off(Device d, void* dst, const void* src, size_t soff,
+                           size_t bytes);
 void   device_copy_d2d(Device d, void* dst, const void* src, size_t bytes);
 void   device_memset0(Device d, void* p, size_t bytes);
 

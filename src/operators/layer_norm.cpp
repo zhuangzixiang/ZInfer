@@ -102,7 +102,7 @@ const Operator g_layer_norm_operator = {
     layer_norm_infer,
     layer_norm_grad,
     layer_norm_ref,
-    {layer_norm_cpu, nullptr, nullptr},
+    {layer_norm_cpu, ZNN_CUDA_K(layer_norm_cuda), ZNN_METAL_K(layer_norm_metal), ZNN_VULKAN_K(layer_norm_vulkan)},
     sizeof(LayerNormOptions),
 };
 

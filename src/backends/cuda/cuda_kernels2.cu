@@ -371,6 +371,17 @@ void conv2d_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
     const int64_t M = (int64_t)N * HO * WO;
     const int CK = C * KH * KW, CKg = Cg * KH * KW;
 
+    if (G > 1) {
+        // 分组走直接内核: im2col 列切片路径在 kit 矩阵对拍中暴露数值错
+        // (ztestkit conv2d groups), 朴素内核与 CPU ref 逐位一致
+        conv2d_k<<<static_cast<unsigned>((y.numel() + kBlock - 1) / kBlock), kBlock>>>(
+            dptr(x), dptr(w), dptr(y),
+            N, C, H, W, O, KH, KW, HO, WO,
+            o->stride[0], o->stride[1], o->pad[0], o->pad[1],
+            o->dilation[0], o->dilation[1], G);
+        return;
+    }
+
     // 快速路径: im2col → 逐组 GEMM(列切片靠 ld 表达, 免拷贝) → NCHW 回转
     Tensor col = Tensor::empty(Shape{M, CK}, DType::F32, Device::CUDA);
     im2col_k<<<(unsigned)((M * C + kBlock - 1) / kBlock), kBlock>>>(

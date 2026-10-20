@@ -61,7 +61,7 @@ const Operator g_cross_entropy_operator = {
     ce_infer,
     ce_grad,
     ce_ref,
-    {nullptr, ZNN_CUDA_K(cross_entropy_cuda), nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(cross_entropy_cuda), ZNN_METAL_K(cross_entropy_metal), ZNN_VULKAN_K(cross_entropy_vulkan)},
 };
 
 Tensor Loss::cross_entropy(const Tensor& logits, const Tensor& targets) {

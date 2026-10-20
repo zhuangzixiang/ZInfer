@@ -1,0 +1,109 @@
+#version 450
+// 归一化族: OP=0 layer_norm(每工作组一行, 与 CUDA layer_norm_k 同构)
+//           OP=1 batch_norm2d(每工作组一通道, 训练态批统计+running 更新)
+layout(local_size_x = 256) in;
+
+layout(constant_id = 0) const int OP = 0;
+
+layout(binding = 0) readonly buffer X  { float x[]; };
+layout(binding = 1) readonly buffer Wt { float wt[]; };
+layout(binding = 2) readonly buffer Bs { float bs[]; };
+layout(binding = 3) buffer Rm { float rm[]; };            // BN: run_mean
+layout(binding = 4) buffer Rv { float rv[]; };            // BN: run_var
+layout(binding = 5) buffer Y  { float y[]; };
+
+layout(push_constant) uniform Pc {
+    int rows;      // LN: 行数 / BN: N*H*W(M)
+    int d;         // LN: 行宽 / BN: C
+    int h;         // BN: H
+    int w;         // BN: W
+    float eps;
+    float momentum;
+    int training;
+} pc;
+
+shared float sm[256];
+shared float sv[256];
+
+void ln_row() {
+    const int r = int(gl_GlobalInvocationID.y);
+    if (r >= pc.rows) return;
+    const int lid = int(gl_LocalInvocationID.x);
+    const int base = r * pc.d;
+    float lsum = 0.0, lsq = 0.0;
+    for (int i = lid; i < pc.d; i += 256) {
+        lsum += x[base + i];
+        lsq += x[base + i] * x[base + i];
+    }
+    sm[lid] = lsum;
+    sv[lid] = lsq;
+    barrier();
+    if (lid == 0) {                                       // 线程 0 合并(行宽典型 ≤4K)
+        float s = 0.0, q = 0.0;
+        for (int i = 0; i < 256; ++i) { s += sm[i]; q += sv[i]; }
+        sm[0] = s / float(pc.d);
+        sv[0] = max(q / float(pc.d) - sm[0] * sm[0], 0.0);
+    }
+    barrier();
+    const float mu = sm[0];
+    const float inv = inversesqrt(sv[0] + pc.eps);
+    for (int i = lid; i < pc.d; i += 256) {
+        y[base + i] = (x[base + i] - mu) * inv * wt[i] + bs[i];
+    }
+}
+
+void bn_channel() {
+    const int c = int(gl_GlobalInvocationID.y);
+    if (c >= pc.d) return;
+    const int lid = int(gl_LocalInvocationID.x);
+    const int m = pc.rows;                                // N*H*W
+    const int hw = pc.h * pc.w;
+    float mu, var;
+    if (pc.training != 0) {
+        float lsum = 0.0;
+        for (int i = lid; i < m; i += 256) {
+            lsum += x[((i / hw) * pc.d + c) * hw + i % hw];
+        }
+        sm[lid] = lsum;
+        barrier();
+        if (lid == 0) {
+            float s = 0.0;
+            for (int i = 0; i < 256; ++i) s += sm[i];
+            sm[0] = s / float(m);
+        }
+        barrier();
+        mu = sm[0];
+        float lsq = 0.0;
+        for (int i = lid; i < m; i += 256) {
+            const float t = x[((i / hw) * pc.d + c) * hw + i % hw] - mu;
+            lsq += t * t;
+        }
+        sv[lid] = lsq;
+        barrier();
+        if (lid == 0) {
+            float s = 0.0;
+            for (int i = 0; i < 256; ++i) s += sv[i];
+            sv[0] = s / float(m);
+            rm[c] = (1.0 - pc.momentum) * rm[c] + pc.momentum * mu;
+            rv[c] = (1.0 - pc.momentum) * rv[c] + pc.momentum * sv[0];
+        }
+        barrier();
+        var = sv[0];
+    } else {
+        mu = rm[c];
+        var = rv[c];
+    }
+    const float inv = inversesqrt(var + pc.eps);
+    for (int i = lid; i < m; i += 256) {
+        const int off = ((i / hw) * pc.d + c) * hw + i % hw;
+        y[off] = (x[off] - mu) * inv * wt[c] + bs[c];
+    }
+}
+
+void main() {
+    if (OP == 0) {
+        ln_row();
+    } else {
+        bn_channel();
+    }
+}

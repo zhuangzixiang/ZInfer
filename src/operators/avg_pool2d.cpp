@@ -71,13 +71,26 @@ static void avg_pool2d_grad(BackwardContext& c) {
     Tensor& dx = *c.grad_inputs[0];
     const int64_t C = x.size(1), H = x.size(2), W = x.size(3);
     const int64_t HO = g.size(2), WO = g.size(3);
-    if (x.device() == Device::CUDA) {       // 原生: 均摊梯度原子散射
-        ZNN_CUDA_CALL(ZNN_CUDA_K(avg_pool_grad_cuda)(
-            cuda_ptr(g), cuda_ptr(dx),
-            x.size(0) * C * HO * WO, (int)H, (int)W, (int)HO, (int)WO,
-            (int)o->kernel[0], (int)o->kernel[1],
-            (int)o->pool.stride[0], (int)o->pool.stride[1],
-            (int)o->pool.pad[0], (int)o->pool.pad[1]));
+    if (x.device() != Device::CPU) {       // 原生: 均摊梯度原子散射
+        switch (x.device()) {
+        case Device::CUDA:
+            ZNN_CUDA_CALL(ZNN_CUDA_K(avg_pool_grad_cuda)(
+                cuda_ptr(g), cuda_ptr(dx),
+                x.size(0) * C * HO * WO, (int)H, (int)W, (int)HO, (int)WO,
+                (int)o->kernel[0], (int)o->kernel[1],
+                (int)o->pool.stride[0], (int)o->pool.stride[1],
+                (int)o->pool.pad[0], (int)o->pool.pad[1]));
+            break;
+        case Device::Vulkan:
+            ZNN_VULKAN_CALL(vulkan_backend::avg_pool_grad_vulkan(x, g, dx,
+                                                                 c.options));
+            break;
+        case Device::Metal:
+            ZNN_METAL_CALL(metal_backend::avg_pool_grad_metal(g, dx,
+                                                              c.options));
+            break;
+        default: break;
+        }
         return;
     }
     const float* gp = g.data<float>();
@@ -118,7 +131,7 @@ const Operator g_avg_pool2d_operator = {
     avg_pool2d_infer,
     avg_pool2d_grad,
     avg_pool2d_ref,
-    {avg_pool2d_cpu, nullptr, nullptr},
+    {avg_pool2d_cpu, ZNN_CUDA_K(avg_pool2d_cuda), ZNN_METAL_K(avg_pool2d_metal), ZNN_VULKAN_K(avg_pool2d_vulkan)},
     sizeof(PoolCallOptions),
 };
 

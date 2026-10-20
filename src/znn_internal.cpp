@@ -72,6 +72,25 @@ void device_copy_d2h(Device d, void* dst, const void* src, size_t bytes) {
     default: std::memcpy(dst, src, bytes);
     }
 }
+
+void device_copy_d2h_off(Device d, void* dst, const void* src, size_t soff,
+                         size_t bytes) {
+    switch (d) {
+    case Device::CUDA:   // 设备指针可算术
+        ZNN_CUDA_CALL(cuda_backend::copy_device_to_host(
+            dst, static_cast<const char*>(src) + soff, bytes));
+        return;
+    case Device::Vulkan:
+        ZNN_VULKAN_CALL(vulkan_backend::copy_device_to_host_off(dst, src, soff,
+                                                               bytes));
+        return;
+    case Device::Metal:
+        ZNN_METAL_CALL(metal_backend::copy_device_to_host_off(dst, src, soff,
+                                                             bytes));
+        return;
+    default: std::memcpy(dst, static_cast<const char*>(src) + soff, bytes);
+    }
+}
 void device_copy_d2d(Device d, void* dst, const void* src, size_t bytes) {
     // 注意: 本原语不做视图偏移(基址到基址); 视图拷贝由调用方折算
     switch (d) {
@@ -655,10 +674,10 @@ Tensor Tensor::to_device(Device device) const {
                             + src.impl_->offset * esz,
                         t.impl_->nbytes());
     } else {
-        device_copy_d2h(from, t.impl_->storage->data(),
-                        static_cast<const char*>(impl_->storage->data())
-                            + impl_->offset * esz,
-                        impl_->nbytes());
+        // 视图偏移经原语折算(mapped/设备指针上) —— GPU 句柄不可指针算术
+        device_copy_d2h_off(from, t.impl_->storage->data(),
+                            impl_->storage->data(), impl_->offset * esz,
+                            impl_->nbytes());
     }
     return t;
 }
@@ -719,9 +738,10 @@ template <class T>
 T Tensor::item() const {
     require(impl_, "empty tensor");
     require(numel() == 1, "item on non-scalar");
-    if (impl_->device != Device::CPU) {          // GPU: 同步拷回单值
+    if (impl_->device != Device::CPU) {          // GPU: 同步拷回单值(含视图偏移)
         T v;
-        device_copy_d2h(impl_->device, &v, impl_->storage->data(), sizeof(T));
+        device_copy_d2h_off(impl_->device, &v, impl_->storage->data(),
+                            impl_->offset * dtype_size(impl_->dtype), sizeof(T));
         return v;
     }
     const T* p = data<T>();

@@ -39,7 +39,7 @@ const Operator g_mse_operator = {
     mse_infer,
     mse_grad,
     mse_ref,
-    {nullptr, ZNN_CUDA_K(mse_cuda), nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(mse_cuda), ZNN_METAL_K(mse_metal), ZNN_VULKAN_K(mse_vulkan)},
 };
 
 Tensor Loss::mse(const Tensor& pred, const Tensor& target) {

@@ -66,7 +66,7 @@ const Operator g_permute_operator = {
     permute_infer,
     permute_grad,
     permute_ref,
-    {nullptr, ZNN_CUDA_K(permute_cuda), nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(permute_cuda), ZNN_METAL_K(permute_metal), ZNN_VULKAN_K(permute_vulkan)},
     sizeof(PermuteOptions),
 };
 

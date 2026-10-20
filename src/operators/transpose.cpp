@@ -64,7 +64,7 @@ const Operator g_transpose_operator = {
     transpose_infer,
     transpose_grad,
     transpose_ref,
-    {nullptr, ZNN_CUDA_K(transpose_cuda), nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(transpose_cuda), ZNN_METAL_K(transpose_metal), ZNN_VULKAN_K(transpose_vulkan)},
     sizeof(TransposeOptions),
 };
 

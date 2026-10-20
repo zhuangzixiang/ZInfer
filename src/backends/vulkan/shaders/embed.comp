@@ -1,0 +1,36 @@
+#version 450
+// embedding: OP=0 前向行收集 / OP=1 梯度散射累加
+// 索引为 I64: GLSL 无 int64 缓冲保证 —— 以 uint 双字读低 32 位
+// (词表行数 < 2^31, 高位必为 0)。梯度累加用 uint 位视图 + CAS 循环
+// 模拟 float 原子加(GLSL 无 float atomicAdd), 与 CUDA 语义一致。
+layout(local_size_x = 256) in;
+
+layout(constant_id = 0) const int OP = 0;
+
+layout(binding = 0) readonly buffer W { float w[]; };      // OP0: 权重 / OP1: 梯度
+layout(binding = 1) readonly buffer Idx2 { uint idx2[]; }; // I64 索引低字(2i)
+layout(binding = 2) buffer Y { float y[]; };               // OP0: 输出 / OP1: dw
+layout(binding = 3) buffer DwU { uint dwu[]; };            // OP1: dw 的 uint 位视图
+
+layout(push_constant) uniform Pc { int total; int d; int rows; } pc;
+
+void main() {
+    const uint i = gl_GlobalInvocationID.x;
+    if (i >= uint(pc.total)) return;
+    if (OP == 0) {
+        const int v = int(idx2[2u * (i / uint(pc.d))]);   // 低 32 位
+        y[i] = (v >= 0 && v < pc.rows) ? w[v * pc.d + int(i) % pc.d] : 0.0;
+    } else {
+        const int v = int(idx2[2u * (i / uint(pc.d))]);
+        const uint slot = uint(v) * uint(pc.d) + i % uint(pc.d);
+        const float add = w[i];                           // g 经 binding0 进来
+        uint old = atomicCompSwap(dwu[slot], dwu[slot], dwu[slot]); // 原子读
+        for (;;) {
+            const float cur = uintBitsToFloat(old);
+            const uint neu = floatBitsToUint(cur + add);
+            const uint got = atomicCompSwap(dwu[slot], old, neu);
+            if (got == old) break;
+            old = got;
+        }
+    }
+}

@@ -21,6 +21,16 @@
 #include "backends/vulkan/gen/copy.h"
 #include "backends/vulkan/gen/bcastgrad.h"
 #include "backends/vulkan/gen/opt.h"
+#include "backends/vulkan/gen/fill.h"
+#include "backends/vulkan/gen/embed.h"
+#include "backends/vulkan/gen/norm.h"
+#include "backends/vulkan/gen/loss.h"
+#include "backends/vulkan/gen/conv.h"
+#include "backends/vulkan/gen/pool.h"
+#include "operators/shared.hpp"
+#include <cmath>
+#include <random>
+#include <vector>
 #include <stdexcept>
 #include <cstring>
 
@@ -34,10 +44,13 @@ void require(bool ok, const char* what) {
     if (!ok) throw std::runtime_error(std::string("znn vulkan: ") + what);
 }
 
-// Storage 裸句柄(与 CUDA 内核同模式; Vulkan 侧为 VkBuf*)
+// Storage 裸句柄(基址, 无绑定偏移 —— VkDescriptorBufferInfo.offset 受
+// minStorageBufferOffsetAlignment 限制; 视图偏移一律走推送常量/拷贝区偏移)
 VBuf vhandle(const Tensor& t) {
-    return VBuf{t.data<Tensor::VulkanDataPtr>(),
-                (uint64_t)(t.storage_offset() * 4)};   // F32 字节偏移
+    return VBuf{t.data<Tensor::VulkanDataPtr>(), 0};
+}
+void* vbase(const Tensor& t) {
+    return t.data<Tensor::VulkanDataPtr>();
 }
 
 // 右对齐广播步长(维长 1 → 步长 0); 与 CUDA bcast_map 同构
@@ -317,15 +330,18 @@ void strided_copy_vulkan(const Tensor& src, Tensor& dst, int rank,
     struct Pc {
         int32_t total, rank;
         int32_t ss[8], ds[8], sh[8];
+        int32_t soff, doff;
     } pc{};
     pc.total = (int32_t)total;
     pc.rank = rank;
+    pc.soff = (int32_t)src.storage_offset();
+    pc.doff = (int32_t)dst.storage_offset();
     for (int d = 0; d < rank; ++d) {
         pc.ss[d] = (int32_t)ss[d];
         pc.ds[d] = (int32_t)ds[d];
         pc.sh[d] = (int32_t)sh[d];
     }
-    const VBuf bufs[2] = {vhandle(src), vhandle(dst)};
+    const VBuf bufs[2] = {{vbase(src), 0}, {vbase(dst), 0}};
     bridge::dispatch_bufs(p, bufs, 2, &pc, sizeof(pc),
                           (unsigned)((total + 255) / 256), 1, 1);
 }
@@ -338,15 +354,18 @@ void strided_copy_raw_vk(const void* src, uint64_t soff, void* dst, uint64_t dof
     struct Pc {
         int32_t total, rank;
         int32_t ss[8], ds[8], sh[8];
+        int32_t soff, doff;
     } pc{};
     pc.total = (int32_t)total;
     pc.rank = rank;
+    pc.soff = (int32_t)(soff / 4);   // 字节 → 元素(推送常量, 绕开绑定对齐)
+    pc.doff = (int32_t)(doff / 4);
     for (int d = 0; d < rank; ++d) {
         pc.ss[d] = (int32_t)ss[d];
         pc.ds[d] = (int32_t)ds[d];
         pc.sh[d] = (int32_t)sh[d];
     }
-    const VBuf bufs[2] = {{const_cast<void*>(src), soff}, {dst, doff}};
+    const VBuf bufs[2] = {{const_cast<void*>(src), 0}, {dst, 0}};
     bridge::dispatch_bufs(p, bufs, 2, &pc, sizeof(pc),
                           (unsigned)((total + 255) / 256), 1, 1);
 }
@@ -371,6 +390,380 @@ void adam_step_vulkan(const Tensor& p, const Tensor& g, const Tensor& m,
     const VBuf bufs[4] = {vhandle(p), vhandle(g), vhandle(m), vhandle(v)};
     bridge::dispatch_bufs(pl, bufs, 4, &pc, sizeof(pc),
                           (unsigned)((n + 255) / 256), 1, 1);
+}
+
+// ============================================================ SB2-SB4
+
+namespace {
+void* hdl(const Tensor& t) { return t.data<Tensor::VulkanDataPtr>(); }
+uint64_t grp(long long n) { return (uint64_t)((n + 255) / 256); }
+} // namespace
+
+// ---- 布局族: 步长表 + strided_copy_raw(数据全程留 GPU) ----
+void reshape_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                    const void*) {
+    const Tensor& x = *in[0];
+    Tensor& y = *out[0];
+    if (x.is_contiguous() && y.is_contiguous()) {
+        // 视图偏移经 VkBufferCopy 区偏移(绑定层无对齐顾虑)
+        copy_device_to_device_off(hdl(y), (uint64_t)y.storage_offset() * 4,
+                                  hdl(x), (uint64_t)x.storage_offset() * 4,
+                                  (size_t)x.numel() * 4);
+        return;
+    }
+    const int rank = (int)y.dim_count();
+    long long ss[8], ds[8], sh[8];
+    for (int d = 0; d < rank; ++d) {
+        const int64_t sd = d + x.dim_count() - rank;   // 右对齐(维度数可不同)
+        ss[d] = sd >= 0 ? x.strides()[sd] : 0;
+        ds[d] = y.strides()[d];
+        sh[d] = y.size(d);
+    }
+    strided_copy_raw(Device::Vulkan, hdl(x), x.storage_offset(), hdl(y),
+                     y.storage_offset(), rank, ss, ds, sh, y.numel());
+}
+
+void transpose_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                      const void* options) {
+    struct TOptions { int64_t d0, d1; };
+    const TOptions* o = static_cast<const TOptions*>(options);
+    const Tensor& x = *in[0];
+    Tensor& y = *out[0];
+    const int64_t r = x.dim_count();
+    const int64_t d0 = o->d0 < 0 ? o->d0 + r : o->d0;
+    const int64_t d1 = o->d1 < 0 ? o->d1 + r : o->d1;
+    long long ss[8], ds[8], sh[8];
+    for (int64_t d = 0; d < r; ++d) {
+        ss[d] = x.strides()[d];
+        ds[d] = (d == d0) ? y.strides()[d1]
+                          : (d == d1 ? y.strides()[d0] : y.strides()[d]);
+        sh[d] = x.size(d);
+    }
+    strided_copy_raw(Device::Vulkan, hdl(x), x.storage_offset(), hdl(y),
+                     y.storage_offset(), (int)r, ss, ds, sh, x.numel());
+}
+
+void permute_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                    const void* options) {
+    struct POptions { int64_t order[8]; int64_t rank; };
+    const POptions* o = static_cast<const POptions*>(options);
+    const Tensor& x = *in[0];
+    Tensor& y = *out[0];
+    int64_t inv[8];
+    for (int64_t k = 0; k < o->rank; ++k) {
+        inv[o->order[k]] = k;
+    }
+    long long ss[8], ds[8], sh[8];
+    for (int64_t d = 0; d < o->rank; ++d) {
+        ss[d] = x.strides()[d];
+        ds[d] = y.strides()[inv[d]];
+        sh[d] = x.size(d);
+    }
+    strided_copy_raw(Device::Vulkan, hdl(x), x.storage_offset(), hdl(y),
+                     y.storage_offset(), (int)o->rank, ss, ds, sh, x.numel());
+}
+
+void slice_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                  const void* options) {
+    struct SOptions { int64_t dim; int64_t begin; int64_t end; };
+    const SOptions* o = static_cast<const SOptions*>(options);
+    const Tensor& x = *in[0];
+    Tensor& y = *out[0];
+    const int64_t dim = o->dim < 0 ? o->dim + x.dim_count() : o->dim;
+    const int rank = (int)y.dim_count();
+    long long ss[8], ds[8], sh[8];
+    for (int d = 0; d < rank; ++d) {
+        ss[d] = x.strides()[d];
+        ds[d] = y.strides()[d];
+        sh[d] = y.size(d);
+    }
+    strided_copy_raw(Device::Vulkan, hdl(x),
+                     x.storage_offset() + o->begin * x.strides()[dim],
+                     hdl(y), y.storage_offset(), rank, ss, ds, sh, y.numel());
+}
+
+void cat_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                const void* options) {
+    Tensor& y = *out[0];
+    const int64_t dim = static_cast<const int64_t*>(options)[0];
+    int64_t offset = 0;
+    for (size_t i = 0; i < in.size(); ++i) {
+        const Tensor& x = *in[i];
+        const int rank = (int)x.dim_count();
+        long long ss[8], ds[8], sh[8];
+        for (int d = 0; d < rank; ++d) {
+            ss[d] = x.strides()[d];
+            ds[d] = y.strides()[d];
+            sh[d] = x.size(d);
+        }
+        strided_copy_raw(Device::Vulkan, hdl(x), x.storage_offset(), hdl(y),
+                         y.storage_offset() + offset * y.strides()[dim],
+                         rank, ss, ds, sh, x.numel());
+        offset += x.size(dim);
+    }
+}
+
+void stack_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                  const void* options) {
+    Tensor& y = *out[0];
+    const int64_t dim = static_cast<const int64_t*>(options)[0];
+    for (size_t i = 0; i < in.size(); ++i) {
+        const Tensor& x = *in[i];
+        const int rank = (int)x.dim_count();
+        long long ss[8], ds[8], sh[8];
+        for (int d = 0; d < rank; ++d) {
+            ss[d] = x.strides()[d];
+            ds[d] = y.strides()[d < dim ? d : d + 1];   // 输出多一维
+            sh[d] = x.size(d);
+        }
+        strided_copy_raw(Device::Vulkan, hdl(x), x.storage_offset(), hdl(y),
+                         y.storage_offset() + (int64_t)i * y.strides()[dim],
+                         rank, ss, ds, sh, x.numel());
+    }
+}
+
+// ---- 生成族 ----
+void arange_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*> out,
+                   const void*) {
+    void* p = bridge::get_pipeline(spirv::fill, spirv::fill_bytes, 0, 0, 1);
+    require(p, "fill pipeline");
+    const int32_t n = (int32_t)out[0]->numel();
+    const VBuf bufs[1] = {vhandle(*out[0])};
+    bridge::dispatch_bufs(p, bufs, 1, &n, sizeof(n), 1, 1, 1);
+}
+
+void randn_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*> out,
+                  const void* options) {
+    // 与 CUDA 同源: 宿主 Box-Muller 后上传(数值逐位一致)
+    const unsigned seed = *static_cast<const unsigned*>(options);
+    const int64_t n = out[0]->numel();
+    std::vector<float> host((size_t)n);
+    std::mt19937 engine(seed ? seed : 42);
+    std::normal_distribution<float> dist(0.f, 1.f);
+    for (int64_t i = 0; i < n; ++i) host[(size_t)i] = dist(engine);
+    copy_host_to_device(hdl(*out[0]), host.data(), (size_t)n * sizeof(float));
+}
+
+// ---- embedding(前向行收集; 梯度 CAS 散射) ----
+void embedding_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                      const void*) {
+    const Tensor& w = *in[0];
+    const Tensor& idx = *in[1];
+    const int64_t D = w.size(1);
+    void* p = bridge::get_pipeline(spirv::embed, spirv::embed_bytes, 0, 0, 3);
+    require(p, "embed pipeline");
+    struct Pc { int32_t total, d, rows; } pc{(int32_t)(idx.numel() * D),
+                                             (int32_t)D,
+                                             (int32_t)(w.numel() / D)};
+    const VBuf bufs[3] = {vhandle(w), vhandle(idx), vhandle(*out[0])};
+    bridge::dispatch_bufs(p, bufs, 3, &pc, sizeof(pc),
+                          (unsigned)grp(idx.numel() * D), 1, 1);
+}
+
+void embedding_grad_vulkan(const Tensor& g, const Tensor& idx, Tensor& dw) {
+    const int64_t D = dw.size(1);
+    void* p = bridge::get_pipeline(spirv::embed, spirv::embed_bytes, 1, 0, 4);
+    require(p, "embed-grad pipeline");
+    struct Pc { int32_t total, d, rows; } pc{(int32_t)(idx.numel() * D),
+                                             (int32_t)D, 0};
+    const VBuf bufs[4] = {vhandle(g), vhandle(idx), vhandle(dw), vhandle(dw)};
+    bridge::dispatch_bufs(p, bufs, 4, &pc, sizeof(pc),
+                          (unsigned)grp(idx.numel() * D), 1, 1);
+}
+
+// ---- 归一化族 ----
+void layer_norm_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                       const void* options) {
+    const double eps = *static_cast<const double*>(options);
+    const Tensor& x = *in[0];
+    const int64_t d = x.size(-1);
+    const int64_t rows = x.numel() / d;
+    void* p = bridge::get_pipeline(spirv::norm, spirv::norm_bytes, 0, 0, 6);
+    require(p, "ln pipeline");
+    struct Pc { int32_t rows, d, h, w; float eps, momentum; int32_t training; } pc{
+        (int32_t)rows, (int32_t)d, 0, 0, (float)eps, 0.f, 0};
+    const VBuf bufs[6] = {vhandle(x), vhandle(*in[1]), vhandle(*in[2]),
+                          vhandle(x), vhandle(x), vhandle(*out[0])};
+    bridge::dispatch_bufs(p, bufs, 6, &pc, sizeof(pc), 1, (unsigned)rows, 1);
+}
+
+void batch_norm2d_vulkan(KernelContext&, Span<const Tensor*> in,
+                         Span<Tensor*> out, const void* options) {
+    const float* opts = static_cast<const float*>(options);
+    const Tensor& x = *in[0];
+    const int C = (int)x.size(1);
+    void* p = bridge::get_pipeline(spirv::norm, spirv::norm_bytes, 1, 0, 6);
+    require(p, "bn pipeline");
+    struct Pc { int32_t m, c, h, w; float eps, momentum; int32_t training; } pc{
+        (int32_t)(x.size(0) * x.size(2) * x.size(3)), C,
+        (int32_t)x.size(2), (int32_t)x.size(3),
+        opts[0], opts[1], (int32_t)opts[2]};
+    const VBuf bufs[6] = {vhandle(x), vhandle(*in[1]), vhandle(*in[2]),
+                          vhandle(*in[3]), vhandle(*in[4]), vhandle(*out[0])};
+    bridge::dispatch_bufs(p, bufs, 6, &pc, sizeof(pc), 1, (unsigned)C, 1);
+}
+
+// ---- 损失族 ----
+void cross_entropy_vulkan(KernelContext&, Span<const Tensor*> in,
+                          Span<Tensor*> out, const void*) {
+    const Tensor& x = *in[0];
+    const Tensor& t = *in[1];
+    void* p = bridge::get_pipeline(spirv::loss, spirv::loss_bytes, 0, 0, 4);
+    require(p, "ce pipeline");
+    struct Pc { int32_t n, c; } pc{(int32_t)x.size(0), (int32_t)x.size(1)};
+    const VBuf bufs[4] = {vhandle(x), vhandle(x), vhandle(t), vhandle(*out[0])};
+    bridge::dispatch_bufs(p, bufs, 4, &pc, sizeof(pc), 1, 1, 1);
+}
+
+void mse_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                const void*) {
+    void* p = bridge::get_pipeline(spirv::loss, spirv::loss_bytes, 1, 0, 4);
+    require(p, "mse pipeline");
+    struct Pc { int32_t n, c; } pc{(int32_t)in[0]->numel(), 0};
+    const VBuf bufs[4] = {vhandle(*in[0]), vhandle(*in[1]),
+                          vhandle(*in[1]), vhandle(*out[0])};
+    bridge::dispatch_bufs(p, bufs, 4, &pc, sizeof(pc), 1, 1, 1);
+}
+
+// ---- conv2d(前向/dw/dx; 与 CUDA conv2d_k/dw_k/dx_k 逐行同构) ----
+namespace {
+struct ConvPc {
+    int32_t n, c, h, w, o, kh, kw, ho, wo;
+    int32_t sh, sw, ph, pw, dh, dwd, g;
+};
+ConvPc conv_pc(const Tensor& x, const Tensor& wt, const Tensor& y,
+               const Conv2dOptions& o) {
+    return ConvPc{(int32_t)x.size(0), (int32_t)x.size(1), (int32_t)x.size(2),
+                  (int32_t)x.size(3), (int32_t)wt.size(0), (int32_t)wt.size(2),
+                  (int32_t)wt.size(3), (int32_t)y.size(2), (int32_t)y.size(3),
+                  (int32_t)o.stride[0], (int32_t)o.stride[1],
+                  (int32_t)o.pad[0], (int32_t)o.pad[1],
+                  (int32_t)o.dilation[0], (int32_t)o.dilation[1],
+                  (int32_t)o.groups};
+}
+} // namespace
+
+void conv2d_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                   const void* options) {
+    const Conv2dOptions* o = static_cast<const Conv2dOptions*>(options);
+    const Tensor& x = *in[0];
+    const Tensor& w = *in[1];
+    Tensor& y = *out[0];
+    void* p = bridge::get_pipeline(spirv::conv, spirv::conv_bytes, 0, 0, 4);
+    require(p, "conv pipeline");
+    ConvPc pc = conv_pc(x, w, y, *o);
+    const VBuf bufs[4] = {vhandle(x), vhandle(w), vhandle(x), vhandle(y)};
+    bridge::dispatch_bufs(p, bufs, 4, &pc, sizeof(pc),
+                          (unsigned)grp(y.numel()), 1, 1);
+}
+
+void conv2d_grad_vulkan(const Tensor& x, const Tensor& w, const Tensor& g,
+                        Tensor& dx, Tensor& dw, const void* options) {
+    const Conv2dOptions* o = static_cast<const Conv2dOptions*>(options);
+    ConvPc pc = conv_pc(x, w, g, *o);   // 输出几何取自 g(=前向输出形状)
+    void* pdw = bridge::get_pipeline(spirv::conv, spirv::conv_bytes, 1, 0, 4);
+    require(pdw, "conv-dw pipeline");
+    const VBuf bufs_dw[4] = {vhandle(x), vhandle(w), vhandle(g), vhandle(dw)};
+    bridge::dispatch_bufs(pdw, bufs_dw, 4, &pc, sizeof(pc),
+                          (unsigned)grp(dw.numel()), 1, 1);
+    void* pdx = bridge::get_pipeline(spirv::conv, spirv::conv_bytes, 2, 0, 4);
+    require(pdx, "conv-dx pipeline");
+    const VBuf bufs_dx[4] = {vhandle(x), vhandle(w), vhandle(g), vhandle(dx)};
+    bridge::dispatch_bufs(pdx, bufs_dx, 4, &pc, sizeof(pc),
+                          (unsigned)grp(dx.numel()), 1, 1);
+}
+
+// ---- 池化 ----
+namespace {
+struct PoolPc {
+    int32_t total, h, w, ho, wo, kh, kw, sh, sw, ph, pw;
+};
+PoolPc pool_pc(const Tensor& x, const Tensor& y, const PoolCallOptions& o) {
+    return PoolPc{(int32_t)y.numel(), (int32_t)x.size(2), (int32_t)x.size(3),
+                  (int32_t)y.size(2), (int32_t)y.size(3),
+                  (int32_t)o.kernel[0], (int32_t)o.kernel[1],
+                  (int32_t)o.pool.stride[0], (int32_t)o.pool.stride[1],
+                  (int32_t)o.pool.pad[0], (int32_t)o.pool.pad[1]};
+}
+} // namespace
+
+void max_pool2d_vulkan(KernelContext&, Span<const Tensor*> in,
+                       Span<Tensor*> out, const void* options) {
+    const PoolCallOptions* o = static_cast<const PoolCallOptions*>(options);
+    void* p = bridge::get_pipeline(spirv::pool, spirv::pool_bytes, 0, 0, 4);
+    require(p, "pool pipeline");
+    PoolPc pc = pool_pc(*in[0], *out[0], *o);
+    const VBuf bufs[4] = {vhandle(*in[0]), vhandle(*in[0]),
+                          vhandle(*out[0]), vhandle(*out[0])};
+    bridge::dispatch_bufs(p, bufs, 4, &pc, sizeof(pc),
+                          (unsigned)grp(out[0]->numel()), 1, 1);
+}
+
+void avg_pool2d_vulkan(KernelContext&, Span<const Tensor*> in,
+                       Span<Tensor*> out, const void* options) {
+    const PoolCallOptions* o = static_cast<const PoolCallOptions*>(options);
+    void* p = bridge::get_pipeline(spirv::pool, spirv::pool_bytes, 1, 0, 4);
+    require(p, "pool pipeline");
+    PoolPc pc = pool_pc(*in[0], *out[0], *o);
+    const VBuf bufs[4] = {vhandle(*in[0]), vhandle(*in[0]),
+                          vhandle(*out[0]), vhandle(*out[0])};
+    bridge::dispatch_bufs(p, bufs, 4, &pc, sizeof(pc),
+                          (unsigned)grp(out[0]->numel()), 1, 1);
+}
+
+void max_pool_grad_vulkan(const Tensor& x, const Tensor& g, Tensor& dx,
+                          const void* options) {
+    const PoolCallOptions* o = static_cast<const PoolCallOptions*>(options);
+    void* p = bridge::get_pipeline(spirv::pool, spirv::pool_bytes, 2, 0, 4);
+    require(p, "pool-grad pipeline");
+    PoolPc pc = pool_pc(x, g, *o);      // 输出几何取自 g(=池化输出形状)
+    pc.total = (int32_t)g.numel();
+    const VBuf bufs[4] = {vhandle(g), vhandle(x), vhandle(dx), vhandle(dx)};
+    bridge::dispatch_bufs(p, bufs, 4, &pc, sizeof(pc),
+                          (unsigned)grp(g.numel()), 1, 1);
+}
+
+void avg_pool_grad_vulkan(const Tensor& x, const Tensor& g, Tensor& dx,
+                          const void* options) {
+    const PoolCallOptions* o = static_cast<const PoolCallOptions*>(options);
+    void* p = bridge::get_pipeline(spirv::pool, spirv::pool_bytes, 3, 0, 4);
+    require(p, "pool-grad pipeline");
+    PoolPc pc = pool_pc(x, g, *o);      // 输出几何取自 g(=池化输出形状)
+    pc.total = (int32_t)g.numel();
+    const VBuf bufs[4] = {vhandle(g), vhandle(g), vhandle(dx), vhandle(dx)};
+    bridge::dispatch_bufs(p, bufs, 4, &pc, sizeof(pc),
+                          (unsigned)grp(g.numel()), 1, 1);
+}
+
+// ---- attention: 每 (b,h) 头组合原生算子(linear=q@kT/softmax/matmul),
+//      输出经 strided copy 写入 y 对应视图 —— 零 CPU 往返 ----
+void attention_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                      const void*) {
+    const Tensor& q = *in[0];
+    const Tensor& k = *in[1];
+    const Tensor& v = *in[2];
+    Tensor& y = *out[0];
+    const int64_t B = q.size(0), H = q.size(1), L = q.size(2), D = q.size(3);
+    const float scale = 1.f / std::sqrt((float)D);
+    const long long ss[3] = {L * D, D, 1};               // o1 [1,L,D] 连续
+    const long long sh[3] = {1, L, D};
+    // y 的 (b,h) 头按 [1,L,D] 解释: 行/列步长 = y 的第 2/3 维步长
+    // (不可取 4 维视图的前 3 步长 —— 维度错位致行步长取到批步长)
+    const long long ds[3] = {0, y.strides()[2], y.strides()[3]};
+    for (int64_t b = 0; b < B; ++b) {
+        for (int64_t h = 0; h < H; ++h) {
+            Tensor qh = q.slice(0, b, b + 1).slice(1, h, h + 1).reshape({L, D});
+            Tensor kh = k.slice(0, b, b + 1).slice(1, h, h + 1).reshape({L, D});
+            Tensor vh = v.slice(0, b, b + 1).slice(1, h, h + 1).reshape({L, D});
+            Tensor p = Tensor::linear(qh, kh);           // q@kT [L,L]
+            Tensor sm = Activator::softmax(Tensor::mul(
+                p, Tensor::full(Shape{}, scale, DType::F32, q.device())));
+            Tensor o1 = Tensor::matmul(sm, vh).reshape({1, L, D});
+            const int64_t head_off = (b * H + h) * L * D;
+            strided_copy_raw(Device::Vulkan, hdl(o1), 0, hdl(y),
+                             head_off, 3, ss, ds, sh, L * D);
+        }
+    }
 }
 
 } // namespace vulkan_backend

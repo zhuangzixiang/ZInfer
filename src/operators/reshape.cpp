@@ -39,7 +39,7 @@ const Operator g_reshape_operator = {
     reshape_infer,
     reshape_grad,
     reshape_ref,
-    {nullptr, ZNN_CUDA_K(reshape_cuda), nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(reshape_cuda), ZNN_METAL_K(reshape_metal), ZNN_VULKAN_K(reshape_vulkan)},
     sizeof(ReshapeOptions),
 };
 

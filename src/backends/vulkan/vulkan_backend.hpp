@@ -26,7 +26,12 @@ void   free(void* p);
 void   memset0(void* p, size_t bytes);
 void   copy_host_to_device(void* dst, const void* src, size_t bytes);
 void   copy_device_to_host(void* dst, const void* src, size_t bytes);
+void   copy_device_to_host_off(void* dst, const void* src, size_t soff,
+                               size_t bytes);
 void   copy_device_to_device(void* dst, const void* src, size_t bytes);
+// 带字节偏移的 d2d(VkBufferCopy 区偏移, 无对齐限制; 视图 reshape 用)
+void   copy_device_to_device_off(void* dst, uint64_t doff, const void* src,
+                                 uint64_t soff, size_t bytes);
 
 // ---- 算子内核(kernels[Vulkan] 槽位; 着色器见 shaders/) ----
 void unary_cuda_style_elementwise(KernelContext&, Span<const Tensor*> in,
@@ -93,6 +98,33 @@ void sgd_step_vulkan(const Tensor& p, const Tensor& g, const Tensor& vel,
 void adam_step_vulkan(const Tensor& p, const Tensor& g, const Tensor& m,
                       const Tensor& v, long long n, float lr, float b1,
                       float b2, float eps, float wd, float bias1, float bias2);
+
+// ---- SB2-SB4: 布局/生成/归一化/损失/卷积/池化/注意力 ----
+void reshape_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void transpose_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void permute_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void slice_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void cat_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void stack_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void arange_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void randn_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void embedding_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void layer_norm_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void batch_norm2d_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void cross_entropy_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void mse_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void conv2d_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void max_pool2d_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void avg_pool2d_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void attention_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+// 梯度直连(梯度规则经 backend_slots 宏调用)
+void conv2d_grad_vulkan(const Tensor& x, const Tensor& w, const Tensor& g,
+                        Tensor& dx, Tensor& dw, const void* options);
+void max_pool_grad_vulkan(const Tensor& x, const Tensor& g, Tensor& dx,
+                          const void* options);
+void avg_pool_grad_vulkan(const Tensor& x, const Tensor& g, Tensor& dx,
+                          const void* options);
+void embedding_grad_vulkan(const Tensor& g, const Tensor& idx, Tensor& dw);
 
 } // namespace vulkan_backend
 } // namespace znn

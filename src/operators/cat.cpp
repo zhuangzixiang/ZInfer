@@ -85,7 +85,7 @@ const Operator g_cat_operator = {
     cat_infer,
     cat_grad,
     cat_ref,
-    {nullptr, ZNN_CUDA_K(cat_cuda), nullptr, nullptr},
+    {nullptr, ZNN_CUDA_K(cat_cuda), ZNN_METAL_K(cat_metal), ZNN_VULKAN_K(cat_vulkan)},
     sizeof(CatOptions),
 };
 
