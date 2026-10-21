@@ -146,6 +146,11 @@ add_library(znn
 )
 target_include_directories(znn PUBLIC include PRIVATE src third_party/eigen
     third_party/onednn/include third_party/vulkan/include)
+if(ZNN_CUDA AND CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
+    # dynlib.hpp is included by ordinary C++ translation units as well as
+    # .cu files; expose the CUDA headers to those host compilations.
+    target_include_directories(znn PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+endif()
 
 if(Python3_Interpreter_FOUND)
     add_custom_target(kernel_coverage

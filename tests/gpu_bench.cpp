@@ -46,6 +46,13 @@ int main() {
         bench("TF32", Precision::TF32, M, n);
         bench("FP16", Precision::FP16, M, n);
     }
+    fprintf(stderr, "=== small matmul (synchronized, allocation included) ===\n");
+    const int64_t small[] = {16, 32, 64, 128, 256};
+    for (int64_t M : small) {
+        bench("FP32", Precision::FP32, M, 50);
+        bench("TF32", Precision::TF32, M, 50);
+        bench("FP16", Precision::FP16, M, 50);
+    }
 
     fprintf(stderr, "=== GEMM-class ops (TF32, data-resident) ===\n");
     // linear: y[N,OUT] = x[N,IN] × w[OUT,IN]^T (+bias)
