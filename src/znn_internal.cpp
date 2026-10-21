@@ -43,6 +43,42 @@ size_t dtype_size(DType dtype) {
     }
 }
 
+namespace {
+uint16_t f32_to_f16(float x) {
+    uint32_t u;
+    std::memcpy(&u, &x, sizeof(u));
+    const uint32_t s = (u >> 16) & 0x8000u;
+    int e = int((u >> 23) & 0xffu) - 127 + 15;
+    uint32_t m = u & 0x7fffffu;
+    if (e <= 0) return static_cast<uint16_t>(s);
+    if (e >= 31) return static_cast<uint16_t>(s | 0x7c00u);
+    return static_cast<uint16_t>(s | (uint32_t(e) << 10) | (m >> 13));
+}
+float f16_to_f32(uint16_t h) {
+    const uint32_t s = (uint32_t(h & 0x8000u)) << 16;
+    const uint32_t e = (h >> 10) & 31u;
+    const uint32_t m = h & 1023u;
+    uint32_t u;
+    if (e == 0) u = s;
+    else if (e == 31) u = s | 0x7f800000u | (m << 13);
+    else u = s | ((e - 15 + 127) << 23) | (m << 13);
+    float x;
+    std::memcpy(&x, &u, sizeof(x));
+    return x;
+}
+uint16_t f32_to_bf16(float x) {
+    uint32_t u;
+    std::memcpy(&u, &x, sizeof(u));
+    return static_cast<uint16_t>((u + 0x8000u) >> 16);
+}
+float bf16_to_f32(uint16_t h) {
+    uint32_t u = uint32_t(h) << 16;
+    float x;
+    std::memcpy(&x, &u, sizeof(x));
+    return x;
+}
+}
+
 void check_cpu(Device device) {
     if (device != Device::CPU) {
         throw std::runtime_error("znn: device not built in (GPU 里程碑)");
@@ -422,6 +458,9 @@ Tensor Tensor::zeros(Shape shape, DType dtype, Device device) {
 }
 
 Tensor Tensor::ones(Shape shape, DType dtype, Device device) {
+    if (dtype == DType::F16 || dtype == DType::BF16) {
+        return Tensor::ones(shape, DType::F32, device).to_dtype(dtype);
+    }
     // 宿主填充后按需上传(设备指针不可宿主直写)
     Tensor t = Tensor::empty(shape, dtype, Device::CPU);
     if (dtype == DType::F32) {
@@ -437,7 +476,10 @@ Tensor Tensor::ones(Shape shape, DType dtype, Device device) {
 }
 
 Tensor Tensor::full(Shape shape, double value, DType dtype, Device device) {
-    require(dtype == DType::F32, "full supports F32 in v1");
+    if (dtype == DType::F16 || dtype == DType::BF16) {
+        return Tensor::full(shape, value, DType::F32, device).to_dtype(dtype);
+    }
+    require(dtype == DType::F32, "full supports floating types");
     Tensor t = Tensor::empty(shape, dtype, Device::CPU);
     float* p = t.data<float>();
     for (int64_t i = 0; i < t.numel(); ++i) {
@@ -682,6 +724,36 @@ Tensor Tensor::to_device(Device device) const {
     return t;
 }
 
+Tensor Tensor::to_dtype(DType dtype) const {
+    require(impl_, "empty tensor");
+    if (dtype == impl_->dtype) return *this;
+    Tensor cpu = impl_->device == Device::CPU ? *this : to_device(Device::CPU);
+    Tensor out = Tensor::empty(cpu.shape(), dtype, Device::CPU);
+    const int64_t n = cpu.numel();
+    const float* fp = cpu.dtype() == DType::F32 ? cpu.data<float>() : nullptr;
+    const uint16_t* hp = (cpu.dtype() == DType::F16 || cpu.dtype() == DType::BF16)
+        ? cpu.data<uint16_t>() : nullptr;
+    auto value = [&](int64_t i) {
+        if (cpu.dtype() == DType::F32) return fp[i];
+        if (cpu.dtype() == DType::F16) return f16_to_f32(hp[i]);
+        if (cpu.dtype() == DType::BF16) return bf16_to_f32(hp[i]);
+        throw std::runtime_error("znn: dtype conversion requires floating input");
+    };
+    if (dtype == DType::F32) {
+        float* p = out.data<float>();
+        for (int64_t i = 0; i < n; ++i) p[i] = value(i);
+    } else if (dtype == DType::F16 || dtype == DType::BF16) {
+        uint16_t* p = out.data<uint16_t>();
+        for (int64_t i = 0; i < n; ++i) {
+            const float v = value(i);
+            p[i] = dtype == DType::F16 ? f32_to_f16(v) : f32_to_bf16(v);
+        }
+    } else {
+        throw std::runtime_error("znn: unsupported floating dtype conversion");
+    }
+    return impl_->device == Device::CPU ? out : out.to_device(impl_->device);
+}
+
 int64_t Tensor::storage_offset() const {
     return impl_ ? impl_->offset : 0;
 }
@@ -706,10 +778,13 @@ Tensor Tensor::clone() const {
 // Metal/Vulkan: 裸句柄(不做偏移算术 —— 句柄不可算术, 子缓冲由绑定层处理)
 template <class T>
 T* Tensor::data() const {
-    if constexpr (std::is_same<T, float>::value || std::is_same<T, int64_t>::value) {
+    if constexpr (std::is_same<T, float>::value || std::is_same<T, uint16_t>::value
+                  || std::is_same<T, int64_t>::value) {
+        const DType want = std::is_same<T, float>::value ? DType::F32
+            : std::is_same<T, uint16_t>::value ? DType::F16 : DType::I64;
         if (!impl_ || !impl_->storage || impl_->device != Device::CPU
-            || impl_->dtype != (std::is_same<T, float>::value ? DType::F32
-                                                              : DType::I64)) {
+            || (impl_->dtype != want && !(std::is_same<T, uint16_t>::value
+                && impl_->dtype == DType::BF16))) {
             return nullptr;
         }
         return static_cast<T*>(impl_->storage->data()) + impl_->offset;
@@ -729,7 +804,7 @@ T* Tensor::data() const {
         return reinterpret_cast<T*>(impl_->storage->data());
     } else {
         static_assert(!sizeof(T),
-                      "data<T>: T must be float/int64_t/CudaDataPtr/"
+                      "data<T>: T must be float/uint16_t/int64_t/CudaDataPtr/"
                       "MetalDataPtr/VulkanDataPtr");
     }
 }
@@ -753,6 +828,7 @@ T Tensor::item() const {
 
 template float*                Tensor::data<float>() const;
 template int64_t*              Tensor::data<int64_t>() const;
+template uint16_t*             Tensor::data<uint16_t>() const;
 template Tensor::CudaDataPtr*  Tensor::data<Tensor::CudaDataPtr>() const;
 template Tensor::MetalDataPtr* Tensor::data<Tensor::MetalDataPtr>() const;
 template Tensor::VulkanDataPtr* Tensor::data<Tensor::VulkanDataPtr>() const;

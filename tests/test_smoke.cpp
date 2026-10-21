@@ -486,15 +486,15 @@ static void test_sgd_momentum() {
 }
 
 static void test_dtype_guard() {
-    bool threw = false;
-    try {
-        Tensor a = Tensor::zeros({2}, DType::F16);
-        Tensor b = Tensor::zeros({2}, DType::F16);
-        (void)Tensor::add(a, b);
-    } catch (const std::exception& e) {
-        threw = std::string(e.what()).find("F32") != std::string::npos;
-    }
-    check(threw, "unsupported dtype is rejected instead of reinterpreted");
+    const float h[] = {1.25f, -2.5f};
+    Tensor f = Tensor::from_host(h, {2}).to_dtype(DType::F16);
+    Tensor b = f.to_dtype(DType::BF16);
+    Tensor r = Tensor::add(f, b).to_dtype(DType::F32);
+    check(f.dtype() == DType::F16 && b.dtype() == DType::BF16,
+          "F16/BF16 storage dtype is preserved");
+    check(fabsf(r.data<float>()[0] - 2.5f) < 0.02f
+          && fabsf(r.data<float>()[1] + 5.f) < 0.04f,
+          "F16/BF16 arithmetic promotes and converts correctly");
 }
 
 static void test_dropout_layer() {

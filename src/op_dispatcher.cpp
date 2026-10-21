@@ -99,6 +99,22 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
                 + std::to_string(i) + "); use to_device() to align");
         }
     }
+    // F16/BF16 storage uses the same numerically stable F32 operator kernels.
+    // Convert at the dispatcher boundary so every registered backend keeps one
+    // implementation and the result is converted back to the input dtype.
+    if (inputs[0]->dtype() == DType::F16 || inputs[0]->dtype() == DType::BF16) {
+        const DType storage_dtype = inputs[0]->dtype();
+        std::vector<Tensor> promoted(inputs.size());
+        std::vector<const Tensor*> promoted_ptrs(inputs.size());
+        for (size_t i = 0; i < inputs.size(); ++i) {
+            promoted[i] = (inputs[i]->dtype() == DType::F16
+                           || inputs[i]->dtype() == DType::BF16)
+                ? inputs[i]->to_dtype(DType::F32) : *inputs[i];
+            promoted_ptrs[i] = &promoted[i];
+        }
+        return run(op, Span<const Tensor*>(promoted_ptrs.data(), promoted_ptrs.size()),
+                   options).to_dtype(storage_dtype);
+    }
     // 当前所有算术/训练 kernel 均以 F32 实现；I64 只作为 embedding
     // 的索引输入存在。拒绝把 F16/BF16/U8 静默重解释成 float 指针。
     if (inputs[0]->dtype() != DType::F32 &&

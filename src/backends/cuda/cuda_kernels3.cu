@@ -399,6 +399,39 @@ __global__ void attn_output_k(const float* p, const float* v, float* o,
     o[i] = acc;
 }
 
+// Small attention fusion: one thread computes one output element and keeps
+// the score row in registers. This removes the temporary [B*H,L,L] tensor and
+// the three launch boundaries that dominate short sequences.
+__global__ void attn_fused_small_k(const float* q, const float* k,
+                                   const float* v, float* o,
+                                   int64_t total, int L, int D,
+                                   float scale, int causal) {
+    const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
+    if (i >= total) return;
+    const int64_t bh = i / ((int64_t)L * D);
+    const int64_t r = i % ((int64_t)L * D);
+    const int row = (int)(r / D), col = (int)(r % D);
+    const float* qp = q + (bh * L + row) * D;
+    const float* kp = k + bh * L * D;
+    const float* vp = v + bh * L * D;
+    const int limit = causal ? row + 1 : L;
+    float m = -FLT_MAX;
+    for (int j = 0; j < limit; ++j) {
+        float s = 0.f;
+        for (int d = 0; d < D; ++d) s += qp[d] * kp[j * D + d];
+        m = fmaxf(m, s * scale);
+    }
+    float denom = 0.f, acc = 0.f;
+    for (int j = 0; j < limit; ++j) {
+        float s = 0.f;
+        for (int d = 0; d < D; ++d) s += qp[d] * kp[j * D + d];
+        const float w = expf(s * scale - m);
+        denom += w;
+        acc += w * vp[j * D + col];
+    }
+    o[i] = acc / denom;
+}
+
 // ---- embedding 反向: 梯度行散射累加(重复索引原子加) ----
 __global__ void embedding_grad_k(const float* g, const long long* idx, float* dw,
                                  long long total, int D) {
@@ -413,7 +446,7 @@ void embedding_grad_cuda(const float* g, const long long* idx, float* dw,
 }
 
 void attention_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
-                    const void*) {
+                    const void* options) {
     const Tensor& q = *in[0];
     const Tensor& k = *in[1];
     const Tensor& v = *in[2];
@@ -421,6 +454,16 @@ void attention_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> ou
     const int B = q.size(0), H = q.size(1), L = q.size(2), D = q.size(3);
     const float scale = 1.f / std::sqrt(static_cast<float>(D));
     const int64_t bh = (int64_t)B * H;
+
+    struct Options { bool causal; };
+    const bool causal = options && static_cast<const Options*>(options)->causal;
+    if (L <= 128 && D <= 128 && bh * L * D <= (1 << 20)) {
+        const int64_t total = bh * L * D;
+        attn_fused_small_k<<<(unsigned)((total + kBlk3 - 1) / kBlk3), kBlk3>>>(
+            dptr(q), dptr(k), dptr(v), dptr(y), total, L, D, scale,
+            causal ? 1 : 0);
+        return;
+    }
 
     // scratch: P[bh, L, L](先存原始分数, softmax 原地覆盖)
     Tensor p = Tensor::empty(Shape{bh * L, L}, DType::F32, Device::CUDA);
