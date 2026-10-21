@@ -13,7 +13,7 @@ struct LinearOptions {
 };
 
 static void linear_infer(Span<const TensorMeta*> in, const void*,
-                         std::vector<Shape>& outs) {
+                         ShapeList& outs) {
     const Shape& x = *in[0]->shape;                       // [N, in]
     const Shape& w = *in[1]->shape;                       // [out, in]
     if (x.rank != 2 || w.rank != 2 || x[1] != w[1]) {

@@ -20,7 +20,7 @@ static void max_pool2d_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor
 
 
 static void max_pool2d_infer(Span<const TensorMeta*> in, const void* options,
-                             std::vector<Shape>& outs) {
+                             ShapeList& outs) {
     const PoolCallOptions* o = static_cast<const PoolCallOptions*>(options);
     const Shape& x = *in[0]->shape;                       // {N,C,H,W}
     if (x.rank != 4) {

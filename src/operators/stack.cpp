@@ -13,7 +13,7 @@ struct StackOptions {
 };
 
 static void stack_infer(Span<const TensorMeta*> in, const void* options,
-                        std::vector<Shape>& outs) {
+                        ShapeList& outs) {
     const Shape& first = *in[0]->shape;
     for (size_t i = 1; i < in.size(); ++i) {   // stack 要求同形(否则输出有洞)
         const Shape& s = *in[i]->shape;

@@ -7,7 +7,7 @@ namespace znn {
 
 extern const Operator g_mse_operator;
 
-static void mse_infer(Span<const TensorMeta*>, const void*, std::vector<Shape>& outs) {
+static void mse_infer(Span<const TensorMeta*>, const void*, ShapeList& outs) {
     outs.push_back(Shape{});
 }
 

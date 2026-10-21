@@ -17,7 +17,7 @@ static int64_t resolve(int64_t dim, int64_t rank) {
 }
 
 static void transpose_infer(Span<const TensorMeta*> in, const void* options,
-                            std::vector<Shape>& outs) {
+                            ShapeList& outs) {
     const TransposeOptions* o = static_cast<const TransposeOptions*>(options);
     Shape s = *in[0]->shape;
     const int64_t a = resolve(o->d0, s.rank);

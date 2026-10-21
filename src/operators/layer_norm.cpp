@@ -26,7 +26,7 @@ static void layer_norm_cpu(KernelContext& c, Span<const Tensor*> in,
 
 
 static void layer_norm_infer(Span<const TensorMeta*> in, const void*,
-                             std::vector<Shape>& outs) {
+                             ShapeList& outs) {
     outs.push_back(*in[0]->shape);
 }
 

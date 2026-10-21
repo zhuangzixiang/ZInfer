@@ -24,7 +24,7 @@ static void softmax_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> 
 
 
 
-static void softmax_infer(Span<const TensorMeta*> in, const void*, std::vector<Shape>& outs) {
+static void softmax_infer(Span<const TensorMeta*> in, const void*, ShapeList& outs) {
     outs.push_back(*in[0]->shape);
 }
 

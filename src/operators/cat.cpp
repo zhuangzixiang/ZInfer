@@ -17,7 +17,7 @@ static int64_t resolve_dim(int64_t dim, int64_t rank) {
 }
 
 static void cat_infer(Span<const TensorMeta*> in, const void* options,
-                      std::vector<Shape>& outs) {
+                      ShapeList& outs) {
     const Shape& first = *in[0]->shape;
     const int64_t dim = resolve_dim(static_cast<const CatOptions*>(options)->dim, first.rank);
     Shape out = first;

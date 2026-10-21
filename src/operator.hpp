@@ -19,6 +19,7 @@
 #pragma once
 #include "znn.hpp"
 #include <cstddef>
+#include <stdexcept>
 #include <vector>
 
 namespace znn
@@ -48,6 +49,21 @@ struct TensorMeta
     Device       device;
 };
 
+// v1 算子全部为单输出。固定小缓冲避免每次 eager 调用为输出 shape
+// 分配 heap；保留少量额外槽位给未来的轻量多输出算子。
+struct ShapeList {
+    Shape values[4];
+    size_t count = 0;
+
+    void push_back(const Shape& s) {
+        if (count >= 4) throw std::runtime_error("znn: too many operator outputs");
+        values[count++] = s;
+    }
+    bool empty() const { return count == 0; }
+    Shape& operator[](size_t i) { return values[i]; }
+    const Shape& operator[](size_t i) const { return values[i]; }
+};
+
 // 计算内核的执行上下文
 // Precision 定义在 znn.hpp 公共头(用户 API 需要), 此处直接使用
 struct KernelContext
@@ -71,7 +87,7 @@ struct BackwardContext
 };
 
 // 形状推导: 推导每个输出的shape(不碰具体数据)!OpDispatcher::run 在分配输出缓冲之前调用
-using ShapeInferenceFunction = void (*)(Span<const TensorMeta*> inputs, const void* options, std::vector<Shape>& outputs);
+using ShapeInferenceFunction = void (*)(Span<const TensorMeta*> inputs, const void* options, ShapeList& outputs);
 // 计算内核: 真正做数学的函数! run 分配输出之后经函数指针调用;
 // 数据几何经 Tensor 公共访问器获取(data<T>/strides/shape/device),
 // inputs 只读约定, outputs 已分配只管写

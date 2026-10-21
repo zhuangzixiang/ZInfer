@@ -16,7 +16,7 @@ struct SliceOptions {
 };
 
 static void slice_infer(Span<const TensorMeta*> in, const void* options,
-                        std::vector<Shape>& outs) {
+                        ShapeList& outs) {
     const SliceOptions* o = static_cast<const SliceOptions*>(options);
     Shape s = *in[0]->shape;
     const int64_t dim = o->dim < 0 ? o->dim + s.rank : o->dim;

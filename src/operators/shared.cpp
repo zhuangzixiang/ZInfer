@@ -22,11 +22,11 @@ Shape broadcast_shapes(const Shape& a, const Shape& b) {
     return out;
 }
 
-void infer_broadcast(Span<const TensorMeta*> inputs, const void*, std::vector<Shape>& outs) {
+void infer_broadcast(Span<const TensorMeta*> inputs, const void*, ShapeList& outs) {
     outs.push_back(broadcast_shapes(*inputs[0]->shape, *inputs[1]->shape));
 }
 
-void infer_same(Span<const TensorMeta*> inputs, const void*, std::vector<Shape>& outs) {
+void infer_same(Span<const TensorMeta*> inputs, const void*, ShapeList& outs) {
     outs.push_back(*inputs[0]->shape);
 }
 
@@ -130,7 +130,7 @@ float unary_deriv(UnaryBwd fn, float x, float y) {
 }
 
 static void unary_bwd_infer(Span<const TensorMeta*> in, const void*,
-                            std::vector<Shape>& outs) {
+                            ShapeList& outs) {
     outs.push_back(*in[0]->shape);
 }
 
@@ -430,7 +430,7 @@ void strided_copy_raw(Device dev, const void* src, int64_t soff, void* dst,
     }
 }
 
-void infer_reduce(Span<const TensorMeta*> inputs, const void* options, std::vector<Shape>& outs) {
+void infer_reduce(Span<const TensorMeta*> inputs, const void* options, ShapeList& outs) {
     const ReduceAttrs* a = static_cast<const ReduceAttrs*>(options);
     const Shape& s = *inputs[0]->shape;
     const int64_t dim = a->dim < 0 ? a->dim + s.rank : a->dim;

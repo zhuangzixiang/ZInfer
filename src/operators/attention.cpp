@@ -15,7 +15,7 @@ struct AttentionOptions {
 };
 
 static void attention_infer(Span<const TensorMeta*> in, const void*,
-                            std::vector<Shape>& outs) {
+                            ShapeList& outs) {
     for (size_t i = 1; i < in.size(); ++i) {
         if (!(*in[i]->shape == *in[0]->shape)) {
             throw std::runtime_error("znn: attention expects same-shape q/k/v");

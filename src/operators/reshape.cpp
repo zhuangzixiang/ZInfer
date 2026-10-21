@@ -13,7 +13,7 @@ struct ReshapeOptions {
 };
 
 static void reshape_infer(Span<const TensorMeta*> in, const void* options,
-                          std::vector<Shape>& outs) {
+                          ShapeList& outs) {
     (void)in;
     const ReshapeOptions* o = static_cast<const ReshapeOptions*>(options);
     outs.push_back(o->target);

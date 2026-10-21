@@ -8,7 +8,7 @@ namespace znn {
 extern const Operator g_embedding_operator;
 
 static void embedding_infer(Span<const TensorMeta*> in, const void*,
-                            std::vector<Shape>& outs) {
+                            ShapeList& outs) {
     const Shape& w = *in[0]->shape;                       // {V, D}
     const Shape& idx = *in[1]->shape;
     if (w.rank != 2) {

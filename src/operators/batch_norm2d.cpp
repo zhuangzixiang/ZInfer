@@ -34,7 +34,7 @@ struct BatchNormOptions {
 };
 
 static void batch_norm2d_infer(Span<const TensorMeta*> in, const void*,
-                               std::vector<Shape>& outs) {
+                               ShapeList& outs) {
     outs.push_back(*in[0]->shape);
 }
 

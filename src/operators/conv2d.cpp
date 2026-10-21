@@ -9,7 +9,7 @@ namespace znn {
 extern const Operator g_conv2d_operator;
 
 static void conv2d_infer(Span<const TensorMeta*> in, const void* options,
-                         std::vector<Shape>& outs) {
+                         ShapeList& outs) {
     const Conv2dOptions* o = static_cast<const Conv2dOptions*>(options);
     const Shape& x = *in[0]->shape;                       // {N,C,H,W}
     const Shape& w = *in[1]->shape;                       // {O,C,KH,KW}

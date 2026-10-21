@@ -15,8 +15,8 @@ namespace znn {
 Shape broadcast_shapes(const Shape& a, const Shape& b);
 
 // ---- 形状推导帮手 ----
-void infer_broadcast(Span<const TensorMeta*> inputs, const void*, std::vector<Shape>& outs);   // 二元
-void infer_same(Span<const TensorMeta*> inputs, const void*, std::vector<Shape>& outs);        // 一元同形
+void infer_broadcast(Span<const TensorMeta*> inputs, const void*, ShapeList& outs);   // 二元
+void infer_same(Span<const TensorMeta*> inputs, const void*, ShapeList& outs);        // 一元同形
 
 // ---- CPU 参考内核帮手(输出连续; 输入可为广播/strided 视图) ----
 void unary_kernel(Span<const Tensor*> in, Span<Tensor*> out, float (*fn)(float));
@@ -114,6 +114,6 @@ struct PoolCallOptions {
 };
 
 // 规约类(sum/mean)共用形状推导: ReduceAttrs 选项
-void infer_reduce(Span<const TensorMeta*> inputs, const void* options, std::vector<Shape>& outs);
+void infer_reduce(Span<const TensorMeta*> inputs, const void* options, ShapeList& outs);
 
 } // namespace znn

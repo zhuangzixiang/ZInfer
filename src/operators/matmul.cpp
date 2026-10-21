@@ -7,7 +7,7 @@ namespace znn {
 
 extern const Operator g_matmul_operator;
 
-static void matmul_infer(Span<const TensorMeta*> in, const void*, std::vector<Shape>& outs) {
+static void matmul_infer(Span<const TensorMeta*> in, const void*, ShapeList& outs) {
     const Shape& a = *in[0]->shape;
     const Shape& b = *in[1]->shape;
     if (a.rank != 2 || b.rank != 2 || a[1] != b[0]) {

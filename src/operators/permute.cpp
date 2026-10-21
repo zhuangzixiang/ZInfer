@@ -14,7 +14,7 @@ struct PermuteOptions {
 };
 
 static void permute_infer(Span<const TensorMeta*> in, const void* options,
-                          std::vector<Shape>& outs) {
+                          ShapeList& outs) {
     const PermuteOptions* o = static_cast<const PermuteOptions*>(options);
     const Shape& s = *in[0]->shape;
     Shape out;

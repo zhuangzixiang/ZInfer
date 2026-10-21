@@ -6,6 +6,7 @@
 #include "operators/shared.hpp"
 #include <cstdio>
 #include <cstdlib>
+#include <array>
 #include <mutex>
 #include <stdexcept>
 #include <unordered_set>
@@ -101,14 +102,27 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
     OpScope scope(op->name);
     try {
     // 1. 名片与形状推理(契约收指针数组)
-    std::vector<TensorMeta> meta_storage(inputs.size());
-    std::vector<const TensorMeta*> metas(inputs.size());
+    std::array<TensorMeta, 8> meta_small;
+    std::array<const TensorMeta*, 8> meta_ptrs;
+    std::vector<TensorMeta> meta_large;
+    std::vector<const TensorMeta*> meta_large_ptrs;
+    TensorMeta* meta_storage = nullptr;
+    const TensorMeta** metas = nullptr;
+    if (inputs.size() <= meta_small.size()) {
+        meta_storage = meta_small.data();
+        metas = meta_ptrs.data();
+    } else {
+        meta_large.resize(inputs.size());
+        meta_large_ptrs.resize(inputs.size());
+        meta_storage = meta_large.data();
+        metas = meta_large_ptrs.data();
+    }
     for (size_t i = 0; i < inputs.size(); ++i) {
         meta_storage[i] = TensorMeta{&inputs[i]->shape(), inputs[i]->dtype(), inputs[i]->device()};
         metas[i] = &meta_storage[i];
     }
-    std::vector<Shape> out_shapes;
-    op->infer(Span<const TensorMeta*>(metas.data(), metas.size()), options, out_shapes);
+    ShapeList out_shapes;
+    op->infer(Span<const TensorMeta*>(metas, inputs.size()), options, out_shapes);
     if (out_shapes.empty()) {
         throw std::runtime_error("znn: infer produced no output");
     }
