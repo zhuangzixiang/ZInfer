@@ -98,21 +98,82 @@ __global__ void softmax_small_k(const float* x, float* y, int64_t n, int d) {
     for (int i = lane; i < d; i += 32) yr[i] /= s;
 }
 
+// 任意 dim 的 softmax: 每 warp 负责一行(沿 dim 的 stride 步进),
+// 外层下标经 odims/xstr 步长表折算基址(与 reduce_any_k 同构)。
+struct SoftmaxDimIn {
+    int rank;                  // 去掉 softmax 维后的维数
+    long long odims[8];
+    long long xstr[8];
+    long long n_dim;
+    long long s_dim;           // x/y 同形(连续化后)步长一致
+};
+
+__global__ void softmax_dim_k(const float* x, float* y, long long rows,
+                              SoftmaxDimIn m) {
+    const int64_t r = blockIdx.x * (int64_t)blockDim.y + threadIdx.y;
+    if (r >= rows) return;
+    int64_t t = r, base = 0;
+    for (int d = m.rank - 1; d >= 0; --d) {
+        base += (t % m.odims[d]) * m.xstr[d];
+        t /= m.odims[d];
+    }
+    const int lane = threadIdx.x;
+    const float* xr = x + base;
+    float* yr = y + base;
+    float mx = -3.4e38f;
+    for (int64_t i = lane; i < m.n_dim; i += 32)
+        mx = fmaxf(mx, xr[i * m.s_dim]);
+    for (int off = 16; off > 0; off >>= 1)
+        mx = fmaxf(mx, __shfl_down_sync(0xffffffff, mx, off));
+    mx = __shfl_sync(0xffffffff, mx, 0);
+    float s = 0.f;
+    for (int64_t i = lane; i < m.n_dim; i += 32) {
+        yr[i * m.s_dim] = expf(xr[i * m.s_dim] - mx);
+        s += yr[i * m.s_dim];
+    }
+    for (int off = 16; off > 0; off >>= 1)
+        s += __shfl_down_sync(0xffffffff, s, off);
+    s = __shfl_sync(0xffffffff, s, 0);
+    for (int64_t i = lane; i < m.n_dim; i += 32) yr[i * m.s_dim] /= s;
+}
+
 void softmax_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
-                  const void*) {
-    require_contiguous1c(*in[0], *out[0]);
-    const Tensor& x = *in[0];
-    const int64_t d = x.size(-1);
-    const int64_t n = x.numel() / d;
-    if (d <= 32) {
-        softmax_small_k<<<static_cast<unsigned>(n), 32>>>(dptr(x), dptr(*out[0]), n,
-                                                           static_cast<int>(d));
+                  const void* options) {
+    Tensor xc = in[0]->is_contiguous() ? *in[0] : in[0]->clone();
+    const Tensor& x = xc;
+    // softmax 维来自选项(此前无视 dim 恒取末维 —— 语义错误)
+    const int64_t dim_req = static_cast<const int64_t*>(options)[0];
+    const int64_t dim = dim_req < 0 ? dim_req + x.dim_count() : dim_req;
+    if (dim == x.dim_count() - 1) {              // 末维: 专用快路径
+        const int64_t d = x.size(-1);
+        const int64_t n = x.numel() / d;
+        if (d <= 32) {
+            softmax_small_k<<<static_cast<unsigned>(n), 32>>>(dptr(x), dptr(*out[0]),
+                                                              n, static_cast<int>(d));
+            return;
+        }
+        dim3 block(32, 8);
+        dim3 grid(static_cast<unsigned>((n + 7) / 8));
+        softmax_lastdim_k<<<grid, block, 2 * 8 * 32 * sizeof(float)>>>(
+            dptr(x), dptr(*out[0]), n, d);
         return;
     }
+    // 一般维: 连续输入上按步长表逐行 softmax
+    SoftmaxDimIn m;
+    m.n_dim = x.size(dim);
+    m.s_dim = x.strides()[dim];
+    m.rank = 0;
+    int64_t rows = 1;
+    for (int64_t d = 0; d < x.dim_count(); ++d) {
+        if (d == dim) continue;
+        m.odims[m.rank] = x.size(d);
+        m.xstr[m.rank] = x.strides()[d];
+        ++m.rank;
+        rows *= x.size(d);
+    }
     dim3 block(32, 8);
-    dim3 grid(static_cast<unsigned>((n + 7) / 8));
-    softmax_lastdim_k<<<grid, block, 2 * 8 * 32 * sizeof(float)>>>(
-        dptr(x), dptr(*out[0]), n, d);
+    dim3 grid(static_cast<unsigned>((rows + 7) / 8));
+    softmax_dim_k<<<grid, block>>>(dptr(x), dptr(*out[0]), rows, m);
 }
 
 // ---- sum / mean 任意维规约: 每线程沿 dim 求和(与 CPU 语义一致;
@@ -132,25 +193,50 @@ struct ReduceIn {
     float scale;               // sum 传 1, mean 传 1/n
 };
 
-__global__ void reduce_any_k(const float* x, float* y, long long total,
-                             ReduceIn m) {
-    const long long o = blockIdx.x * (long long)blockDim.x + threadIdx.x;
-    if (o >= total) return;
+// 两段式规约: 每输出由 nseg 个块分段求和(块内树归约, 固定分段 → 确定性),
+// 再由末核逐输出合并。此前一线程一输出串行扫全维, 输出数少(dim0/标量)
+// 时整卡只有一两个块在跑, 万元素级规约达 10ms 量级。
+constexpr int kRedBlk = 256;
+
+__global__ void reduce_part_k(const float* x, float* part, long long seg,
+                              ReduceIn m) {
+    const long long o = blockIdx.x;            // 输出
+    const long long p = blockIdx.y;            // 段号
+    __shared__ float sh[kRedBlk];
     long long t = o, base = 0;
     for (int d = m.rank - 1; d >= 0; --d) {
         base += (t % m.odims[d]) * m.xstr[d];
         t /= m.odims[d];
     }
+    const long long begin = p * seg;
+    const long long end = begin + seg < m.n_dim ? begin + seg : m.n_dim;
     float acc = 0.f;
-    for (long long j = 0; j < m.n_dim; ++j) acc += x[base + j * m.s_dim];
-    y[o] = acc * m.scale;
+    for (long long j = begin + threadIdx.x; j < end; j += kRedBlk)
+        acc += x[base + j * m.s_dim];
+    sh[threadIdx.x] = acc;
+    __syncthreads();
+    for (int s = kRedBlk / 2; s > 0; s >>= 1) {
+        if (threadIdx.x < s) sh[threadIdx.x] += sh[threadIdx.x + s];
+        __syncthreads();
+    }
+    if (threadIdx.x == 0) part[o * gridDim.y + p] = sh[0];
+}
+
+__global__ void reduce_final_k(const float* part, float* y, long long nseg,
+                               float scale) {
+    const long long o = blockIdx.x * (long long)blockDim.x + threadIdx.x;
+    const long long total = gridDim.x * (long long)blockDim.x;
+    if (o >= total) return;
+    float acc = 0.f;
+    for (long long p = 0; p < nseg; ++p) acc += part[o * nseg + p];
+    y[o] = acc * scale;
 }
 
 static void reduce_host(Span<const Tensor*> in, Span<Tensor*> out,
                         const void* options, bool is_mean) {
-    require_contiguous1c(*in[0], *out[0]);
+    Tensor xc = in[0]->is_contiguous() ? *in[0] : in[0]->clone();
+    const Tensor& x = xc;
     const ReduceCallOptions* a = static_cast<const ReduceCallOptions*>(options);
-    const Tensor& x = *in[0];
     const int64_t dim = a->dim < 0 ? a->dim + x.dim_count() : a->dim;
     ReduceIn m;
     m.n_dim = x.size(dim);
@@ -164,8 +250,16 @@ static void reduce_host(Span<const Tensor*> in, Span<Tensor*> out,
         ++m.rank;
     }
     const long long total = out[0]->numel();
-    reduce_any_k<<<(unsigned)((total + kBlock - 1) / kBlock), kBlock>>>(
-        dptr(x), dptr(*out[0]), total, m);
+    // 分段策略: 段长约 4×kRedBlk, 输出少时提高并行(上限防爆显存)
+    long long nseg = (m.n_dim + 4 * kRedBlk - 1) / (4 * kRedBlk);
+    if (nseg > 4096) nseg = 4096;
+    if (nseg < 1) nseg = 1;
+    const long long seg = (m.n_dim + nseg - 1) / nseg;
+    Tensor part = Tensor::empty(Shape{total * nseg}, DType::F32, Device::CUDA);
+    dim3 grid((unsigned)total, (unsigned)nseg);
+    reduce_part_k<<<grid, kRedBlk>>>(dptr(x), dptr(part), seg, m);
+    reduce_final_k<<<(unsigned)((total + kRedBlk - 1) / kRedBlk), kRedBlk>>>(
+        dptr(part), dptr(*out[0]), nseg, m.scale);
 }
 
 void sum_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
@@ -386,10 +480,11 @@ void avg_pool_grad_cuda(const float* g, float* dx, long long total,
 
 void conv2d_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
                  const void* options) {
-    require_contiguous2c(*in[0], *in[1], *out[0]);
+    Tensor xm = in[0]->is_contiguous() ? *in[0] : in[0]->clone();   // 视图材料化
+    Tensor wm = in[1]->is_contiguous() ? *in[1] : in[1]->clone();
     const Conv2dOptions* o = static_cast<const Conv2dOptions*>(options);
-    const Tensor& x = *in[0];
-    const Tensor& w = *in[1];
+    const Tensor& x = xm;
+    const Tensor& w = wm;
     Tensor& y = *out[0];
     const int N = x.size(0), C = x.size(1), H = x.size(2), W = x.size(3);
     const int O = w.size(0), KH = w.size(2), KW = w.size(3);

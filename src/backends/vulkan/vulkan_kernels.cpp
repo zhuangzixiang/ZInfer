@@ -17,6 +17,7 @@
 #include "backends/vulkan/gen/gemm_big.h"
 #include "backends/vulkan/gen/reduce.h"
 #include "backends/vulkan/gen/softmax.h"
+#include "backends/vulkan/gen/softmaxdim.h"
 #include "backends/vulkan/gen/unarybwd.h"
 #include "backends/vulkan/gen/copy.h"
 #include "backends/vulkan/gen/bcastgrad.h"
@@ -222,12 +223,12 @@ void linear_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     }
 }
 
-// ---- 规约: sum/mean 沿 dim(任意维) ----
+// ---- 规约: sum/mean 沿 dim(任意维; 每 workgroup 一输出协作归约) ----
 namespace {
 void reduce_run(Span<const Tensor*> in, Span<Tensor*> out, int64_t dim, bool mean) {
-    const Tensor& x = *in[0];
+    Tensor xm = in[0]->is_contiguous() ? *in[0] : in[0]->clone();   // 视图材料化
+    const Tensor& x = xm;
     Tensor& y = *out[0];
-    require(x.is_contiguous() && y.is_contiguous(), "reduce needs contiguous");
     if (dim < 0) dim += x.dim_count();
     void* p = bridge::get_pipeline(spirv::reduce, spirv::reduce_bytes,
                                   (uint32_t)(x.dim_count() - 1),
@@ -247,7 +248,7 @@ void reduce_run(Span<const Tensor*> in, Span<Tensor*> out, int64_t dim, bool mea
         pc.xstr[r] = (int32_t)x.strides()[d];
         ++r;
     }
-    const uint32_t groups = (uint32_t)((pc.total + 255) / 256);
+    const uint32_t groups = (uint32_t)pc.total;   // 每 workgroup 一输出
     bridge::dispatch(p, vhandle(x), vhandle(x), vhandle(y), &pc, sizeof(pc), groups, 1, 1);
 }
 } // namespace
@@ -267,24 +268,46 @@ void mean_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     reduce_run(in, out, a->dim, true);
 }
 
-// ---- softmax(末维) ----
+// ---- softmax(末维快路径 + 任意 dim 通用路径) ----
 void softmax_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                     const void* options) {
-    const Tensor& x = *in[0];
+    Tensor xm = in[0]->is_contiguous() ? *in[0] : in[0]->clone();   // 视图材料化
+    const Tensor& x = xm;
     Tensor& y = *out[0];
-    require(x.is_contiguous() && y.is_contiguous(), "softmax needs contiguous");
     struct SO { int64_t dim; };
     const int64_t dim = static_cast<const SO*>(options)->dim;
     const int64_t d = dim < 0 ? dim + x.dim_count() : dim;
-    if (d != x.dim_count() - 1) {
-        throw std::runtime_error("znn vulkan: softmax last-dim only (fallback)");
+    if (d == x.dim_count() - 1) {                 // 末维: 每线程一行
+        void* p = bridge::get_pipeline(spirv::softmax, spirv::softmax_bytes, 0, 0);
+        require(p, "softmax pipeline");
+        struct Pc { int32_t rows; int32_t L; } pc{(int32_t)(x.numel() / x.size(d)),
+                                                  (int32_t)x.size(d)};
+        const uint32_t groups = (uint32_t)((pc.rows + 255) / 256);
+        bridge::dispatch(p, vhandle(x), vhandle(x), vhandle(y), &pc, sizeof(pc),
+                         groups, 1, 1);
+        return;
     }
-    void* p = bridge::get_pipeline(spirv::softmax, spirv::softmax_bytes, 0, 0);
-    require(p, "softmax pipeline");
-    struct Pc { int32_t rows; int32_t L; } pc{(int32_t)(x.numel() / x.size(d)),
-                                              (int32_t)x.size(d)};
-    const uint32_t groups = (uint32_t)((pc.rows + 255) / 256);
-    bridge::dispatch(p, vhandle(x), vhandle(x), vhandle(y), &pc, sizeof(pc), groups, 1, 1);
+    // 一般维: 每 workgroup 一行(此前直接抛错降级 —— 现原生)
+    void* p = bridge::get_pipeline(spirv::softmaxdim, spirv::softmaxdim_bytes,
+                                   (uint32_t)(x.dim_count() - 1), 0);
+    require(p, "softmaxdim pipeline");
+    struct Pc {
+        int32_t rows; int32_t n_dim; int32_t s_dim;
+        int32_t odims[8]; int32_t xstr[8];
+    } pc{};
+    pc.n_dim = (int32_t)x.size(d);
+    pc.s_dim = (int32_t)x.strides()[d];
+    pc.rows = 1;
+    int r = 0;
+    for (int64_t k = 0; k < x.dim_count(); ++k) {
+        if (k == d) continue;
+        pc.odims[r] = (int32_t)x.size(k);
+        pc.xstr[r] = (int32_t)x.strides()[k];
+        ++r;
+        pc.rows *= (int32_t)x.size(k);
+    }
+    bridge::dispatch(p, vhandle(x), vhandle(x), vhandle(y), &pc, sizeof(pc),
+                     (uint32_t)pc.rows, 1, 1);
 }
 
 // ---- 直连内核(unary_bwd 经注册表槽位; 其余经 backend_slots 宏直调) ----

@@ -166,6 +166,7 @@ bool binary(Span<const Tensor*> in, Span<Tensor*> out, int alg) {
 // ---- softmax(末维) ----
 bool softmax(Span<const Tensor*> in, Span<Tensor*> out, int64_t dim) {
     if (dn::family_off("softmax") || !dn::available_onednn()) return false;
+    if (!in[0]->is_contiguous() || !out[0]->is_contiguous()) return false;
     Eng eng;
     Stm stm;
     if (!eng.ok() || !stm.ok()) return false;

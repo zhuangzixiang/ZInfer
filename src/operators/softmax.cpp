@@ -28,29 +28,34 @@ static void softmax_infer(Span<const TensorMeta*> in, const void*, ShapeList& ou
     outs.push_back(*in[0]->shape);
 }
 
-// 沿 dim 的逐行 softmax: outer 遍历除 dim 外的全部下标, 行内步进 stride[dim]
+// 沿 dim 的逐行 softmax: outer 遍历除 dim 外的全部下标。
+// 输入按其步长寻址(可为任意视图), 输出按自身(连续)步长写 —— 此前
+// 直接拿输入步长寻址输出, 仅连续输入时碰巧正确(存量 bug)。
 static void softmax_rows(const float* xp, float* yp, const Shape& shape,
-                         const int64_t* strides, int64_t dim) {
+                         const int64_t* xstr, int64_t dim) {
     const int64_t n = shape[dim];
-    const int64_t sd = strides[dim];
-    int64_t outer = 1;
-    for (int64_t d = 0; d < shape.rank; ++d) {
+    const int64_t sd = xstr[dim];
+    int64_t outer = 1, os[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    int64_t acc = 1;
+    for (int64_t d = shape.rank - 1; d >= 0; --d) {         // 输出行主序步长
+        os[d] = acc;
+        acc *= shape[d];
         if (d != dim) outer *= shape[d];
     }
     int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     for (int64_t o = 0; o < outer; ++o) {
-        int64_t base = 0;
+        int64_t bx = 0, by = 0;
         for (int64_t d = 0; d < shape.rank; ++d) {
-            if (d != dim) base += idx[d] * strides[d];
+            if (d != dim) { bx += idx[d] * xstr[d]; by += idx[d] * os[d]; }
         }
-        float m = xp[base];
-        for (int64_t k = 1; k < n; ++k) m = m < xp[base + k * sd] ? xp[base + k * sd] : m;
+        float m = xp[bx];
+        for (int64_t k = 1; k < n; ++k) m = m < xp[bx + k * sd] ? xp[bx + k * sd] : m;
         float s = 0.f;
         for (int64_t k = 0; k < n; ++k) {
-            yp[base + k * sd] = expf(xp[base + k * sd] - m);
-            s += yp[base + k * sd];
+            yp[by + k * os[dim]] = expf(xp[bx + k * sd] - m);
+            s += yp[by + k * os[dim]];
         }
-        for (int64_t k = 0; k < n; ++k) yp[base + k * sd] /= s;
+        for (int64_t k = 0; k < n; ++k) yp[by + k * os[dim]] /= s;
         for (int64_t d = shape.rank - 1; d >= 0; --d) {     // 推进 outer 下标(跳过 dim)
             if (d == dim) continue;
             if (++idx[d] < shape[d]) break;

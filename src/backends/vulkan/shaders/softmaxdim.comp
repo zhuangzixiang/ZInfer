@@ -1,0 +1,59 @@
+#version 450
+// 任意 dim 的 softmax: 每 workgroup 负责一行(沿 dim 的 stride 步进),
+// 线程协作求行最大/指数和 + 共享内存树归约(数值稳定, 确定性)。
+// 末维 softmax 用 softmax.comp 快路径, 本着色器覆盖一般维。
+layout(local_size_x = 256) in;
+
+layout(constant_id = 0) const int RANK = 1;    // 去掉 softmax 维后的秩
+
+layout(binding = 0) readonly buffer Xbuf { float x[]; };
+layout(binding = 2) buffer Ybuf { float y[]; };
+
+layout(push_constant) uniform Pc {
+    int rows;           // softmax 行数(除 dim 外的元素积)
+    int n_dim;          // softmax 维长度
+    int s_dim;          // softmax 维步长(x/y 同形)
+    int odims[8];       // 除 dim 外各维尺寸
+    int xstr[8];        // 对应输入步长
+} pc;
+
+shared float sh[256];
+
+void main() {
+    const int r = int(gl_WorkGroupID.x);
+    if (r >= pc.rows) return;
+    int t = r;
+    int base = 0;
+    for (int d = RANK - 1; d >= 0; --d) {
+        base += (t % pc.odims[d]) * pc.xstr[d];
+        t /= pc.odims[d];
+    }
+    const int lane = int(gl_LocalInvocationID.x);
+    float m = -3.4e38;
+    for (int j = lane; j < pc.n_dim; j += 256) {
+        m = max(m, x[base + j * pc.s_dim]);
+    }
+    sh[lane] = m;
+    barrier();
+    for (int s = 128; s > 0; s >>= 1) {
+        if (lane < s) sh[lane] = max(sh[lane], sh[lane + s]);
+        barrier();
+    }
+    const float mx = sh[0];
+    float acc = 0.0;
+    for (int j = lane; j < pc.n_dim; j += 256) {
+        const float e = exp(x[base + j * pc.s_dim] - mx);
+        y[base + j * pc.s_dim] = e;
+        acc += e;
+    }
+    sh[lane] = acc;
+    barrier();
+    for (int s = 128; s > 0; s >>= 1) {
+        if (lane < s) sh[lane] += sh[lane + s];
+        barrier();
+    }
+    const float sum = sh[0];
+    for (int j = lane; j < pc.n_dim; j += 256) {
+        y[base + j * pc.s_dim] /= sum;
+    }
+}

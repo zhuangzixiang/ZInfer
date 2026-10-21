@@ -118,29 +118,94 @@ kernel void gemm(device const float* a [[buffer(0)]],
 }
 )MSL";
 
-// MSL: 任意维规约(每线程沿 dim 累加 K 个, 步长表同 CUDA/Vulkan 版)
+// MSL: 任意维规约(每 threadgroup 一输出, 线程沿 dim 协作 + 组内存树归约;
+// 与 CUDA/Vulkan 版同构 —— 此前一线程一输出, 少输出场景整卡欠载)
 const char* kMslReduce = R"MSL(
 #include <metal_stdlib>
 using namespace metal;
 
 kernel void reduce(device const float* x [[buffer(0)]],
                    device float* y [[buffer(2)]],
-                   constant const int* pc [[buffer(3)]], uint3 tpig [[thread_position_in_grid]]) {
+                   constant const int* pc [[buffer(3)]],
+                   uint3 tpig [[thread_position_in_grid]],
+                   uint3 tptg [[thread_position_in_threadgroup]]) {
     // pc[0]=total pc[1]=n_dim pc[2]=s_dim pc[3]=RANK pc[4]=MEAN
     // pc[10+d]=odims[d], pc[20+d]=xstr[d]
-    const int o = (int)(tpig.x);
-    if (o >= pc[0]) return;
-    int t = o;
+    const int out = (int)(tpig.x) / 256;      // 每组一输出 → 组号 = 线程序/256
+    if (out >= pc[0]) return;
+    int t = out;
     int base = 0;
     for (int d = pc[3] - 1; d >= 0; --d) {
         base += (t % pc[10 + d]) * pc[20 + d];
         t /= pc[10 + d];
     }
+    threadgroup float sh[256];
+    const int lane = (int)(tptg.x);
     float acc = 0.0f;
-    for (int j = 0; j < pc[1]; ++j) {
+    for (int j = lane; j < pc[1]; j += 256) {
         acc += x[base + j * pc[2]];
     }
-    y[o] = (pc[4] == 1) ? acc / (float)pc[1] : acc;
+    sh[lane] = acc;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (int s = 128; s > 0; s >>= 1) {
+        if (lane < s) sh[lane] += sh[lane + s];
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    if (lane == 0) {
+        y[out] = (pc[4] == 1) ? sh[0] / (float)pc[1] : sh[0];
+    }
+}
+)MSL";
+
+// MSL: 任意 dim 的 softmax(每 threadgroup 一行, 组内协作 max/sum; 数值稳定)
+const char* kMslSoftmaxDim = R"MSL(
+#include <metal_stdlib>
+using namespace metal;
+
+kernel void softmax_dim(device const float* x [[buffer(0)]],
+                        device float* y [[buffer(2)]],
+                        constant const int* pc [[buffer(3)]],
+                        uint3 tpig [[thread_position_in_grid]],
+                        uint3 tptg [[thread_position_in_threadgroup]]) {
+    // pc[0]=rows pc[1]=n_dim pc[2]=s_dim pc[3]=RANK
+    // pc[10+d]=odims[d], pc[20+d]=xstr[d]
+    const int r = (int)(tpig.x) / 256;        // 每组一行 → 组号 = 线程序/256
+    if (r >= pc[0]) return;
+    int t = r;
+    int base = 0;
+    for (int d = pc[3] - 1; d >= 0; --d) {
+        base += (t % pc[10 + d]) * pc[20 + d];
+        t /= pc[10 + d];
+    }
+    threadgroup float sh[256];
+    const int lane = (int)(tptg.x);
+    float m = -3.4e38f;
+    for (int j = lane; j < pc[1]; j += 256) {
+        m = fmax(m, x[base + j * pc[2]]);
+    }
+    sh[lane] = m;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (int s = 128; s > 0; s >>= 1) {
+        if (lane < s) sh[lane] = fmax(sh[lane], sh[lane + s]);
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    const float mx = sh[0];
+    float acc = 0.0f;
+    for (int j = lane; j < pc[1]; j += 256) {
+        const float e = exp(x[base + j * pc[2]] - mx);
+        y[base + j * pc[2]] = e;
+        acc += e;
+    }
+    sh[lane] = acc;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    for (int s = 128; s > 0; s >>= 1) {
+        if (lane < s) sh[lane] += sh[lane + s];
+        threadgroup_barrier(mem_flags::mem_threadgroup);
+    }
+    const float sum = sh[0];
+    for (int j = lane; j < pc[1]; j += 256) {
+        y[base + j * pc[2]] /= sum;
+    }
 }
 )MSL";
 
@@ -335,9 +400,9 @@ void linear_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
 // ---- 规约 / softmax ----
 namespace {
 void reduce_run(Span<const Tensor*> in, Span<Tensor*> out, int64_t dim, bool mean) {
-    const Tensor& x = *in[0];
+    Tensor xm = in[0]->is_contiguous() ? *in[0] : in[0]->clone();   // 视图材料化
+    const Tensor& x = xm;
     Tensor& y = *out[0];
-    require(x.is_contiguous() && y.is_contiguous(), "reduce needs contiguous");
     if (dim < 0) dim += x.dim_count();
     static id<MTLComputePipelineState> p = nil;
     if (!p) p = device::pipeline(kMslReduce, "reduce");
@@ -356,7 +421,7 @@ void reduce_run(Span<const Tensor*> in, Span<Tensor*> out, int64_t dim, bool mea
     }
     const uint32_t total = (uint32_t)pc[0];
     device::dispatch(p, mbuf(x), mbuf(x), mbuf(y), pc, sizeof(pc),
-                     MTLSizeMake(rup(total, 256), 1, 1), MTLSizeMake(256, 1, 1), nil);
+                     MTLSizeMake(total, 1, 1), MTLSizeMake(256, 1, 1), nil);
 }
 } // namespace
 
@@ -374,21 +439,39 @@ void mean_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
 
 void softmax_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                    const void* options) {
-    const Tensor& x = *in[0];
+    Tensor xm = in[0]->is_contiguous() ? *in[0] : in[0]->clone();   // 视图材料化
+    const Tensor& x = xm;
     Tensor& y = *out[0];
-    require(x.is_contiguous() && y.is_contiguous(), "softmax needs contiguous");
     struct SO { int64_t dim; };
     const int64_t dim = static_cast<const SO*>(options)->dim;
     const int64_t d = dim < 0 ? dim + x.dim_count() : dim;
-    if (d != x.dim_count() - 1) {
-        throw std::runtime_error("znn metal: softmax last-dim only (fallback)");
+    if (d == x.dim_count() - 1) {             // 末维: 每线程一行
+        static id<MTLComputePipelineState> p = nil;
+        if (!p) p = device::pipeline(kMslSoftmax, "softmax");
+        const int pc[2] = {(int)(x.numel() / x.size(d)), (int)x.size(d)};
+        const uint32_t rows = (uint32_t)pc[0];
+        device::dispatch(p, mbuf(x), mbuf(x), mbuf(y), pc, sizeof(pc),
+                         MTLSizeMake(rup(rows, 256), 1, 1), MTLSizeMake(256, 1, 1), nil);
+        return;
     }
-    static id<MTLComputePipelineState> p = nil;
-    if (!p) p = device::pipeline(kMslSoftmax, "softmax");
-    const int pc[2] = {(int)(x.numel() / x.size(d)), (int)x.size(d)};
-    const uint32_t rows = (uint32_t)pc[0];
-    device::dispatch(p, mbuf(x), mbuf(x), mbuf(y), pc, sizeof(pc),
-                     MTLSizeMake(rup(rows, 256), 1, 1), MTLSizeMake(256, 1, 1), nil);
+    // 一般维: 每 threadgroup 一行(此前直接抛错降级 —— 现原生)
+    static id<MTLComputePipelineState> pd = nil;
+    if (!pd) pd = device::pipeline(kMslSoftmaxDim, "softmax_dim");
+    int pc[40] = {0};
+    pc[1] = (int)x.size(d);
+    pc[2] = (int)x.strides()[d];
+    pc[3] = (int)(x.dim_count() - 1);
+    pc[0] = 1;
+    int r = 0;
+    for (int64_t k = 0; k < x.dim_count(); ++k) {
+        if (k == d) continue;
+        pc[10 + r] = (int)x.size(k);
+        pc[20 + r] = (int)x.strides()[k];
+        ++r;
+        pc[0] *= (int)x.size(k);
+    }
+    device::dispatch(pd, mbuf(x), mbuf(x), mbuf(y), pc, sizeof(pc),
+                     MTLSizeMake((uint32_t)pc[0], 1, 1), MTLSizeMake(256, 1, 1), nil);
 }
 
 // ---- 直连内核(unary_bwd 经注册表槽位; 其余经 backend_slots 宏直调) ----
