@@ -172,11 +172,28 @@ void clone_grad(BackwardContext& c) {
 }
 } // namespace
 
+// ref 与 run 必须是可区分的代码: MSVC /OPT:ICF 会把逐字节相同的函数折叠成
+// 同一地址, 派发器以 kernel==ref 判定"需回退" —— 曾致 CUDA clone 每次都
+// 误判降级绕 CPU。ref 用显式 CPU 双步长循环(天然与 run 不同)。
 namespace {
 void clone_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                const void*) {
-    impl::copy_view_to(*in[0], *out[0]);   // 与 clone_run 同实现(独立地址:
-}                                          // 派发器以 kernel==ref 判回落)
+    const Tensor& x = *in[0];
+    Tensor& y = *out[0];
+    const int64_t rank = x.dim_count();
+    int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    const float* xp = x.data<float>();
+    float* yp = y.data<float>();
+    for (int64_t i = 0; i < x.numel(); ++i) {
+        int64_t so = 0;
+        for (int64_t d = 0; d < rank; ++d) so += idx[d] * x.strides()[d];
+        yp[i] = xp[so];
+        for (int64_t d = rank - 1; d >= 0; --d) {
+            if (++idx[d] < x.size(d)) break;
+            idx[d] = 0;
+        }
+    }
+}
 }
 
 const Operator g_clone_operator = {
@@ -277,16 +294,17 @@ void sum_into(const Tensor& x, int64_t dim, bool keepdim, Tensor& out) {
     const int64_t* os = out.strides();
     int64_t idx[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     for (int64_t i = 0; i < x.numel(); ++i) {
-        int64_t ro = 0;
-        for (int64_t d = 0; d < x.dim_count(); ++d) {
+        int64_t ro = 0, so = 0;               // so: 输入步长寻址(此前误用扁平 i,
+        for (int64_t d = 0; d < x.dim_count(); ++d) {   // strided 视图读错元素)
             if (d != dim) {
                 // keepdim 时输出仍含被规约维(长 1), 映射保持 d;
                 // 此前恒按 d-1 映射 —— 3D 中间维 keepdim 一直算错(存量 bug)
                 const int64_t rd = keepdim ? d : (d > dim ? d - 1 : d);
                 ro += idx[d] * os[rd];
             }
+            so += idx[d] * xs[d];
         }
-        op[ro] += xp[i];
+        op[ro] += xp[so];
         for (int64_t d = x.dim_count() - 1; d >= 0; --d) {
             if (++idx[d] < x.size(d)) break;
             idx[d] = 0;

@@ -198,10 +198,9 @@ void div_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, const v
 #define ZNN_UNARY_HOST(fname, kname)                                          \
     void fname(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,     \
                const void*) {                                                 \
-        require_contiguous1(*in[0], *out[0]);                                 \
+        Tensor a = in[0]->is_contiguous() ? *in[0] : in[0]->clone();          \
         const long long n = out[0]->numel();                                  \
-        kname<<<blocks(n), kBlock>>>(dptr(*in[0]),                   \
-                                     dptr(*out[0]), n);               \
+        kname<<<blocks(n), kBlock>>>(dptr(a), dptr(*out[0]), n);       \
     }
 
 ZNN_UNARY_HOST(neg_cuda, neg_k)

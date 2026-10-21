@@ -182,13 +182,11 @@ void slice_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
 // ---- cat / stack: 每输入一次 strided copy(逐输入启动) ----
 void cat_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
               const void* options) {
-    req1c(*in[0], *out[0]);                                // v1: 全部连续
     Tensor& y = *out[0];
     const int64_t dim = static_cast<const int64_t*>(options)[0];
     int64_t offset = 0;
     for (size_t i = 0; i < in.size(); ++i) {
-        const Tensor& x = *in[i];
-        req1c(x, y);
+        const Tensor x = in[i]->is_contiguous() ? *in[i] : in[i]->clone();
         // 沿 dim 的偏移体现在 base pointer
         strided_copy_k<<<blocks3(x.numel()), kBlk3>>>(
             dptr(x), dptr(y) + offset * y.strides()[dim],
@@ -202,8 +200,7 @@ void stack_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     Tensor& y = *out[0];
     const int64_t dim = static_cast<const int64_t*>(options)[0];
     for (size_t i = 0; i < in.size(); ++i) {
-        const Tensor& x = *in[i];
-        req1c(x, y);
+        const Tensor x = in[i]->is_contiguous() ? *in[i] : in[i]->clone();
         CopyMap m;
         m.rank = (int)x.dim_count();
         for (int64_t d = 0; d < m.rank; ++d) {
