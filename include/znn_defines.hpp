@@ -11,6 +11,21 @@
 #include <cstdint>
 #include <initializer_list>
 
+// ---- DLL 导出/导入宏(仅 Windows 需要显式标注; 静态库/非 Windows = 空) ----
+#ifdef ZNN_SHARED
+  #ifdef _WIN32
+    #ifdef ZNN_BUILDING
+      #define ZNN_API __declspec(dllexport)
+    #else
+      #define ZNN_API __declspec(dllimport)
+    #endif
+  #else
+    #define ZNN_API __attribute__((visibility("default")))
+  #endif
+#else
+  #define ZNN_API
+#endif
+
 namespace znn {
 
 // ---------------------------------------------------------------- 基础枚举

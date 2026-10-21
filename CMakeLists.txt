@@ -130,20 +130,43 @@ if(ZNN_METAL)
                                 PROPERTIES COMPILE_FLAGS "-fobjc-arc")
 endif()
 
-add_library(znn
-    src/znn_internal.cpp
-    src/grad_scaler.cpp
-    src/backends/onednn/onednn.cpp
-    src/dynlib.cpp
-    src/autograd.cpp
-    src/op_dispatcher.cpp
-    ${ZNN_OPERATORS}
-    ${ZNN_LAYERS}
-    ${ZNN_OPTIM}
-    ${ZNN_CUDA_SRC}
-    ${ZNN_VULKAN_SRC}
-    ${ZNN_METAL_SRC}
-)
+option(ZNN_BUILD_DLL "Build znn as shared library (DLL)" OFF)
+
+if(ZNN_BUILD_DLL)
+    add_library(znn SHARED
+        src/znn_internal.cpp
+        src/grad_scaler.cpp
+        src/backends/onednn/onednn.cpp
+        src/dynlib.cpp
+        src/autograd.cpp
+        src/op_dispatcher.cpp
+        ${ZNN_OPERATORS}
+        ${ZNN_LAYERS}
+        ${ZNN_OPTIM}
+        ${ZNN_CUDA_SRC}
+        ${ZNN_VULKAN_SRC}
+        ${ZNN_METAL_SRC}
+    )
+    set_target_properties(znn PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    target_compile_definitions(znn PRIVATE ZNN_BUILDING ZNN_SHARED)
+    # 公共头消费者定义 ZNN_SHARED(不定义 ZNN_BUILDING → dllimport)
+    target_compile_definitions(znn INTERFACE ZNN_SHARED)
+else()
+    add_library(znn
+        src/znn_internal.cpp
+        src/grad_scaler.cpp
+        src/backends/onednn/onednn.cpp
+        src/dynlib.cpp
+        src/autograd.cpp
+        src/op_dispatcher.cpp
+        ${ZNN_OPERATORS}
+        ${ZNN_LAYERS}
+        ${ZNN_OPTIM}
+        ${ZNN_CUDA_SRC}
+        ${ZNN_VULKAN_SRC}
+        ${ZNN_METAL_SRC}
+    )
+endif()
 target_include_directories(znn PUBLIC include PRIVATE src third_party/eigen
     third_party/onednn/include third_party/vulkan/include)
 if(ZNN_CUDA AND CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES)
