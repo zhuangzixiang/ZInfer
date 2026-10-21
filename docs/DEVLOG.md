@@ -976,3 +976,15 @@ CE 反向链两条回归用例。
 **反思**: 工具 9/10(崩溃栈=一次定位) | 教训×2: (a) 机械迁移后必须
 全库 grep 残留形态(本轮 `->data<int64_t>` 漏扫); (b) 构建命令输出
 不可吞(>/dev/null 掩盖失败跑了多轮旧二进制, 假绿比红更毒)。
+
+---
+
+## [32] Metal 全绿(ALL GREEN on Mac) + Mac 编译修复
+
+**Metal ztestkit 128 项全绿**(Mac mini AppleClang 21 / arm64, 用户实跑)
+- Mac 修 3 类: windows.h 无守卫(ztestkit 跨平台) / shared.hpp 在
+  namespace 内(作用域污染) / mapped_of 未声明 / MSL 内建必须作参数
+  (22 内核 thread_position_in_grid → uint3 tpig [[attr]]) /
+  CE/MSE grid 1→256(dispatchThreads=总线程数)
+- Metal 共享内存架构使 17 算子一次通过: 布局族零派发(mapped 直写),
+  conv/pool/embedding CAS 原子, attention 组合
