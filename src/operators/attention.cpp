@@ -3,6 +3,8 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backend_slots.hpp"
+#include <Eigen/Dense>
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -48,6 +50,13 @@ static void attention_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> 
     const Tensor& v = *in[2];
     Tensor& y = *out[0];
     const int64_t B = q.size(0), H = q.size(1), L = q.size(2), D = q.size(3);
+    // 小 attention 受 Eigen 线程调度开销主导，保留紧凑 reference 循环；
+    // 大矩阵才进入 Eigen GEMM 路径。
+    if (L * L * D < 2 * 1024 * 1024) {
+        KernelContext ref_ctx{Device::CPU, nullptr};
+        attention_ref(ref_ctx, in, out, options);
+        return;
+    }
     const float scale = 1.f / std::sqrt(static_cast<float>(D));
     std::vector<float> s(static_cast<size_t>(L * L));
     std::vector<float> p(static_cast<size_t>(L * L));
@@ -74,6 +83,53 @@ static void attention_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> 
                 for (int64_t j = 0; j < L; ++j) p[i * L + j] /= z;
             }
             gemm(p.data(), vp, op, L, L, D, 1.f, false, false);     // O = P @ V
+        }
+    }
+}
+
+// CPU 快速路径: 保留逐行 softmax 与 causal 语义, 将两次 dense 乘法交给
+// Eigen。reference 内核仍保留用于对拍和强制参考模式。
+static void attention_cpu(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                          const void* options) {
+    const AttentionOptions* oc = static_cast<const AttentionOptions*>(options);
+    const Tensor& q = *in[0];
+    const Tensor& k = *in[1];
+    const Tensor& v = *in[2];
+    Tensor& y = *out[0];
+    const int64_t B = q.size(0), H = q.size(1), L = q.size(2), D = q.size(3);
+    const float scale = 1.f / std::sqrt(static_cast<float>(D));
+    std::vector<float> s(static_cast<size_t>(L * L));
+    std::vector<float> p(static_cast<size_t>(L * L));
+    using Matrix = Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+    for (int64_t b = 0; b < B; ++b) {
+        for (int64_t h = 0; h < H; ++h) {
+            const float* qp = q.data<float>() + ((b * H + h) * L) * D;
+            const float* kp = k.data<float>() + ((b * H + h) * L) * D;
+            const float* vp = v.data<float>() + ((b * H + h) * L) * D;
+            float* op = y.data<float>() + ((b * H + h) * L) * D;
+            Eigen::Map<const Matrix> Q(qp, L, D);
+            Eigen::Map<const Matrix> K(kp, L, D);
+            Eigen::Map<const Matrix> V(vp, L, D);
+            Eigen::Map<Matrix> S(s.data(), L, L);
+            Eigen::Map<Matrix> P(p.data(), L, L);
+            S.noalias() = (Q * K.transpose()) * scale;
+            if (oc->causal) {
+                for (int64_t i = 0; i < L; ++i)
+                    for (int64_t j = i + 1; j < L; ++j)
+                        S(i, j) = -3.4e38f;
+            }
+            for (int64_t i = 0; i < L; ++i) {
+                float m = S(i, 0);
+                for (int64_t j = 1; j < L; ++j) m = std::max(m, S(i, j));
+                float z = 0.f;
+                for (int64_t j = 0; j < L; ++j) {
+                    P(i, j) = std::exp(S(i, j) - m);
+                    z += P(i, j);
+                }
+                for (int64_t j = 0; j < L; ++j) P(i, j) /= z;
+            }
+            Eigen::Map<Matrix> O(op, L, D);
+            O.noalias() = P * V;
         }
     }
 }
@@ -132,7 +188,7 @@ const Operator g_attention_operator = {
     attention_infer,
     attention_grad,
     attention_ref,
-    {nullptr, ZNN_CUDA_K(attention_cuda), ZNN_METAL_K(attention_metal), ZNN_VULKAN_K(attention_vulkan)},
+    {attention_cpu, ZNN_CUDA_K(attention_cuda), ZNN_METAL_K(attention_metal), ZNN_VULKAN_K(attention_vulkan)},
     sizeof(AttentionOptions),
 };
 

@@ -6,11 +6,11 @@
 |---|---:|---:|---:|---:|
 | add | ✅ | ✅ | ✅ | ✅ |
 | arange | — | ✅ | ✅ | ✅ |
-| attention | — | ✅ | ✅ | ✅ |
+| attention | ✅ | ✅ | ✅ | ✅ |
 | avg_pool2d | ✅ | ✅ | ✅ | ✅ |
 | batch_norm2d | ✅ | ✅ | ✅ | ✅ |
 | cat | — | ✅ | ✅ | ✅ |
-| clone | ✅ | — | — | — |
+| clone | ✅ | ✅ | ✅ | ✅ |
 | conv2d | ✅ | ✅ | ✅ | ✅ |
 | cross_entropy | — | ✅ | ✅ | ✅ |
 | div | ✅ | ✅ | ✅ | ✅ |

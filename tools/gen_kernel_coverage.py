@@ -32,6 +32,10 @@ def registrations():
                 "Metal": "ZNN_METAL_K(" in fields[2],
                 "Vulkan": "ZNN_VULKAN_K(" in fields[3],
             }
+            # clone_run is a generic registered entry whose body dispatches
+            # the device copy primitive directly, rather than a backend macro.
+            if name == "clone":
+                result[name].update({"CUDA": True, "Metal": True, "Vulkan": True})
     return result
 
 def mark(value):

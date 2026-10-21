@@ -44,6 +44,21 @@ static void bench_conv2d(int iters) {
                 dt * 1e3, flops / dt / 1e9);
 }
 
+static void bench_attention(int iters) {
+    Tensor q = Tensor::randn({1, 4, 128, 64}, 5);
+    Tensor k = Tensor::randn({1, 4, 128, 64}, 6);
+    Tensor v = Tensor::randn({1, 4, 128, 64}, 7);
+    Tensor warm = Tensor::attention(q, k, v);
+    (void)warm;
+    const double t0 = now_sec();
+    for (int i = 0; i < iters; ++i) {
+        Tensor y = Tensor::attention(q, k, v);
+        (void)y;
+    }
+    const double dt = (now_sec() - t0) / iters;
+    std::printf("attention 1x4x128x64 : %8.3f ms\n", dt * 1e3);
+}
+
 static void bench_mlp_train(int iters) {
     std::vector<Layer*> net = {
         Layer::create(LayerType::Linear, LayerParam{784, 256}),
@@ -87,6 +102,7 @@ int main() {
     bench_matmul(512, 512, 512, 10);
     bench_matmul(1024, 1024, 1024, 3);
     bench_conv2d(5);
+    bench_attention(5);
     bench_mlp_train(20);
     return 0;
 }
