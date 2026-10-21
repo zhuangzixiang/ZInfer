@@ -17,12 +17,33 @@
 #include "dynlib.hpp"
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
+#include <cuda_bf16.h>
 
 namespace znn {
 namespace cuda_backend {
 
 namespace {
 constexpr int kGemmBlk = 256;
+
+// GEMM precision conversion buffers are reused across calls. The CUDA memory
+// pool already caches allocations, but retaining the largest pair also avoids
+// repeated allocation bookkeeping for small matrix workloads.
+struct CastScratch {
+    void* a = nullptr;
+    void* b = nullptr;
+    size_t a_bytes = 0;
+    size_t b_bytes = 0;
+};
+thread_local CastScratch scratch;
+
+void* scratch_buffer(void*& p, size_t& capacity, size_t bytes) {
+    if (capacity < bytes) {
+        if (p) cudaFreeAsync(p, nullptr);
+        if (cudaMallocAsync(&p, bytes, nullptr) != cudaSuccess) return nullptr;
+        capacity = bytes;
+    }
+    return p;
+}
 
 // 列主序核心: gemm(m=N, n=M, k=K, A'=B, B'=A, C), B' 恒为 OP_N
 cublasOperation_t b_op(bool b_transposed) {
@@ -40,11 +61,30 @@ __global__ void cast_f32_f16_k(const float* x, __half* y, long long total,
     y[idx] = __float2half(x[idx]);
 }
 
+__global__ void cast_f32_bf16_k(const float* x, __nv_bfloat16* y,
+                                long long total, int rows, int cols,
+                                int ld, long long bs) {
+    const long long i = blockIdx.x * (long long)blockDim.x + threadIdx.x;
+    if (i >= total) return;
+    const int c = (int)(i % cols);
+    const long long t = i / cols;
+    const long long idx = t / rows * bs + t % rows * ld + c;
+    y[idx] = __float2bfloat16(x[idx]);
+}
+
 // 半精度副本转换(A/B 布局参数与 GEMM 一致), 返回 false = 分配失败
 bool cast_f32_f16(const float* x, __half* y, long long rows, long long cols,
                   int ld, long long bs, int batch) {
     const long long total = batch * rows * cols;
     cast_f32_f16_k<<<(unsigned)((total + kGemmBlk - 1) / kGemmBlk), kGemmBlk>>>(
+        x, y, total, (int)rows, (int)cols, ld, bs);
+    return true;
+}
+
+bool cast_f32_bf16(const float* x, __nv_bfloat16* y, long long rows,
+                   long long cols, int ld, long long bs, int batch) {
+    const long long total = batch * rows * cols;
+    cast_f32_bf16_k<<<(unsigned)((total + kGemmBlk - 1) / kGemmBlk), kGemmBlk>>>(
         x, y, total, (int)rows, (int)cols, ld, bs);
     return true;
 }
@@ -59,8 +99,10 @@ bool gemm_cuda(const float* A, int lda, const float* B, int ldb,
         // 半精度副本: 读取带宽减半 + FP16 Tensor Core; 失败落到 TF32。
         // 转换/分配按真实存储形状 [rows, ld](列切片时 ld > 行宽)
         const long long a_rows = M, b_rows = b_transposed ? N : K;
-        __half* ha = (__half*)cuda_backend::alloc(sizeof(__half) * (size_t)a_rows * lda);
-        __half* hb = (__half*)cuda_backend::alloc(sizeof(__half) * (size_t)b_rows * ldb);
+        __half* ha = (__half*)scratch_buffer(scratch.a, scratch.a_bytes,
+                                              sizeof(__half) * (size_t)a_rows * lda);
+        __half* hb = (__half*)scratch_buffer(scratch.b, scratch.b_bytes,
+                                              sizeof(__half) * (size_t)b_rows * ldb);
         bool ok = ha && hb;
         if (ok) ok = cast_f32_f16(A, ha, M, K, lda, 0, 1);
         if (ok) ok = cast_f32_f16(B, hb, b_rows, b_transposed ? K : N, ldb, 0, 1);
@@ -74,8 +116,27 @@ bool gemm_cuda(const float* A, int lda, const float* B, int ldb,
                      CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT)
                  == CUBLAS_STATUS_SUCCESS;
         }
-        cuda_backend::free(ha);
-        cuda_backend::free(hb);
+        if (ok) return true;
+    }
+    if (p == Precision::BF16 && dynlib::cublas_gemm_ex) {
+        const long long a_rows = M, b_rows = b_transposed ? N : K;
+        __nv_bfloat16* ha = (__nv_bfloat16*)scratch_buffer(scratch.a, scratch.a_bytes,
+                                             sizeof(__nv_bfloat16) * (size_t)a_rows * lda);
+        __nv_bfloat16* hb = (__nv_bfloat16*)scratch_buffer(scratch.b, scratch.b_bytes,
+                                             sizeof(__nv_bfloat16) * (size_t)b_rows * ldb);
+        bool ok = ha && hb;
+        if (ok) ok = cast_f32_bf16(A, ha, M, K, lda, 0, 1);
+        if (ok) ok = cast_f32_bf16(B, hb, b_rows, b_transposed ? K : N, ldb, 0, 1);
+        if (ok) {
+            ok = dynlib::cublas_gemm_ex(
+                     dynlib::cublas_handle, b_op(b_transposed), CUBLAS_OP_N,
+                     N, M, K, &alpha,
+                     hb, CUDA_R_16BF, ldb,
+                     ha, CUDA_R_16BF, lda, &beta,
+                     C, CUDA_R_32F, ldc,
+                     CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT)
+                 == CUBLAS_STATUS_SUCCESS;
+        }
         if (ok) return true;
     }
     if (p != Precision::FP32 && dynlib::cublas_gemm_ex) {
@@ -106,8 +167,10 @@ bool gemm_batched_cuda(const float* A, int lda, long long sa,
         const long long a_rows = M, b_rows = b_transposed ? N : K;
         const size_t a_elems = (size_t)(batch - 1) * sa + (size_t)a_rows * lda;
         const size_t b_elems = (size_t)(batch - 1) * sb + (size_t)b_rows * ldb;
-        __half* ha = (__half*)cuda_backend::alloc(sizeof(__half) * a_elems);
-        __half* hb = (__half*)cuda_backend::alloc(sizeof(__half) * b_elems);
+        __half* ha = (__half*)scratch_buffer(scratch.a, scratch.a_bytes,
+                                              sizeof(__half) * a_elems);
+        __half* hb = (__half*)scratch_buffer(scratch.b, scratch.b_bytes,
+                                              sizeof(__half) * b_elems);
         bool ok = ha && hb;
         if (ok) ok = cast_f32_f16(A, ha, M, K, lda, sa, batch);
         if (ok) ok = cast_f32_f16(B, hb, b_rows, b_transposed ? K : N, ldb, sb, batch);
@@ -121,8 +184,29 @@ bool gemm_batched_cuda(const float* A, int lda, long long sa,
                      batch, CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT)
                  == CUBLAS_STATUS_SUCCESS;
         }
-        cuda_backend::free(ha);
-        cuda_backend::free(hb);
+        if (ok) return true;
+    }
+    if (p == Precision::BF16 && dynlib::cublas_gemm_batched_ex) {
+        const long long a_rows = M, b_rows = b_transposed ? N : K;
+        const size_t a_elems = (size_t)(batch - 1) * sa + (size_t)a_rows * lda;
+        const size_t b_elems = (size_t)(batch - 1) * sb + (size_t)b_rows * ldb;
+        __nv_bfloat16* ha = (__nv_bfloat16*)scratch_buffer(scratch.a, scratch.a_bytes,
+                                             sizeof(__nv_bfloat16) * a_elems);
+        __nv_bfloat16* hb = (__nv_bfloat16*)scratch_buffer(scratch.b, scratch.b_bytes,
+                                             sizeof(__nv_bfloat16) * b_elems);
+        bool ok = ha && hb;
+        if (ok) ok = cast_f32_bf16(A, ha, M, K, lda, sa, batch);
+        if (ok) ok = cast_f32_bf16(B, hb, b_rows, b_transposed ? K : N, ldb, sb, batch);
+        if (ok) {
+            ok = dynlib::cublas_gemm_batched_ex(
+                     dynlib::cublas_handle, b_op(b_transposed), CUBLAS_OP_N,
+                     N, M, K, &alpha,
+                     hb, CUDA_R_16BF, ldb, sb,
+                     ha, CUDA_R_16BF, lda, sa, &beta,
+                     C, CUDA_R_32F, ldc, sc,
+                     batch, CUBLAS_COMPUTE_32F, CUBLAS_GEMM_DEFAULT)
+                 == CUBLAS_STATUS_SUCCESS;
+        }
         if (ok) return true;
     }
     if (p != Precision::FP32 && dynlib::cublas_gemm_batched_ex) {

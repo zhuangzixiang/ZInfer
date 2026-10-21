@@ -1,9 +1,16 @@
 #include "znn.hpp"
 #include <chrono>
 #include <cstdio>
+#include <algorithm>
+#include <vector>
+#include <cuda_runtime_api.h>
 using namespace znn;
 static double now() {
     return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+static double median(std::vector<double>& samples) {
+    std::sort(samples.begin(), samples.end());
+    return samples[samples.size() / 2];
 }
 static void bench(const char* label, Precision mode, int64_t M, int iters) {
     Runtime::set_precision(mode);
@@ -11,11 +18,15 @@ static void bench(const char* label, Precision mode, int64_t M, int iters) {
     Tensor b = Tensor::randn({M, M}, 2).to_device(Device::CUDA);
     Tensor w = Tensor::matmul(a, b);
     w.to_device(Device::CPU);                    // 预热+同步
-    double t0 = now();
-    Tensor last;
-    for (int i = 0; i < iters; ++i) last = Tensor::matmul(a, b);
-    last.to_device(Device::CPU);                 // 同步(真实 GPU 完成时间)
-    double dt = (now() - t0) / iters;
+    std::vector<double> samples;
+    samples.reserve(iters);
+    for (int i = 0; i < iters; ++i) {
+        const double t0 = now();
+        Tensor last = Tensor::matmul(a, b);
+        cudaDeviceSynchronize();
+        samples.push_back(now() - t0);
+    }
+    double dt = median(samples);
     double tf = 2.0 * M * M * M / dt / 1e12;
     fprintf(stderr, "%s %4lld^3: %8.3f ms  %6.2f TF/s\n", label, (long long)M, dt*1e3, tf);
 }
@@ -27,11 +38,15 @@ static void bench_op(const char* label, double flops, int iters,
     auto in = make();
     Tensor y = call(in);                          // 预热
     y.to_device(Device::CPU);
-    double t0 = now();
-    Tensor last;
-    for (int i = 0; i < iters; ++i) last = call(in);
-    last.to_device(Device::CPU);
-    double dt = (now() - t0) / iters;
+    std::vector<double> samples;
+    samples.reserve(iters);
+    for (int i = 0; i < iters; ++i) {
+        const double t0 = now();
+        Tensor last = call(in);
+        cudaDeviceSynchronize();
+        samples.push_back(now() - t0);
+    }
+    double dt = median(samples);
     fprintf(stderr, "%-26s: %8.3f ms  %6.2f TF/s\n", label, dt*1e3, flops/dt/1e12);
 }
 
@@ -45,6 +60,7 @@ int main() {
         bench("FP32", Precision::FP32, M, n);
         bench("TF32", Precision::TF32, M, n);
         bench("FP16", Precision::FP16, M, n);
+        bench("BF16", Precision::BF16, M, n);
     }
     fprintf(stderr, "=== small matmul (synchronized, allocation included) ===\n");
     const int64_t small[] = {16, 32, 64, 128, 256};
@@ -52,6 +68,7 @@ int main() {
         bench("FP32", Precision::FP32, M, 50);
         bench("TF32", Precision::TF32, M, 50);
         bench("FP16", Precision::FP16, M, 50);
+        bench("BF16", Precision::BF16, M, 50);
     }
 
     fprintf(stderr, "=== GEMM-class ops (TF32, data-resident) ===\n");

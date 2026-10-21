@@ -41,7 +41,8 @@ public:
 private:
     OpDispatcher();     // 遍历 g_operator_list 建 name→Operator 索引
     std::unordered_map<std::string, const Operator*> table_;
-    Precision precision_ = Precision::AUTO;
+    // Correctness is the default; callers opt into TF32/FP16/BF16 explicitly.
+    Precision precision_ = Precision::FP32;
 };
 
 } // namespace znn

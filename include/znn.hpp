@@ -43,8 +43,9 @@ namespace znn {
 //   TF32: Tensor Core 加速(与 FP32 范围相同, 尾数 19 位, Ampere+)
 //   FP16: 半精度 Tensor Core(输入转 FP16 计算, 累加与存储仍 FP32;
 //         尾数 10 位, 推理可直接用, 训练必须配 GradScaler 防梯度下溢)
+//   BF16: bfloat16 Tensor Core(输入转 BF16, FP32 累加/输出)
 //   AUTO: 最优可用(TF32 → FP32 兜底)
-enum class Precision : uint8_t { FP32 = 0, TF32, FP16, AUTO };
+enum class Precision : uint8_t { FP32 = 0, TF32, FP16, BF16, AUTO };
 
 class Runtime {
 public:

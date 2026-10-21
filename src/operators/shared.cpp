@@ -184,7 +184,7 @@ const Operator g_clone_operator = {
     infer_same,
     clone_grad,
     clone_ref,
-    {clone_run, ZNN_CUDA_K(clone_run), ZNN_METAL_K(clone_run),
+    {clone_run, clone_run, clone_run,
      ZNN_VULKAN_K(clone_vulkan)},
     0,
 };
