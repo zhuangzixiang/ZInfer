@@ -103,6 +103,7 @@ void memset0(void* p, size_t bytes) {
 namespace device {
 
 id<MTLBuffer> buf_of(void* p) { return static_cast<MtlBuf*>(p)->buffer; }
+void* mapped_of(void* p) { return static_cast<MtlBuf*>(p)->mapped; }
 
 // MSL 源码 → 管线(驱动运行时编译; Metal 官方路径, 无离线工具)
 id<MTLComputePipelineState> pipeline(const char* msl, const char* name) {

@@ -15,6 +15,7 @@ namespace metal_backend {
 namespace device {
 
 id<MTLBuffer> buf_of(void* p);                        // Storage 句柄 → MTLBuffer
+void* mapped_of(void* p);                            // 句柄 → 共享内存映射指针
 id<MTLComputePipelineState> pipeline(const char* msl, // MSL 源码运行时编译
                                      const char* name);
 // 句柄+字节偏移成对(视图); 偏移在 setBuffer 折叠, 句柄永不算术
