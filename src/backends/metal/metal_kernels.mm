@@ -1244,7 +1244,7 @@ void cross_entropy_metal(KernelContext&, Span<const Tensor*> in,
     int pc[2] = {(int)x.size(0), (int)x.size(1)};
     const device::MBuf bufs[4] = {mbuf(x), mbuf(x), mbuf(t), mbuf(*out[0])};
     device::dispatch_bufs_tg(p, bufs, 4, pc, sizeof(pc),
-                             MTLSizeMake(1, 1, 1), MTLSizeMake(256, 1, 1),
+                             MTLSizeMake(256, 1, 1), MTLSizeMake(256, 1, 1),
                              256 * 4, 0);
 }
 
@@ -1256,7 +1256,7 @@ void mse_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const device::MBuf bufs[4] = {mbuf(*in[0]), mbuf(*in[1]),
                                   mbuf(*in[1]), mbuf(*out[0])};
     device::dispatch_bufs_tg(p, bufs, 4, pc, sizeof(pc),
-                             MTLSizeMake(1, 1, 1), MTLSizeMake(256, 1, 1),
+                             MTLSizeMake(256, 1, 1), MTLSizeMake(256, 1, 1),
                              256 * 4, 0);
 }
 
