@@ -201,3 +201,25 @@ batch_norm(推理)。ZNN_NO_ONEDNN="family,..." 可按族禁用(A/B 排查)。
    异步拷贝 + pinned memory);
 3. conv2d im2col 有一次显式拷贝, 可用 stride-map 直接 GEMM 消除;
 4. autograd 节点为裸 new, 未引入节点池(DESIGN §13.3 规划项)。
+
+---
+
+## 三后端全算子吞吐表(2026-10-21, Vulkan 构建; CUDA/Metal 各自构建跑同表)
+
+| 算子 | 形状 | CPU | Vulkan | CUDA | Metal |
+|---|---|---|---|---|---|
+| matmul | 128³ | 32 GF/s | **60 GF/s** | — | — |
+| matmul | 512³ | 151 GF/s | **372 GF/s** | — | — |
+| matmul | 1024³ | 122 GF/s | **824 GF/s** | — | — |
+| linear | 256×512×256 | 95 GF/s | **352 GF/s** | — | — |
+| conv2d | 4×3×32×32→16 | 0.44 ms | **0.08 ms (5.6×)** | — | — |
+| attention | 1×4×128×64 | 2.14 ms | 1.95 ms | — | — |
+| add(bw) | 4M elems | 8.7 GB/s | **14.1 GB/s** | — | — |
+| softmax | 256×1024 | 0.97 ms | 1.38 ms | — | — |
+| embedding | 8×128 | ~0 ms | 0.05 ms | — | — |
+| layer_norm | 64×512 | **0.03 ms** | 0.10 ms | — | — |
+
+**观察**: Vulkan matmul 512³+ 达 CPU 2.5-6.7×(oneDNN CPU vs 直接着色器 GPU);
+conv2d 5.6×(直接内核 vs im2col+GEMM CPU); 逐元素受同步往返限制(3.6ms
+固定开销); softmax/LN 小形状受每派发 0.6ms 提交开销主导; embedding/
+LN 小于 0.1ms 属可接受. Metal 端由用户 Mac 构建后跑同 zbench 补全.
