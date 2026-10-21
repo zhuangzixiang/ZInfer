@@ -346,6 +346,22 @@ void strided_copy_vulkan(const Tensor& src, Tensor& dst, int rank,
                           (unsigned)((total + 255) / 256), 1, 1);
 }
 
+void clone_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                  const void*) {
+    const Tensor& src = *in[0];
+    Tensor& dst = *out[0];
+    const int rank = static_cast<int>(dst.dim_count());
+    long long ss[8] = {}, ds[8] = {}, sh[8] = {};
+    long long total = 1;
+    for (int d = 0; d < rank; ++d) {
+        ss[d] = src.strides()[d];
+        ds[d] = dst.strides()[d];
+        sh[d] = dst.size(d);
+        total *= sh[d];
+    }
+    strided_copy_vulkan(src, dst, rank, ss, ds, sh, total);
+}
+
 void strided_copy_raw_vk(const void* src, uint64_t soff, void* dst, uint64_t doff,
                          int rank, const long long* ss, const long long* ds,
                          const long long* sh, long long total) {

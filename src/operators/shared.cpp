@@ -2,6 +2,9 @@
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backend_slots.hpp"
+#if defined(ZNN_VULKAN)
+#include "backends/vulkan/vulkan_backend.hpp"
+#endif
 #include <Eigen/Dense>
 #include <cstring>
 
@@ -181,7 +184,8 @@ const Operator g_clone_operator = {
     infer_same,
     clone_grad,
     clone_ref,
-    {clone_run, clone_run, clone_run, clone_run},   // 同一 host 入口, 内部按设备派发
+    {clone_run, ZNN_CUDA_K(clone_run), ZNN_METAL_K(clone_run),
+     ZNN_VULKAN_K(clone_vulkan)},
     0,
 };
 

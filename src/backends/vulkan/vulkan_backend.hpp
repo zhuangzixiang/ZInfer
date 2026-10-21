@@ -90,6 +90,7 @@ void grad_bcast_vulkan(const Tensor& g, Tensor& out, long long total, int rank,
 void strided_copy_vulkan(const Tensor& src, Tensor& dst, int rank,
                          const long long* ss, const long long* ds,
                          const long long* sh, long long total);
+void clone_vulkan(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void strided_copy_raw_vk(const void* src, uint64_t soff, void* dst, uint64_t doff,
                          int rank, const long long* ss, const long long* ds,
                          const long long* sh, long long total);
