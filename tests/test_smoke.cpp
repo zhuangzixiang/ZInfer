@@ -485,6 +485,18 @@ static void test_sgd_momentum() {
     Optimizer::destroy(opt);
 }
 
+static void test_dtype_guard() {
+    bool threw = false;
+    try {
+        Tensor a = Tensor::zeros({2}, DType::F16);
+        Tensor b = Tensor::zeros({2}, DType::F16);
+        (void)Tensor::add(a, b);
+    } catch (const std::exception& e) {
+        threw = std::string(e.what()).find("F32") != std::string::npos;
+    }
+    check(threw, "unsupported dtype is rejected instead of reinterpreted");
+}
+
 static void test_dropout_layer() {
     LayerParam dp;
     dp.dropout_rate = 0.5;
@@ -957,6 +969,7 @@ int main() {
     std::fprintf(stderr, "t17\n"); test_grouped_conv_and_causal();
     std::fprintf(stderr, "t18\n"); test_dropout_layer();
     std::fprintf(stderr, "t18b\n"); test_sgd_momentum();
+    std::fprintf(stderr, "t18c\n"); test_dtype_guard();
     std::fprintf(stderr, "t19\n"); test_cuda_parity();
     std::fprintf(stderr, "t20\n"); test_grad_scaler();
     std::fprintf(stderr, "t21\n"); test_gpu_backward_parity();

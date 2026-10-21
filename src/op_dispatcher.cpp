@@ -99,6 +99,14 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
                 + std::to_string(i) + "); use to_device() to align");
         }
     }
+    // 当前所有算术/训练 kernel 均以 F32 实现；I64 只作为 embedding
+    // 的索引输入存在。拒绝把 F16/BF16/U8 静默重解释成 float 指针。
+    if (inputs[0]->dtype() != DType::F32 &&
+        std::string(op->name) != "embedding" &&
+        std::string(op->name) != "arange") {
+        throw std::runtime_error(std::string("znn: op '") + op->name
+                                 + " currently supports F32 tensors only");
+    }
     OpScope scope(op->name);
     try {
     // 1. 名片与形状推理(契约收指针数组)
