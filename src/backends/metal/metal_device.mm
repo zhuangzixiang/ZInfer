@@ -164,8 +164,6 @@ void dispatch_bufs(id<MTLComputePipelineState> p, const MBuf* bufs,
     if (push) {
         [enc setBytes:push length:push_size atIndex:8];   // 推送常量=缓冲8
     }
-    if (tg0_bytes > 0) [enc setThreadgroupMemoryLength:tg0_bytes atIndex:0];
-    if (tg1_bytes > 0) [enc setThreadgroupMemoryLength:tg1_bytes atIndex:1];
     [enc dispatchThreads:grid threadsPerThreadgroup:tg];
     [enc endEncoding];
     [cb commit];

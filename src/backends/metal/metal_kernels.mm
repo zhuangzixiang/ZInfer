@@ -15,6 +15,10 @@
 #import <Foundation/Foundation.h>
 #include <stdexcept>
 #include <string>
+#include "operators/shared.hpp"
+#include <cmath>
+#include <random>
+#include <vector>
 
 namespace znn {
 namespace metal_backend {
@@ -569,9 +573,6 @@ void adam_step_metal(const Tensor& p, const Tensor& g, const Tensor& m,
 }
 
 // ============================================================ SB2-SB4: 17 算子
-#include "operators/shared.hpp"
-#include <random>
-#include <vector>
 
 namespace {
 // Metal 共享内存: 句柄→mapped 指针可直接 memcpy(d2d 免命令缓冲)

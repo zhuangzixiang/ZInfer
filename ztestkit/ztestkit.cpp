@@ -1,6 +1,7 @@
 // ztestkit.cpp — 运行器: 收集用例 → 枚举可用设备 → 逐组合执行 → 报告
 #include "ztestkit.hpp"
 
+#ifdef _WIN32
 // ---- 崩溃自打印栈(dbghelp; 崩溃时直接给出符号化调用栈) ----
 #include <windows.h>
 #include <dbghelp.h>
@@ -39,6 +40,11 @@ LONG crash_stack(EXCEPTION_POINTERS* ep) {
 }
 void install_crash_handler() { SetUnhandledExceptionFilter(crash_stack); }
 } // namespace ztestkit
+#else
+namespace ztestkit {
+void install_crash_handler() {}   // 非 Windows: 无 SEH(POSIX signal 可后续加)
+} // namespace ztestkit
+#endif
 
 
 namespace ztestkit {
