@@ -246,3 +246,37 @@ LN 小于 0.1ms 属可接受. Metal 端由用户 Mac 构建后跑同 zbench 补�
   同步往返主导(M1 ~0.1ms/次, 积小成多)
 - conv2d/attention 与 CPU 持平(直接法内核, 未做分块/寄存器优化)
 - CPU 侧 matmul 74-97 GF/s 为 oneDNN 无 OpenMP 构建下的单线程性能
+
+---
+
+## 三后端全量对比表(2026-10-21 最终版, 含用户 perf 更新后的代码)
+
+| 算子 | 形状 | CPU | Vulkan(4070TiS) | CUDA(4070TiS) | Metal(M1) |
+|---|---|---|---|---|---|
+| matmul | 128³ | 40 GF/s | 59 GF/s | **428 GF/s** | 19 GF/s |
+| matmul | 512³ | 196 GF/s | 369 GF/s | **8441 GF/s** | 158 GF/s |
+| matmul | 1024³ | 178 GF/s | 849 GF/s | **21158 GF/s** | 276 GF/s |
+| linear | 256×512×256 | 161 GF/s | 349 GF/s | **2969 GF/s** | 139 GF/s |
+| conv2d | 4×3×32×32→16 | 0.49 ms | 0.06 ms | **0.03 ms** | 0.26 ms |
+| attention | 1×4×128×64 | 0.80 ms | 1.93 ms | **0.12 ms** | 3.51 ms |
+| add(bw) | 4M elems | 9.5 GB/s | 14.1 GB/s | **1281 GB/s** | 43.0 GB/s |
+| softmax | 256×1024 | 0.94 ms | 1.29 ms | **0.015 ms** | 0.52 ms |
+| embedding | 8×128 | ~0 ms | 0.05 ms | **0.015 ms** | 0.18 ms |
+| layer_norm | 64×512 | 0.03 ms | 0.056 ms | **0.016 ms** | 0.37 ms |
+
+### 后端特征总结
+
+**CUDA(4070 Ti SUPER 16GB)**: 全算子碾压级优势——matmul 1024³ 21.2 TF/s
+= Vulkan 25× = CPU 119×; 逐元素带宽 1281 GB/s(显存直访); 小算子
+0.015ms 级(kernel launch 开销下限). **训练首选**.
+
+**Vulkan(同卡)**: 逐元素带宽 14 GB/s —— 跨 PCIe 瓶颈(HOST_VISIBLE
+系统内存映射, 非显存直址); matmul 849 GF/s = CUDA 的 1/25(朴素
+32×32 分块 vs cuBLAS 高度调优). **跨平台推理可用**.
+
+**Metal(M1)**: 逐元素 43 GB/s 统一内存带宽最强(零拷贝); 大 GEMM
+276 GF/s = M1 CPU 2.8×(GPU 均衡架构); 小算子受 ~0.1ms/次同步往返.
+**Mac 端推理首选**.
+
+**CPU(oneDNN)**: matmul 178-196 GF/s; 逐元素 9.5 GB/s(单线程 Eigen).
+**兜底基线**.
