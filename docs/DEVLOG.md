@@ -988,3 +988,48 @@ CE 反向链两条回归用例。
   CE/MSE grid 1→256(dispatchThreads=总线程数)
 - Metal 共享内存架构使 17 算子一次通过: 布局族零派发(mapped 直写),
   conv/pool/embedding CAS 原子, attention 组合
+
+---
+
+## [33] 外部训练项目(UniFP-Net)实测暴露: 8 缺陷一轮修复(全后端)
+
+首个真实外部消费者(UniFP-Net: 单骨干人脸检测+人像分割, 640² 训练)
+全程联调暴露 8 类缺陷, 本轮全部修复; **ztestkit 249 checks 全绿**
+(CPU+CUDA+Vulkan, ZNN_STRICT_NATIVE=1), hello_dll 消费者级回归全过。
+
+**DLL 接口**: Shape 方法/data<T>/item<T> 未导出 —— Conv2dOptions
+默认成员初始化即触发 Shape 构造, 外部根本链接不上 conv2d; 消费者被迫
+本地补定义(布局耦合, 不可持续)。
+
+**语义错误×3**:
+1. softmax_cuda 无视 options.dim 恒取末维(参数连名字都没取); VK/MT
+   dim≠末维直接抛错降级。→ CUDA softmax_dim_k(步长表逐行)+ VK
+   softmaxdim.comp + MT kMslSoftmaxDim, 末维双快路径保留
+2. Conv2d 工厂漏建 groups 权重形状 → DW 变全卷积(MetaBlock(256) 单块
+   2.03M 参数, 应 0.40M)且前向校验失败; conv2d 算子本身支持分组
+3. Conv2d 偏置 [C]+4D 广播炸 —— add 右对齐语义与 PyTorch 一致没错,
+   错在层: 偏置改 [1,C,1,1] 形态
+
+**性能×2**:
+4. 归约内核一输出一线程: dim0 归约到 48/96 输出整卡 1-2 block, 单次
+   12ms(BN 反传 3-4 次 → 25-48ms), 标量归约单线程 → CUDA 两段式
+   固定分段树归约(确定性, 对拍可复现)/VK+MT 每 workgroup 一输出
+5. clone_ref 与 clone_run 逐字节相同被 /OPT:ICF 折叠同址, 派发器
+   kernel==ref 误判 → **每次 CUDA clone 都绕 CPU 往返**(此前日志
+   "znn fallback: op='clone'" 的真凶, 悬案两周); ref 改显式循环
+
+**鲁棒×2**:
+6. CUDA 一元宏/conv2d/cat/stack 对 strided 视图直接抛错 → 统一
+   binary_bcast_host 同策略(非连续原生 clone, 可微)
+7. CPU 存量×2: sum_into 通用路径扁平下标当存储下标(无视输入步长),
+   softmax_rows 拿输入步长寻址输出 —— 均仅连续输入碰巧正确, 转
+   置视图实测全错(手动参考仲裁); onednn softmax 补连续守卫
+
+**验证**: ztestkit 新增 5 组回归(softmax 任意维×5 形/工厂 groups+偏置/
+strided 视图输入族/大 K dim0 规约/to_device 求导标志) + hello_dll
+导出回归。to_device 顺带保留 requires_grad(叶参数迁移语义)。
+
+**反思**: 工具 8/10(手动参考仲裁一周转 CPU/CUDA 各执一词的悬案一次定谳)
+| 教训: (a) "DLL 导出 112 符号"的完备性要以 hello_dll 级消费者编译
+为验收线, 不是 dumpbin 数数; (b) 相同代码体函数对(ICF 折叠)不可
+作身份判据; (c) 内核并行度要看"输出数", 输出数少≠负载小。
