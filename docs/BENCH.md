@@ -223,3 +223,26 @@ batch_norm(推理)。ZNN_NO_ONEDNN="family,..." 可按族禁用(A/B 排查)。
 conv2d 5.6×(直接内核 vs im2col+GEMM CPU); 逐元素受同步往返限制(3.6ms
 固定开销); softmax/LN 小形状受每派发 0.6ms 提交开销主导; embedding/
 LN 小于 0.1ms 属可接受. Metal 端由用户 Mac 构建后跑同 zbench 补全.
+
+### Metal 补全(Mac mini AppleClang 21 / arm64, 用户实跑 2026-10-21)
+
+| 算子 | 形状 | CPU(M1) | Vulkan(4070TiS) | Metal(M1) | Metal/CPU |
+|---|---|---|---|---|---|
+| matmul | 128³ | 38 GF/s | 60 GF/s | 19 GF/s | 0.5× |
+| matmul | 512³ | 74 GF/s | 372 GF/s | 158 GF/s | **2.1×** |
+| matmul | 1024³ | 97 GF/s | 824 GF/s | 276 GF/s | **2.8×** |
+| linear | 256×512×256 | 95 GF/s | 352 GF/s | 139 GF/s | 1.5× |
+| conv2d | 4×3×32×32→16 | 0.25 ms | 0.08 ms | 0.26 ms | ~1× |
+| attention | 1×4×128×64 | 2.6 ms | 2.0 ms | 3.5 ms | 0.7× |
+| add(bw) | 4M elems | 17.6 GB/s | 14.1 GB/s | **43.0 GB/s** | **2.4×** |
+| softmax | 256×1024 | 0.43 ms | 1.38 ms | 0.52 ms | ~1× |
+| embedding | 8×128 | ~0 ms | 0.05 ms | 0.18 ms | — |
+| layer_norm | 64×512 | 0.04 ms | 0.10 ms | 0.37 ms | 慢 |
+
+**Metal 观察**:
+- 大 GEMM(512³+)充分发挥 M1 GPU: 276 GF/s = CPU 2.8×(统一内存带宽优势)
+- 逐元素带宽 43 GB/s 遥遥领先(共享内存零拷贝, vs Vulkan 14 GB/s 跨 PCIe)
+- 小形状(LN 0.37ms / embedding 0.18ms)受每内核 dispatchThreads+waitUntil
+  同步往返主导(M1 ~0.1ms/次, 积小成多)
+- conv2d/attention 与 CPU 持平(直接法内核, 未做分块/寄存器优化)
+- CPU 侧 matmul 74-97 GF/s 为 oneDNN 无 OpenMP 构建下的单线程性能
