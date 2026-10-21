@@ -1,0 +1,44 @@
+#version 450
+// Fused QK^T -> softmax -> PV. One invocation computes one output element.
+layout(local_size_x = 64) in;
+layout(binding = 0) readonly buffer Qbuf { float q[]; };
+layout(binding = 1) readonly buffer Kbuf { float k[]; };
+layout(binding = 2) readonly buffer Vbuf { float v[]; };
+layout(binding = 3) buffer Obuf { float o[]; };
+layout(push_constant) uniform Pc {
+    int bh;
+    int L;
+    int D;
+    float scale;
+    int causal;
+} pc;
+
+void main() {
+    uint id = gl_GlobalInvocationID.x;
+    int total = pc.bh * pc.L * pc.D;
+    if (id >= uint(total)) return;
+    int head = int(id) / (pc.L * pc.D);
+    int rem = int(id) % (pc.L * pc.D);
+    int row = rem / pc.D;
+    int col = rem % pc.D;
+    int limit = pc.causal != 0 ? row + 1 : pc.L;
+    int qbase = (head * pc.L + row) * pc.D;
+    float m = -3.4e38;
+    for (int j = 0; j < limit; ++j) {
+        float s = 0.0;
+        int kbase = (head * pc.L + j) * pc.D;
+        for (int d = 0; d < pc.D; ++d) s += q[qbase + d] * k[kbase + d];
+        m = max(m, s * pc.scale);
+    }
+    float den = 0.0;
+    float acc = 0.0;
+    for (int j = 0; j < limit; ++j) {
+        float s = 0.0;
+        int kbase = (head * pc.L + j) * pc.D;
+        for (int d = 0; d < pc.D; ++d) s += q[qbase + d] * k[kbase + d];
+        float w = exp(s * pc.scale - m);
+        den += w;
+        acc += w * v[(head * pc.L + j) * pc.D + col];
+    }
+    o[id] = acc / den;
+}

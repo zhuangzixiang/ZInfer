@@ -170,6 +170,43 @@ kernel void softmax(device const float* x [[buffer(0)]],
 }
 )MSL";
 
+const char* kMslAttention = R"MSL(
+#include <metal_stdlib>
+using namespace metal;
+struct AttentionPc { int bh; int L; int D; float scale; int causal; };
+kernel void attention_fused(device const float* q [[buffer(0)]],
+                            device const float* k [[buffer(1)]],
+                            device const float* v [[buffer(2)]],
+                            device float* o [[buffer(3)]],
+                            constant AttentionPc& pc [[buffer(8)]],
+                            uint id [[thread_position_in_grid]]) {
+    const int total = pc.bh * pc.L * pc.D;
+    if ((int)id >= total) return;
+    const int head = (int)id / (pc.L * pc.D);
+    const int rem = (int)id % (pc.L * pc.D);
+    const int row = rem / pc.D, col = rem % pc.D;
+    const int limit = pc.causal ? row + 1 : pc.L;
+    const int qb = (head * pc.L + row) * pc.D;
+    float m = -3.4e38f;
+    for (int j = 0; j < limit; ++j) {
+        float s = 0.0f;
+        const int kb = (head * pc.L + j) * pc.D;
+        for (int d = 0; d < pc.D; ++d) s += q[qb + d] * k[kb + d];
+        m = max(m, s * pc.scale);
+    }
+    float den = 0.0f, acc = 0.0f;
+    for (int j = 0; j < limit; ++j) {
+        float s = 0.0f;
+        const int kb = (head * pc.L + j) * pc.D;
+        for (int d = 0; d < pc.D; ++d) s += q[qb + d] * k[kb + d];
+        const float w = exp(s * pc.scale - m);
+        den += w;
+        acc += w * v[(head * pc.L + j) * pc.D + col];
+    }
+    o[id] = acc / den;
+}
+)MSL";
+
 void require(bool ok, const char* what) {
     if (!ok) throw std::runtime_error(std::string("znn metal: ") + what);
 }
@@ -1374,13 +1411,27 @@ void avg_pool_grad_metal(const Tensor& x, const Tensor& g, Tensor& dx,
 }
 
 void attention_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
-                     const void*) {
+                     const void* options) {
     const Tensor& q = *in[0];
     const Tensor& k = *in[1];
     const Tensor& v = *in[2];
     Tensor& y = *out[0];
     const int64_t B = q.size(0), H = q.size(1), L = q.size(2), D = q.size(3);
     const float scale = 1.f / std::sqrt((float)D);
+    struct Options { bool causal; };
+    const bool causal = options && static_cast<const Options*>(options)->causal;
+    if (L <= 64 && q.is_contiguous() && k.is_contiguous()
+        && v.is_contiguous() && y.is_contiguous()) {
+        static id<MTLComputePipelineState> p = nil;
+        if (!p) p = device::pipeline(kMslAttention, "attention_fused");
+        struct Pc { int bh, L, D; float scale; int causal; } pc{
+            (int)(B * H), (int)L, (int)D, scale, causal ? 1 : 0};
+        const device::MBuf bufs[4] = {mbuf(q), mbuf(k), mbuf(v), mbuf(y)};
+        device::dispatch_bufs(p, bufs, 4, &pc, sizeof(pc),
+                              MTLSizeMake(rup((uint32_t)(B * H * L * D), 64), 1, 1),
+                              MTLSizeMake(64, 1, 1));
+        return;
+    }
     for (int64_t b = 0; b < B; ++b) {
         for (int64_t h = 0; h < H; ++h) {
             Tensor qh = q.slice(0, b, b + 1).slice(1, h, h + 1).reshape({L, D});

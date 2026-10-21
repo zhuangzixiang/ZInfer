@@ -27,6 +27,7 @@
 #include "backends/vulkan/gen/loss.h"
 #include "backends/vulkan/gen/conv.h"
 #include "backends/vulkan/gen/pool.h"
+#include "backends/vulkan/gen/attention.h"
 #include "operators/shared.hpp"
 #include <cmath>
 #include <random>
@@ -754,13 +755,27 @@ void avg_pool_grad_vulkan(const Tensor& x, const Tensor& g, Tensor& dx,
 // ---- attention: 每 (b,h) 头组合原生算子(linear=q@kT/softmax/matmul),
 //      输出经 strided copy 写入 y 对应视图 —— 零 CPU 往返 ----
 void attention_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
-                      const void*) {
+                      const void* options) {
     const Tensor& q = *in[0];
     const Tensor& k = *in[1];
     const Tensor& v = *in[2];
     Tensor& y = *out[0];
     const int64_t B = q.size(0), H = q.size(1), L = q.size(2), D = q.size(3);
     const float scale = 1.f / std::sqrt((float)D);
+    struct Options { bool causal; };
+    const bool causal = options && static_cast<const Options*>(options)->causal;
+    if (L <= 64 && q.is_contiguous() && k.is_contiguous()
+        && v.is_contiguous() && y.is_contiguous()) {
+        void* p = bridge::get_pipeline(spirv::attention, spirv::attention_bytes,
+                                       0, 0, 4);
+        require(p, "attention pipeline");
+        struct Pc { int32_t bh, L, D; float scale; int32_t causal; } pc{
+            (int32_t)(B * H), (int32_t)L, (int32_t)D, scale, causal ? 1 : 0};
+        const VBuf bufs[4] = {vhandle(q), vhandle(k), vhandle(v), vhandle(y)};
+        bridge::dispatch_bufs(p, bufs, 4, &pc, sizeof(pc),
+                              (unsigned)(((int64_t)B * H * L * D + 63) / 64), 1, 1);
+        return;
+    }
     const long long ss[3] = {L * D, D, 1};               // o1 [1,L,D] 连续
     const long long sh[3] = {1, L, D};
     const long long ds[3] = {0, y.strides()[2], y.strides()[3]};
