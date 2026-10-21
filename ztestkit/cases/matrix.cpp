@@ -458,3 +458,97 @@ ZTK_CASE(attention_op, false) {
         Tensor::attention(on(ztk_dev, q), on(ztk_dev, k),
                           on(ztk_dev, v)), 1e-3f);
 }
+
+// ============ 回归: DLL 消费路径暴露的缺陷族(外部训练项目反馈, 本轮修复) ============
+
+// softmax 任意 dim: CUDA 此前无视 dim 恒取末维; Vulkan/Metal 此前直接抛错降级
+ZTK_CASE(softmax_any_dim, false) {
+    Tensor x = Tensor::randn({3, 7, 5, 6}, 71);
+    cmp("softmax dim=0 4D", Activator::softmax(x, 0),
+        Activator::softmax(on(ztk_dev, x), 0), 1e-4f);
+    cmp("softmax dim=1 4D", Activator::softmax(x, 1),
+        Activator::softmax(on(ztk_dev, x), 1), 1e-4f);
+    cmp("softmax dim=2 4D", Activator::softmax(x, 2),
+        Activator::softmax(on(ztk_dev, x), 2), 1e-4f);
+    Tensor x2 = Tensor::randn({5, 9}, 72);
+    cmp("softmax dim=0 2D", Activator::softmax(x2, 0),
+        Activator::softmax(on(ztk_dev, x2), 0), 1e-4f);
+    Tensor xs = Tensor::randn({1000}, 73);
+    cmp("softmax dim=0 1D", Activator::softmax(xs, 0),
+        Activator::softmax(on(ztk_dev, xs), 0), 1e-4f);
+}
+
+// 工厂 Conv2d: groups 权重形状(此前漏建分组 → 参数爆炸/校验失败)
+// 与 4D 偏置广播(此前 [C]+[B,C,H,W] 不可广播 → 抛错)
+ZTK_CASE(conv2d_layer_groups_bias, false) {
+    LayerParam p;
+    p.in = 8; p.out = 16; p.kernel = {3, 3};
+    p.conv.pad = {1, 1};
+    p.conv.groups = 8;                    // DW: 权重应为 [16,1,3,3]
+    p.bias = true;
+    Tensor x = Tensor::randn({2, 8, 7, 7}, 74);
+    // 同一实例先 CPU 后设备(randn 是全局引擎, 双实例权重不同): 权重迁移语义实测
+    Layer* l1 = Layer::create(LayerType::Conv2d, p);
+    Tensor yc = l1->forward(x);
+    Tensor yd = l1->forward(on(ztk_dev, x));
+    auto ps = l1->params();
+    check(ps[0].size(1) == 1 && ps.size() == 2,
+          "dw layer weight [O,1,k,k] + bias param");
+    cmp("conv2d dw+bias layer", yc, yd, 1e-3f);
+    Layer::destroy(l1);
+    // 普通卷积带偏置(4D 广播路径)
+    LayerParam q;
+    q.in = 8; q.out = 12; q.kernel = {1, 1}; q.bias = true;
+    Layer* l2 = Layer::create(LayerType::Conv2d, q);
+    Tensor y2 = l2->forward(x);
+    Tensor y3 = l2->forward(on(ztk_dev, x));
+    cmp("conv2d 1x1+bias layer", y2, y3, 1e-3f);
+    Layer::destroy(l2);
+}
+
+// 非连续视图输入: 各算子此前要求连续直接抛错(CUDA), 统一为原生材料化
+ZTK_CASE(strided_view_inputs, false) {
+    Tensor t = Tensor::randn({4, 6, 5}, 75).transpose(0, 1);   // [6,4,5] 非连续
+    check(!t.is_contiguous(), "transpose view non-contiguous");
+    cmp("exp on transpose", Tensor::exp(t), Tensor::exp(on(ztk_dev, t)), 1e-4f);
+    cmp("silu on transpose", Activator::silu(t),
+        Activator::silu(on(ztk_dev, t)), 1e-4f);
+    cmp("sum dim1 on transpose", Tensor::sum(t, 1),
+        Tensor::sum(on(ztk_dev, t), 1), 1e-3f);
+    cmp("softmax dim1 on transpose", Activator::softmax(t, 1),
+        Activator::softmax(on(ztk_dev, t), 1), 1e-4f);
+    Tensor s = Tensor::randn({2, 8, 6, 6}, 76);
+    Tensor sl = s.slice(1, 2, 6);                               // 通道切片
+    cmp("cat on slices", Tensor::cat({sl, sl}, 1),
+        Tensor::cat({on(ztk_dev, sl), on(ztk_dev, sl)}, 1), 0.f);
+    cmp("stack on transpose", Tensor::stack({t, t}, 0),
+        Tensor::stack({on(ztk_dev, t), on(ztk_dev, t)}, 0), 0.f);
+    Tensor w = Tensor::randn({4, 4, 3, 3}, 77);
+    Conv2dOptions o; o.pad = {1, 1};
+    cmp("conv2d on slice", Tensor::conv2d(sl, w, o),
+        Tensor::conv2d(on(ztk_dev, sl), on(ztk_dev, w), o), 1e-3f);
+}
+
+// 规约大 K 维 0: 两段式路径数值(此前一线程一输出, 本修仅动并行度)
+ZTK_CASE(reduce_dim0_large, false) {
+    Tensor x = Tensor::randn({8192, 96}, 78);
+    cmp("sum dim0 [8192,96]", Tensor::sum(x, 0),
+        Tensor::sum(on(ztk_dev, x), 0), 0.5f);
+    cmp("mean dim0 [8192,96]", Tensor::mean(x, 0),
+        Tensor::mean(on(ztk_dev, x), 0), 1e-4f);
+    Tensor y = Tensor::randn({1000, 7, 5}, 79);
+    cmp("mean dim1 [1000,7,5]", Tensor::mean(y, 1),
+        Tensor::mean(on(ztk_dev, y), 1), 1e-5f);
+    Tensor f = Tensor::randn({4096, 4096}, 80);
+    Tensor s1 = Tensor::sum(f, 1);
+    Tensor s2 = Tensor::sum(on(ztk_dev, f), 1);
+    cmp("sum dim1 [4096,4096]", s1, s2, 2.f);
+}
+
+// to_device 保留 requires_grad(叶参数迁移场景)
+ZTK_CASE(to_device_grad_flag, false) {
+    Tensor x = Tensor::randn({4, 4}, 81);
+    x.requires_grad(true);
+    Tensor d = on(ztk_dev, x);
+    check(d.requires_grad(), "to_device keeps requires_grad");
+}
