@@ -125,8 +125,9 @@ static void conv2d_grad(BackwardContext& c) {
                                 const int64_t j = wo * o->stride[1] + kj * o->dilation[1] - o->pad[1];
                                 if (j < 0 || j >= W) continue;
                                 const float xv = xp[n * xs[0] + c * xs[1] + i * xs[2] + j * xs[3]];
-                                dwp[((oc * Cg2 + c) * KH + ki) * KW + kj] += dy * xv;
-                                dxp[((n * C + c) * H + i) * W + j] += dy * wp[((oc * Cg2 + c) * KH + ki) * KW + kj];
+                                const int64_t lc = c - g * Cg2;
+                                dwp[((oc * Cg2 + lc) * KH + ki) * KW + kj] += dy * xv;
+                                dxp[((n * C + c) * H + i) * W + j] += dy * wp[((oc * Cg2 + lc) * KH + ki) * KW + kj];
                             }
                         }
                     }

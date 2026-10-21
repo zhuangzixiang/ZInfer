@@ -99,6 +99,15 @@ static void attention_grad(BackwardContext& c) {
         Tensor vh = v.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D});
         Tensor gh = g.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D});
         Tensor S = Tensor::mul(Tensor::matmul(qh, kh.transpose(0, 1)), sc_t);
+        if (static_cast<const AttentionOptions*>(c.options)->causal) {
+            // causal mask 与前向保持一致；未来位置的梯度必须为零。
+            Tensor mask = Tensor::zeros({L, L}, DType::F32, dev);
+            float* mp = mask.data<float>();
+            for (int64_t i = 0; i < L; ++i)
+                for (int64_t j = i + 1; j < L; ++j)
+                    mp[i * L + j] = -3.4e38f;
+            S = Tensor::add(S, mask);
+        }
         Tensor P = Activator::softmax(S);
         Tensor dVh = Tensor::matmul(P.transpose(0, 1), gh);      // dV = P^T @ dO
         Tensor dPh = Tensor::matmul(gh, vh.transpose(0, 1));     // dP = dO @ V^T
@@ -106,9 +115,12 @@ static void attention_grad(BackwardContext& c) {
         Tensor dSh = Tensor::mul(P, Tensor::sub(dPh, dot));
         Tensor dQh = Tensor::mul(Tensor::matmul(dSh, kh), sc_t);     // dQ = dS @ K·scale
         Tensor dKh = Tensor::mul(Tensor::matmul(dSh.transpose(0, 1), qh), sc_t);
-        dQ.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D}) = dQh;
-        dK.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D}) = dKh;
-        dV.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D}) = dVh;
+        Tensor dQslot = dQ.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D});
+        Tensor dKslot = dK.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D});
+        Tensor dVslot = dV.slice(0, b, b+1).slice(1, h, h+1).reshape(Shape{L, D});
+        impl::copy_view_to(dQh, dQslot);
+        impl::copy_view_to(dKh, dKslot);
+        impl::copy_view_to(dVh, dVslot);
     }
     *c.grad_inputs[0] = dQ;
     *c.grad_inputs[1] = dK;

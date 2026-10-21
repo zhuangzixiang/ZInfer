@@ -11,9 +11,6 @@ SgdImpl::SgdImpl(std::vector<Tensor> params, const OptimParam& param)
     params_ = std::move(params);   // 基类成员(GradScaler 共享)
     if (param_.momentum > 0) {
         velocity_.resize(params_.size());
-        for (Tensor& v : velocity_) {
-            v = Tensor::zeros(Tensor::zeros({1}).shape());    // 占位, 首步按参数形状分配
-        }
     }
 }
 

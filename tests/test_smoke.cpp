@@ -444,6 +444,45 @@ static void test_grouped_conv_and_causal() {
     Tensor att = Tensor::attention(tq, tq, tv, true);
     check(fabsf(att.data<float>()[0] - 10.f) < 1e-4f
           && fabsf(att.data<float>()[1] - 20.f) < 1e-4f, "causal row0 attends only pos0");
+
+    // 分组卷积反向: 第二组权重梯度必须写入组内局部通道, 不能越组寻址。
+    Tensor GW = Tensor::ones({4, 2, 1, 1});
+    GW.requires_grad(true);
+    Tensor gl = Tensor::sum(Tensor::conv2d(tx, GW, o).flatten(), -1);
+    gl.backward();
+    check(GW.grad().data<float>()[4] == 3.f && GW.grad().data<float>()[5] == 4.f,
+          "grouped conv grad uses local channel index");
+
+    // attention 反向必须把每个 head 的结果散射回原始 view, 不能只改临时句柄。
+    Tensor aq = Tensor::randn({1, 1, 2, 2}, 101);
+    Tensor ak = Tensor::randn({1, 1, 2, 2}, 102);
+    Tensor av = Tensor::randn({1, 1, 2, 2}, 103);
+    aq.requires_grad(true);
+    ak.requires_grad(true);
+    av.requires_grad(true);
+    Tensor al = Tensor::sum(Tensor::attention(aq, ak, av, true).flatten(), -1);
+    al.backward();
+    float grad_norm = 0.f;
+    for (int64_t i = 0; i < aq.grad().numel(); ++i)
+        grad_norm += std::fabs(aq.grad().data<float>()[i]);
+    check(grad_norm > 1e-6f, "causal attention backward writes head gradients");
+}
+
+static void test_sgd_momentum() {
+    Tensor p = Tensor::zeros({2});
+    p.requires_grad(true);
+    Optimizer* opt = Optimizer::create(OptimType::Sgd, std::vector<Tensor>{p},
+                                       OptimParam{0.1, 0.9});
+    Tensor target = Tensor::ones({2});
+    for (int step = 0; step < 3; ++step) {
+        Tensor loss = Loss::mse(p, target);
+        opt->clear();
+        loss.backward();
+        opt->step();
+    }
+    check(p.data<float>()[0] > 0.f && p.data<float>()[1] > 0.f,
+          "sgd momentum buffer matches parameter shape");
+    Optimizer::destroy(opt);
 }
 
 static void test_dropout_layer() {
@@ -917,6 +956,7 @@ int main() {
     std::fprintf(stderr, "t16\n"); test_restriction_lifts();
     std::fprintf(stderr, "t17\n"); test_grouped_conv_and_causal();
     std::fprintf(stderr, "t18\n"); test_dropout_layer();
+    std::fprintf(stderr, "t18b\n"); test_sgd_momentum();
     std::fprintf(stderr, "t19\n"); test_cuda_parity();
     std::fprintf(stderr, "t20\n"); test_grad_scaler();
     std::fprintf(stderr, "t21\n"); test_gpu_backward_parity();
