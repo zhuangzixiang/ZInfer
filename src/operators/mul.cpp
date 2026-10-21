@@ -34,7 +34,7 @@ const Operator g_mul_operator = {
     infer_broadcast,
     mul_grad,
     mul_ref,
-    {mul_cpu, nullptr, ZNN_METAL_K(mul_metal), ZNN_VULKAN_K(mul_vulkan)},
+    {mul_cpu, ZNN_CUDA_K(mul_cuda), ZNN_METAL_K(mul_metal), ZNN_VULKAN_K(mul_vulkan)},
 };
 
 Tensor Tensor::mul(const Tensor& a, const Tensor& b) {

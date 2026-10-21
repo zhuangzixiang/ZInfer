@@ -30,7 +30,7 @@ const Operator g_log_operator = {
     infer_same,
     log_grad,
     log_ref,
-    {log_cpu, nullptr, ZNN_METAL_K(log_metal), ZNN_VULKAN_K(log_vulkan)},
+    {log_cpu, ZNN_CUDA_K(log_cuda), ZNN_METAL_K(log_metal), ZNN_VULKAN_K(log_vulkan)},
 };
 
 Tensor Tensor::log(const Tensor& x) {

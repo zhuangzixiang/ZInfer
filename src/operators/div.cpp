@@ -36,7 +36,7 @@ const Operator g_div_operator = {
     infer_broadcast,
     div_grad,
     div_ref,
-    {div_cpu, nullptr, ZNN_METAL_K(div_metal), ZNN_VULKAN_K(div_vulkan)},
+    {div_cpu, ZNN_CUDA_K(div_cuda), ZNN_METAL_K(div_metal), ZNN_VULKAN_K(div_vulkan)},
 };
 
 Tensor Tensor::div(const Tensor& a, const Tensor& b) {

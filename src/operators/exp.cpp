@@ -30,7 +30,7 @@ const Operator g_exp_operator = {
     infer_same,
     exp_grad,
     exp_ref,
-    {exp_cpu, nullptr, ZNN_METAL_K(exp_metal), ZNN_VULKAN_K(exp_vulkan)},
+    {exp_cpu, ZNN_CUDA_K(exp_cuda), ZNN_METAL_K(exp_metal), ZNN_VULKAN_K(exp_vulkan)},
 };
 
 Tensor Tensor::exp(const Tensor& x) {

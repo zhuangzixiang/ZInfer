@@ -26,7 +26,7 @@ const Operator g_add_operator = {
     infer_broadcast,
     binary_grad,
     add_ref,
-    {add_cpu, nullptr, ZNN_METAL_K(add_metal), ZNN_VULKAN_K(add_vulkan)},
+    {add_cpu, ZNN_CUDA_K(add_cuda), ZNN_METAL_K(add_metal), ZNN_VULKAN_K(add_vulkan)},
 };
 
 Tensor Tensor::add(const Tensor& a, const Tensor& b) {

@@ -6,7 +6,9 @@
 #include "operators/shared.hpp"
 #include <cstdio>
 #include <cstdlib>
+#include <mutex>
 #include <stdexcept>
+#include <unordered_set>
 #include <vector>
 
 namespace znn {
@@ -31,6 +33,28 @@ void print_trace(const char* op, const char* what) {
     for (size_t i = t_op_stack.size() - 1; i > 0; --i) {
         std::fprintf(stderr, "  at '%s' <- '%s'\n", t_op_stack[i],
                      t_op_stack[i - 1]);
+    }
+}
+
+const char* device_name(Device d) {
+    switch (d) {
+    case Device::CPU: return "CPU";
+    case Device::CUDA: return "CUDA";
+    case Device::Metal: return "Metal";
+    case Device::Vulkan: return "Vulkan";
+    default: return "unknown";
+    }
+}
+
+void report_fallback(const char* op, Device dev) {
+    static std::mutex mu;
+    static std::unordered_set<std::string> reported;
+    const std::string key = std::string(op) + ":" + device_name(dev);
+    std::lock_guard<std::mutex> lock(mu);
+    if (reported.insert(key).second) {
+        std::fprintf(stderr,
+                     "znn fallback: op='%s' device=%s path=%s->CPU->%s\n",
+                     op, device_name(dev), device_name(dev), op);
     }
 }
 
@@ -109,16 +133,11 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
         // 透明降级: 拷回 CPU 执行 ref, 结果拷回原设备(带一次性告警)
         // ZNN_STRICT_NATIVE=1: 降级即抛错(ztestkit 铁律验证用 —— 全算子原生)
         static const bool strict = std::getenv("ZNN_STRICT_NATIVE") != nullptr;
-        static bool warned = false;
         if (strict) {
             throw std::runtime_error(std::string("znn: op '") + op->name
                                      + "' has no native kernel (STRICT_NATIVE)");
         }
-        if (!warned) {
-            std::fprintf(stderr, "znn: op '%s' has no native kernel, falling back to CPU",
-                         op->name);
-            warned = true;
-        }
+        report_fallback(op->name, dev);
         std::vector<Tensor> cpu_ins(inputs.size());
         std::vector<const Tensor*> cpu_ptrs(inputs.size());
         for (size_t i = 0; i < inputs.size(); ++i) {

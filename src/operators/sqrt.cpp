@@ -30,7 +30,7 @@ const Operator g_sqrt_operator = {
     infer_same,
     sqrt_grad,
     sqrt_ref,
-    {sqrt_cpu, nullptr, ZNN_METAL_K(sqrt_metal), ZNN_VULKAN_K(sqrt_vulkan)},
+    {sqrt_cpu, ZNN_CUDA_K(sqrt_cuda), ZNN_METAL_K(sqrt_metal), ZNN_VULKAN_K(sqrt_vulkan)},
 };
 
 Tensor Tensor::sqrt(const Tensor& x) {

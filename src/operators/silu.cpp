@@ -30,7 +30,7 @@ const Operator g_silu_operator = {
     infer_same,
     silu_grad,
     silu_ref,
-    {silu_cpu, nullptr, ZNN_METAL_K(silu_metal), ZNN_VULKAN_K(silu_vulkan)},
+    {silu_cpu, ZNN_CUDA_K(silu_cuda), ZNN_METAL_K(silu_metal), ZNN_VULKAN_K(silu_vulkan)},
 };
 
 Tensor Activator::silu(const Tensor& x) {

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(zinfer CXX)
 
+find_package(Python3 COMPONENTS Interpreter QUIET)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -144,6 +146,13 @@ add_library(znn
 )
 target_include_directories(znn PUBLIC include PRIVATE src third_party/eigen
     third_party/onednn/include third_party/vulkan/include)
+
+if(Python3_Interpreter_FOUND)
+    add_custom_target(kernel_coverage
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/gen_kernel_coverage.py
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Generating backend kernel coverage table")
+endif()
 if(ZNN_CUDA)
     target_compile_definitions(znn PRIVATE ZNN_CUDA)
 endif()
