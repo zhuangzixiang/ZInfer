@@ -457,7 +457,7 @@ void attention_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> ou
 
     struct Options { bool causal; };
     const bool causal = options && static_cast<const Options*>(options)->causal;
-    if (L <= 128 && D <= 128 && bh * L * D <= (1 << 20)) {
+    if (L <= 64 && D <= 128 && bh * L * D <= (1 << 20)) {
         const int64_t total = bh * L * D;
         attn_fused_small_k<<<(unsigned)((total + kBlk3 - 1) / kBlk3), kBlk3>>>(
             dptr(q), dptr(k), dptr(v), dptr(y), total, L, D, scale,

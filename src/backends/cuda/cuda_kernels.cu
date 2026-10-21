@@ -82,6 +82,25 @@ __global__ void matmul_k(const float* a, const float* b, float* c,
     c[m * N + n] = acc;
 }
 
+__global__ void small_gemm_k(const float* a, const float* b, float* c,
+                             int M, int K, int N) {
+    __shared__ float sa[16][16];
+    __shared__ float sb[16][16];
+    const int row = blockIdx.y * 16 + threadIdx.y;
+    const int col = blockIdx.x * 16 + threadIdx.x;
+    float acc = 0.f;
+    for (int base = 0; base < K; base += 16) {
+        sa[threadIdx.y][threadIdx.x] =
+            (row < M && base + threadIdx.x < K) ? a[row * K + base + threadIdx.x] : 0.f;
+        sb[threadIdx.y][threadIdx.x] =
+            (base + threadIdx.y < K && col < N) ? b[(base + threadIdx.y) * N + col] : 0.f;
+        __syncthreads();
+        for (int k = 0; k < 16; ++k) acc += sa[threadIdx.y][k] * sb[k][threadIdx.x];
+        __syncthreads();
+    }
+    if (row < M && col < N) c[row * N + col] = acc;
+}
+
 // ---- 优化器设备内核 ----
 __global__ void sgd_k(float* p, const float* g, float* vel,
                       long long n, float lr, float momentum, float wd) {
@@ -203,6 +222,13 @@ void matmul_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
     Tensor b = in[1]->is_contiguous() ? *in[1] : in[1]->clone();
     Tensor& y = *out[0];
     const int M = a.size(0), K = a.size(1), N = b.size(1);
+
+    if (ctx.precision == Precision::FP32 && M <= 128 && N <= 128 && K <= 128) {
+        dim3 block(16, 16);
+        dim3 grid((N + 15) / 16, (M + 15) / 16);
+        small_gemm_k<<<grid, block>>>(dptr(a), dptr(b), dptr(y), M, K, N);
+        return;
+    }
 
     // 快速路径: 共享 GEMM 原语(cuBLAS, DLL 缺失时 false → 朴素内核)
     if (gemm_cuda(dptr(a), K, dptr(b), N,

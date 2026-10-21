@@ -104,6 +104,12 @@ int main() {
                  [&] { return std::make_tuple(q, k, v); },
                  [](auto& t) { return Tensor::attention(std::get<0>(t), std::get<1>(t), std::get<2>(t)); });
     }
+    {
+        Tensor x = Tensor::randn({4096, 32}, 17).to_device(Device::CUDA);
+        bench_op("softmax 4096x32 (small)", 2.0 * 4096 * 32, 50,
+                 [&] { return std::make_tuple(x); },
+                 [](auto& t) { return Activator::softmax(std::get<0>(t)); });
+    }
     Runtime::set_precision(Precision::AUTO);
     fprintf(stderr, "=== done ===\n");
     return 0;

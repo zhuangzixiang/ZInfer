@@ -76,12 +76,39 @@ __global__ void softmax_lastdim_k(const float* x, float* y, int64_t n, int64_t d
     }
 }
 
+// One warp per row avoids the shared-memory two-dimensional reduction used by
+// the general kernel. This is the common small-classifier/attention case.
+__global__ void softmax_small_k(const float* x, float* y, int64_t n, int d) {
+    const int64_t r = blockIdx.x;
+    if (r >= n) return;
+    const int lane = threadIdx.x;
+    const float* xr = x + r * d;
+    float* yr = y + r * d;
+    float m = -3.4e38f;
+    for (int i = lane; i < d; i += 32) m = fmaxf(m, xr[i]);
+    for (int off = 16; off > 0; off >>= 1) m = fmaxf(m, __shfl_down_sync(0xffffffff, m, off));
+    m = __shfl_sync(0xffffffff, m, 0);
+    float s = 0.f;
+    for (int i = lane; i < d; i += 32) {
+        yr[i] = expf(xr[i] - m);
+        s += yr[i];
+    }
+    for (int off = 16; off > 0; off >>= 1) s += __shfl_down_sync(0xffffffff, s, off);
+    s = __shfl_sync(0xffffffff, s, 0);
+    for (int i = lane; i < d; i += 32) yr[i] /= s;
+}
+
 void softmax_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                   const void*) {
     require_contiguous1c(*in[0], *out[0]);
     const Tensor& x = *in[0];
     const int64_t d = x.size(-1);
     const int64_t n = x.numel() / d;
+    if (d <= 32) {
+        softmax_small_k<<<static_cast<unsigned>(n), 32>>>(dptr(x), dptr(*out[0]), n,
+                                                           static_cast<int>(d));
+        return;
+    }
     dim3 block(32, 8);
     dim3 grid(static_cast<unsigned>((n + 7) / 8));
     softmax_lastdim_k<<<grid, block, 2 * 8 * 32 * sizeof(float)>>>(
