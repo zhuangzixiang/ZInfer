@@ -40,10 +40,10 @@ using namespace metal;
 kernel void elementwise(device const float* a [[buffer(0)]],
                         device const float* b [[buffer(1)]],
                         device float* y [[buffer(2)]],
-                        constant const int* pc [[buffer(3)]]) {
+                        constant const int* pc [[buffer(3)]], uint3 tpig [[thread_position_in_grid]]) {
     // pc[0]=n pc[1]=op pc[2]=rank
     // pc[10+d]=dims pc[20+d]=sa pc[30+d]=sb(维长 1 → 步长 0)
-    const int i = (int)((thread_position_in_grid).x);
+    const int i = (int)(tpig.x);
     if (i >= pc[0]) return;
     int t = i, oa = 0, ob = 0;
     for (int d = pc[2] - 1; d >= 0; --d) {
@@ -82,12 +82,12 @@ using namespace metal;
 kernel void gemm(device const float* a [[buffer(0)]],
                  device const float* b [[buffer(1)]],
                  device float* y [[buffer(2)]],
-                 constant const int* pc [[buffer(3)]]) {
+                 constant const int* pc [[buffer(3)]], uint3 tpig [[thread_position_in_grid]], uint3 tpit [[thread_position_in_threadgroup]]) {
     // pc = {M, N, K, lda, ldb, ldc, TB}
-    const int row = (int)((thread_position_in_grid).y);
-    const int col = (int)((thread_position_in_grid).x);
-    const int lr = (int)((thread_position_in_threadgroup).y);
-    const int lc = (int)((thread_position_in_threadgroup).x);
+    const int row = (int)(tpig.y);
+    const int col = (int)(tpig.x);
+    const int lr = (int)(tpit.y);
+    const int lc = (int)(tpit.x);
     const bool inr = (row < pc[0]) && (col < pc[1]);
 
     threadgroup float ta[8][9];
@@ -125,10 +125,10 @@ using namespace metal;
 
 kernel void reduce(device const float* x [[buffer(0)]],
                    device float* y [[buffer(2)]],
-                   constant const int* pc [[buffer(3)]]) {
+                   constant const int* pc [[buffer(3)]], uint3 tpig [[thread_position_in_grid]]) {
     // pc[0]=total pc[1]=n_dim pc[2]=s_dim pc[3]=RANK pc[4]=MEAN
     // pc[10+d]=odims[d], pc[20+d]=xstr[d]
-    const int o = (int)((thread_position_in_grid).x);
+    const int o = (int)(tpig.x);
     if (o >= pc[0]) return;
     int t = o;
     int base = 0;
@@ -151,8 +151,8 @@ using namespace metal;
 
 kernel void softmax(device const float* x [[buffer(0)]],
                     device float* y [[buffer(2)]],
-                    constant const int* pc [[buffer(3)]]) {
-    const int r = (int)((thread_position_in_grid).x);
+                    constant const int* pc [[buffer(3)]], uint3 tpig [[thread_position_in_grid]]) {
+    const int r = (int)(tpig.x);
     if (r >= pc[0]) return;
     const int base = r * pc[1];
     float m = -3.4e38f;
@@ -385,8 +385,8 @@ kernel void unarybwd(device const float* g [[buffer(0)]],
                      device const float* x [[buffer(1)]],
                      device const float* yo [[buffer(2)]],
                      device float* gi [[buffer(3)]],
-                     constant const int* pc [[buffer(8)]]) {
-    const int i = (int)((thread_position_in_grid).x);
+                     constant const int* pc [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
+    const int i = (int)(tpig.x);
     if (i >= pc[0]) return;
     gi[i] = g[i] * deriv(pc[1], x[i], yo[i]);
 }
@@ -399,9 +399,9 @@ using namespace metal;
 
 kernel void stridedcopy(device const float* s [[buffer(0)]],
                         device float* d [[buffer(1)]],
-                        constant const int* pc [[buffer(8)]]) {
+                        constant const int* pc [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
     // pc[0]=total pc[1]=rank pc[10+d]=ss pc[20+d]=ds pc[30+d]=sh
-    const int i = (int)((thread_position_in_grid).x);
+    const int i = (int)(tpig.x);
     if (i >= pc[0]) return;
     int t = i, so = 0, dof = 0;
     for (int d2 = pc[1] - 1; d2 >= 0; --d2) {
@@ -421,9 +421,9 @@ using namespace metal;
 
 kernel void bcastgrad(device const float* g [[buffer(0)]],
                       device float* outv [[buffer(1)]],
-                      constant const int* pc [[buffer(8)]]) {
+                      constant const int* pc [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
     // pc[0]=total pc[1]=rank pc[10+d]=dims pc[20+d]=eff; scale 存 pc[30] 位型
-    const int i = (int)((thread_position_in_grid).x);
+    const int i = (int)(tpig.x);
     if (i >= pc[0]) return;
     int t = i, go = 0;
     for (int d2 = pc[1] - 1; d2 >= 0; --d2) {
@@ -444,9 +444,9 @@ kernel void optstep(device float* p [[buffer(0)]],
                     device const float* g [[buffer(1)]],
                     device float* u1 [[buffer(2)]],
                     device float* u2 [[buffer(3)]],
-                    constant const int* pc [[buffer(8)]]) {
+                    constant const int* pc [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
     // pc[0]=n pc[1]=opt; pc[2..] 存 float 位型(lr,p1..p6)
-    const int i = (int)((thread_position_in_grid).x);
+    const int i = (int)(tpig.x);
     if (i >= pc[0]) return;
     const constant float* pf = (constant float*)&pc[2];
     const float lr = pf[0];
@@ -587,8 +587,8 @@ const char* kMslFill = R"MSL(
 using namespace metal;
 
 kernel void fillarange(device float* y [[buffer(0)]],
-                       constant const int* pc [[buffer(8)]]) {
-    const int i = (int)((thread_position_in_grid).x);
+                       constant const int* pc [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
+    const int i = (int)(tpig.x);
     if (i >= pc[0]) return;
     y[i] = (float)i;
 }
@@ -596,8 +596,8 @@ kernel void fillarange(device float* y [[buffer(0)]],
 kernel void embedfwd(device const float* w [[buffer(0)]],
                      device const ulong* idx [[buffer(1)]],
                      device float* y [[buffer(2)]],
-                     constant const int* pc [[buffer(8)]]) {
-    const int i = (int)((thread_position_in_grid).x);
+                     constant const int* pc [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
+    const int i = (int)(tpig.x);
     if (i >= pc[0]) return;
     const int v = (int)idx[i / pc[1]];
     y[i] = (v >= 0 && v < pc[2]) ? w[v * pc[1] + i % pc[1]] : 0.0f;
@@ -607,8 +607,8 @@ kernel void embedgrad(device const float* g [[buffer(0)]],
                       device const ulong* idx [[buffer(1)]],
                       device float* dw [[buffer(2)]],
                       device atomic_uint* dwu [[buffer(3)]],
-                      constant const int* pc [[buffer(8)]]) {
-    const int i = (int)((thread_position_in_grid).x);
+                      constant const int* pc [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
+    const int i = (int)(tpig.x);
     if (i >= pc[0]) return;
     const int v = (int)idx[i / pc[1]];
     const uint slot = (uint)(v * pc[1] + i % pc[1]);
@@ -636,10 +636,10 @@ kernel void lnrow(device const float* x [[buffer(0)]],
                   device float* y [[buffer(5)]],
                   constant const int* pc [[buffer(8)]],
                   threadgroup float* sm [[threadgroup(0)]],
-                  threadgroup float* sv [[threadgroup(1)]]) {
-    const int r = (int)((thread_position_in_grid).y);
+                  threadgroup float* sv [[threadgroup(1)]], uint3 tpig [[thread_position_in_grid]], uint3 tpit [[thread_position_in_threadgroup]]) {
+    const int r = (int)(tpig.y);
     if (r >= pc[0]) return;
-    const int lid = (int)((thread_position_in_threadgroup).x);
+    const int lid = (int)(tpit.x);
     const int base = r * pc[1];
     float ls = 0.0f, lq = 0.0f;
     for (int i = lid; i < pc[1]; i += 256) {
@@ -668,10 +668,10 @@ kernel void bnchannel(device const float* x [[buffer(0)]],
                       device float* rv [[buffer(4)]],
                       device float* y [[buffer(5)]],
                       constant const int* pc [[buffer(8)]],
-                      threadgroup float* sm [[threadgroup(0)]]) {
-    const int c = (int)((thread_position_in_grid).y);
+                      threadgroup float* sm [[threadgroup(0)]], uint3 tpig [[thread_position_in_grid]], uint3 tpit [[thread_position_in_threadgroup]]) {
+    const int c = (int)(tpig.y);
     if (c >= pc[1]) return;
-    const int lid = (int)((thread_position_in_threadgroup).x);
+    const int lid = (int)(tpit.x);
     const int m = pc[0], hw = pc[2] * pc[3];
     float mu, var;
     if (pc[6] != 0) {
@@ -725,8 +725,8 @@ kernel void cekernel(device const float* x [[buffer(0)]],
                      device const ulong* t [[buffer(2)]],
                      device float* y [[buffer(3)]],
                      constant const int* pc [[buffer(8)]],
-                     threadgroup float* acc [[threadgroup(0)]]) {
-    const int lid = (int)((thread_position_in_threadgroup).x);
+                     threadgroup float* acc [[threadgroup(0)]], uint3 tpit [[thread_position_in_threadgroup]]) {
+    const int lid = (int)(tpit.x);
     float l = 0.0f;
     for (int i = lid; i < pc[0]; i += 256) {
         const int base = i * pc[1];
@@ -749,8 +749,8 @@ kernel void msekernel(device const float* p [[buffer(0)]],
                       device const float* t [[buffer(1)]],
                       device float* y [[buffer(3)]],
                       constant const int* pc [[buffer(8)]],
-                      threadgroup float* acc [[threadgroup(0)]]) {
-    const int lid = (int)((thread_position_in_threadgroup).x);
+                      threadgroup float* acc [[threadgroup(0)]], uint3 tpit [[thread_position_in_threadgroup]]) {
+    const int lid = (int)(tpit.x);
     float l = 0.0f;
     for (int i = lid; i < pc[0]; i += 256) {
         const float d = p[i] - t[i];
@@ -779,9 +779,9 @@ struct ConvPc { int n,c,h,w,o,kh,kw,ho,wo,sh,sw,ph,pw,dh,dw,g; };
 kernel void convfwd(device const float* x [[buffer(0)]],
                     device const float* wt [[buffer(1)]],
                     device float* y [[buffer(3)]],
-                    constant const int* pcp [[buffer(8)]]) {
+                    constant const int* pcp [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
     const ConvPc pc = *(constant const ConvPc*)pcp;
-    const int i = (int)((thread_position_in_grid).x);
+    const int i = (int)(tpig.x);
     const int total = pc.n * pc.o * pc.ho * pc.wo;
     if (i >= total) return;
     const int wo = i % pc.wo;
@@ -810,9 +810,9 @@ kernel void convfwd(device const float* x [[buffer(0)]],
 kernel void convdw(device const float* x [[buffer(0)]],
                    device const float* g [[buffer(2)]],
                    device float* dw [[buffer(3)]],
-                   constant const int* pcp [[buffer(8)]]) {
+                   constant const int* pcp [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
     const ConvPc pc = *(constant const ConvPc*)pcp;
-    const int i = (int)((thread_position_in_grid).x);
+    const int i = (int)(tpig.x);
     const int total = pc.o * (pc.c / pc.g) * pc.kh * pc.kw;
     if (i >= total) return;
     const int kj = i % pc.kw;
@@ -841,9 +841,9 @@ kernel void convdw(device const float* x [[buffer(0)]],
 kernel void convdx(device const float* g [[buffer(2)]],
                    device const float* wt [[buffer(1)]],
                    device float* dx [[buffer(3)]],
-                   constant const int* pcp [[buffer(8)]]) {
+                   constant const int* pcp [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
     const ConvPc pc = *(constant const ConvPc*)pcp;
-    const int i = (int)((thread_position_in_grid).x);
+    const int i = (int)(tpig.x);
     const int total = pc.n * pc.c * pc.h * pc.w;
     if (i >= total) return;
     const int j = i % pc.w;
@@ -880,8 +880,8 @@ using namespace metal;
 
 kernel void poolmax(device const float* x [[buffer(0)]],
                     device float* y [[buffer(2)]],
-                    constant const int* pc [[buffer(8)]]) {
-    const int i = (int)((thread_position_in_grid).x);
+                    constant const int* pc [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
+    const int i = (int)(tpig.x);
     if (i >= pc[0]) return;
     const int wo = i % pc[4];
     const int t0 = i / pc[4];
@@ -903,8 +903,8 @@ kernel void poolmax(device const float* x [[buffer(0)]],
 
 kernel void poolavg(device const float* x [[buffer(0)]],
                     device float* y [[buffer(2)]],
-                    constant const int* pc [[buffer(8)]]) {
-    const int i = (int)((thread_position_in_grid).x);
+                    constant const int* pc [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
+    const int i = (int)(tpig.x);
     if (i >= pc[0]) return;
     const int wo = i % pc[4];
     const int t0 = i / pc[4];
@@ -930,8 +930,8 @@ kernel void poolmaxgrad(device const float* g [[buffer(0)]],
                         device const float* x [[buffer(1)]],
                         device float* dx [[buffer(2)]],
                         device atomic_uint* dxu [[buffer(3)]],
-                        constant const int* pc [[buffer(8)]]) {
-    const int i = (int)((thread_position_in_grid).x);
+                        constant const int* pc [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
+    const int i = (int)(tpig.x);
     if (i >= pc[0]) return;
     const int wo = i % pc[4];
     const int t0 = i / pc[4];
@@ -966,8 +966,8 @@ kernel void poolmaxgrad(device const float* g [[buffer(0)]],
 kernel void poolavggrad(device const float* g [[buffer(0)]],
                         device float* dx [[buffer(2)]],
                         device atomic_uint* dxu [[buffer(3)]],
-                        constant const int* pc [[buffer(8)]]) {
-    const int i = (int)((thread_position_in_grid).x);
+                        constant const int* pc [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
+    const int i = (int)(tpig.x);
     if (i >= pc[0]) return;
     const int wo = i % pc[4];
     const int t0 = i / pc[4];
