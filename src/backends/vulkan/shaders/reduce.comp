@@ -1,6 +1,7 @@
 #version 450
-// 任意维规约(sum/mean): 每线程规约沿 dim 的 K 个元素(行距 s_dim),
-// 输出多下标由 Map 结构等价的步长表计算(与 CUDA 版同构)
+// 任意维规约(sum/mean): 每 workgroup 负责一个输出, 线程沿 dim 协作
+// 累加 + 共享内存树归约(固定归约序 → 确定性)。此前一线程一输出串行
+// 扫全维, 输出数少(dim0/标量)时整卡只有零星线程在跑。
 layout(local_size_x = 256) in;
 
 layout(constant_id = 0) const int RANK = 1;    // 去掉规约维后的秩
@@ -17,8 +18,10 @@ layout(push_constant) uniform Pc {
     int xstr[8];        // 输入对应步长
 } pc;
 
+shared float sh[256];
+
 void main() {
-    const int o = int(gl_GlobalInvocationID.x);
+    const int o = int(gl_WorkGroupID.x);
     if (o >= pc.total) return;
     int t = o;
     int base = 0;
@@ -27,8 +30,18 @@ void main() {
         t /= pc.odims[d];
     }
     float acc = 0.0;
-    for (int j = 0; j < pc.n_dim; ++j) {
+    for (int j = int(gl_LocalInvocationID.x); j < pc.n_dim; j += 256) {
         acc += x[base + j * pc.s_dim];
     }
-    y[o] = (MEAN == 1) ? acc / float(pc.n_dim) : acc;
+    sh[gl_LocalInvocationID.x] = acc;
+    barrier();
+    for (int s = 128; s > 0; s >>= 1) {
+        if (int(gl_LocalInvocationID.x) < s) {
+            sh[gl_LocalInvocationID.x] += sh[gl_LocalInvocationID.x + s];
+        }
+        barrier();
+    }
+    if (gl_LocalInvocationID.x == 0) {
+        y[o] = (MEAN == 1) ? sh[0] / float(pc.n_dim) : sh[0];
+    }
 }
