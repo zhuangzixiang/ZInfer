@@ -147,9 +147,8 @@ if(ZNN_BUILD_DLL)
         ${ZNN_VULKAN_SRC}
         ${ZNN_METAL_SRC}
     )
-    set_target_properties(znn PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    # 仅导出 ZNN_API 标注的公共 API(7 类 ~150 方法), 非 WINDOWS_EXPORT_ALL
     target_compile_definitions(znn PRIVATE ZNN_BUILDING ZNN_SHARED)
-    # 公共头消费者定义 ZNN_SHARED(不定义 ZNN_BUILDING → dllimport)
     target_compile_definitions(znn INTERFACE ZNN_SHARED)
 else()
     add_library(znn

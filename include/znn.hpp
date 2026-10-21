@@ -47,7 +47,7 @@ namespace znn {
 //   AUTO: 最优可用(TF32 → FP32 兜底)
 enum class Precision : uint8_t { FP32 = 0, TF32, FP16, BF16, AUTO };
 
-class Runtime {
+class ZNN_API Runtime {
 public:
     static bool device_available(Device dev);   // 后端是否编入且可用(编译开关决定)
     static void set_grad_enabled(bool yes);     // false = 全局暂停建图(验证/推理段)
@@ -60,7 +60,7 @@ public:
 
 struct TensorTape;   // 内部: 归属张量的计算记录(见 autograd.hpp)
 
-class Tensor {
+class ZNN_API Tensor {
 public:
     // ---- 创建(目标设备默认 CPU) ----
     static Tensor zeros(Shape shape, DType dt = DType::F32, Device dev = Device::CPU);
@@ -171,7 +171,7 @@ private:
 // ---------------------------------------------------------------- Activator
 // 命名静态方法: 调用处与论文同构, 编译期分发; 新激活 = 加一个方法。
 
-class Activator {
+class ZNN_API Activator {
 public:
     static Tensor relu   (const Tensor& x);
     static Tensor gelu   (const Tensor& x);
@@ -184,7 +184,7 @@ public:
 // ---------------------------------------------------------------- Loss
 // 损失函数返回标量张量。
 
-class Loss {
+class ZNN_API Loss {
 public:
     // 交叉熵 = softmax + 负对数似然(分类标准损失); targets: I64 标签
     static Tensor cross_entropy(const Tensor& logits, const Tensor& targets);
@@ -195,7 +195,7 @@ public:
 // ---------------------------------------------------------------- Layer
 // 虚接口 + 工厂。自定义层: 继承 Layer 实现 forward 即可直接使用, 无需注册。
 
-class Layer {
+class ZNN_API Layer {
 public:
     // 按类型构造, 必填项缺失/非法抛异常(不返回 nullptr)
     static Layer* create(LayerType type, const LayerParam& param);
@@ -213,7 +213,7 @@ protected:
 
 // ---------------------------------------------------------------- Optimizer
 
-class Optimizer {
+class ZNN_API Optimizer {
 public:
     // 从一组 Layer 自动收集参数并构造(常规训练)
     static Optimizer* create(OptimType type, const std::vector<Layer*>& layers, const OptimParam& param);
@@ -247,7 +247,7 @@ protected:
 //       if (scaler.unscale(*opt)) opt->step();    // false = 梯度含 inf/nan, 跳步
 //       scaler.update();                          // 动态调整 s(成功渐增/失败减半)
 //   }
-class GradScaler {
+class ZNN_API GradScaler {
 public:
     explicit GradScaler(float init_scale = 65536.f, int growth_interval = 2000);
 
