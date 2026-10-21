@@ -120,9 +120,7 @@ const Operator g_attention_operator = {
     attention_infer,
     attention_grad,
     attention_ref,
-    // attention Vulkan: 内核存在但线性组合在特定缓冲地址出错(未定位),
-    // 槽位置空 = 明确回落 + STRICT 报警(验证门禁未过, 保持锁定)
-    {nullptr, ZNN_CUDA_K(attention_cuda), ZNN_METAL_K(attention_metal), nullptr},
+    {nullptr, ZNN_CUDA_K(attention_cuda), ZNN_METAL_K(attention_metal), ZNN_VULKAN_K(attention_vulkan)},
     sizeof(AttentionOptions),
 };
 

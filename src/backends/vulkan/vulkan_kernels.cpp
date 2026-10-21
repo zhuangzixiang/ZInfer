@@ -747,21 +747,25 @@ void attention_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const float scale = 1.f / std::sqrt((float)D);
     const long long ss[3] = {L * D, D, 1};               // o1 [1,L,D] 连续
     const long long sh[3] = {1, L, D};
-    // y 的 (b,h) 头按 [1,L,D] 解释: 行/列步长 = y 的第 2/3 维步长
-    // (不可取 4 维视图的前 3 步长 —— 维度错位致行步长取到批步长)
     const long long ds[3] = {0, y.strides()[2], y.strides()[3]};
+    // 标量预分配到循环外(免每头一次 alloc+释放池复用)
+    Tensor sc = Tensor::full(Shape{}, scale, DType::F32, q.device());
     for (int64_t b = 0; b < B; ++b) {
         for (int64_t h = 0; h < H; ++h) {
-            Tensor qh = q.slice(0, b, b + 1).slice(1, h, h + 1).reshape({L, D});
-            Tensor kh = k.slice(0, b, b + 1).slice(1, h, h + 1).reshape({L, D});
-            Tensor vh = v.slice(0, b, b + 1).slice(1, h, h + 1).reshape({L, D});
+            // 头提取 = 连续 4D 张量的带偏移 memcpy(跳过全部布局算子 ——
+            // slice→reshape 三层派发在池复用下产生错误数据)
+            const int64_t hoff = (b * H + h) * L * D * 4;
+            Tensor qh = Tensor::empty(Shape{L, D}, DType::F32, q.device());
+            Tensor kh = Tensor::empty(Shape{L, D}, DType::F32, q.device());
+            Tensor vh = Tensor::empty(Shape{L, D}, DType::F32, q.device());
+            copy_device_to_device_off(hdl(qh), 0, hdl(q), hoff, L * D * 4);
+            copy_device_to_device_off(hdl(kh), 0, hdl(k), hoff, L * D * 4);
+            copy_device_to_device_off(hdl(vh), 0, hdl(v), hoff, L * D * 4);
             Tensor p = Tensor::linear(qh, kh);           // q@kT [L,L]
-            Tensor sm = Activator::softmax(Tensor::mul(
-                p, Tensor::full(Shape{}, scale, DType::F32, q.device())));
-            Tensor o1 = Tensor::matmul(sm, vh).reshape({1, L, D});
-            const int64_t head_off = (b * H + h) * L * D;
+            Tensor sm = Activator::softmax(Tensor::mul(p, sc));
+            Tensor o1 = Tensor::matmul(sm, vh);          // [L,D]
             strided_copy_raw(Device::Vulkan, hdl(o1), 0, hdl(y),
-                             head_off, 3, ss, ds, sh, L * D);
+                             (b * H + h) * L * D, 3, ss, ds, sh, L * D);
         }
     }
 }
