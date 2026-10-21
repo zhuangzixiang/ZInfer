@@ -55,20 +55,20 @@ enum class DType : uint8_t {
 // 有语义; 一般张量(如权重 {out,in})请用索引访问(支持负索引, -1=最末维)。
 struct Shape {
     Shape() = default;
-    Shape(std::initializer_list<int64_t> dims);   // {B,C,H,W} / {out,in} / {} 标量
+    ZNN_API Shape(std::initializer_list<int64_t> dims);   // {B,C,H,W} / {out,in} / {} 标量
 
     int64_t dims[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     int64_t rank    = 0;                          // 维数, 0 = 标量
 
-    int64_t& operator[](int64_t i);
-    int64_t  operator[](int64_t i) const;
+    ZNN_API int64_t& operator[](int64_t i);
+    ZNN_API int64_t  operator[](int64_t i) const;
 
     int64_t n() const { return dims[0]; }         // 图像类张量便捷访问
     int64_t c() const { return dims[1]; }
     int64_t h() const { return dims[2]; }
     int64_t w() const { return dims[3]; }
 
-    bool operator==(const Shape& other) const;
+    ZNN_API bool operator==(const Shape& other) const;
 };
 
 // ---------------------------------------------------------------- 运算选项

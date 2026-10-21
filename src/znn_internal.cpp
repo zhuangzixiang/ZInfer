@@ -721,6 +721,8 @@ Tensor Tensor::to_device(Device device) const {
                             impl_->storage->data(), impl_->offset * esz,
                             impl_->nbytes());
     }
+    // 搬运保留求导标志(叶参数迁移场景; 数据纯拷贝不带图, 梯度独立累积)
+    if (impl_->requires_grad) t.requires_grad(true);
     return t;
 }
 
@@ -826,14 +828,15 @@ T Tensor::item() const {
     return *p;
 }
 
-template float*                Tensor::data<float>() const;
-template int64_t*              Tensor::data<int64_t>() const;
-template uint16_t*             Tensor::data<uint16_t>() const;
-template Tensor::CudaDataPtr*  Tensor::data<Tensor::CudaDataPtr>() const;
-template Tensor::MetalDataPtr* Tensor::data<Tensor::MetalDataPtr>() const;
-template Tensor::VulkanDataPtr* Tensor::data<Tensor::VulkanDataPtr>() const;
-template float    Tensor::item<float>() const;
-template int64_t  Tensor::item<int64_t>() const;
+// 显式实例化带导出: DLL 消费者链接数据读取原语(缺失则外部不可链接)
+template ZNN_API float*                Tensor::data<float>() const;
+template ZNN_API int64_t*              Tensor::data<int64_t>() const;
+template ZNN_API uint16_t*             Tensor::data<uint16_t>() const;
+template ZNN_API Tensor::CudaDataPtr*  Tensor::data<Tensor::CudaDataPtr>() const;
+template ZNN_API Tensor::MetalDataPtr* Tensor::data<Tensor::MetalDataPtr>() const;
+template ZNN_API Tensor::VulkanDataPtr* Tensor::data<Tensor::VulkanDataPtr>() const;
+template ZNN_API float    Tensor::item<float>() const;
+template ZNN_API int64_t  Tensor::item<int64_t>() const;
 
 // ============================================================ 自动求导
 
