@@ -30,6 +30,7 @@
 #include "backends/vulkan/gen/pool.h"
 #include "backends/vulkan/gen/attention.h"
 #include "operators/shared.hpp"
+#include "operators/batch_norm_options.hpp"
 #include <cmath>
 #include <random>
 #include <vector>
@@ -629,7 +630,9 @@ void layer_norm_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out
 
 void batch_norm2d_vulkan(KernelContext&, Span<const Tensor*> in,
                          Span<Tensor*> out, const void* options) {
-    const float* opts = static_cast<const float*>(options);
+    // options = BatchNormOptions{double eps, double momentum, bool training}
+    // (此前 float[3] 强转读错训练标志 —— 见 CUDA 同款修复)
+    const BatchNormOptions* o = static_cast<const BatchNormOptions*>(options);
     const Tensor& x = *in[0];
     const int C = (int)x.size(1);
     void* p = bridge::get_pipeline(spirv::norm, spirv::norm_bytes, 1, 0, 6);
@@ -637,7 +640,7 @@ void batch_norm2d_vulkan(KernelContext&, Span<const Tensor*> in,
     struct Pc { int32_t m, c, h, w; float eps, momentum; int32_t training; } pc{
         (int32_t)(x.size(0) * x.size(2) * x.size(3)), C,
         (int32_t)x.size(2), (int32_t)x.size(3),
-        opts[0], opts[1], (int32_t)opts[2]};
+        (float)o->eps, (float)o->momentum, o->training ? 1 : 0};
     const VBuf bufs[6] = {vhandle(x), vhandle(*in[1]), vhandle(*in[2]),
                           vhandle(*in[3]), vhandle(*in[4]), vhandle(*out[0])};
     bridge::dispatch_bufs(p, bufs, 6, &pc, sizeof(pc), 1, (unsigned)C, 1);

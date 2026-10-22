@@ -1,6 +1,7 @@
 // batch_norm2d: 通道归一化(NCHW); 训练态用批统计并就地更新 running 均值/方差,
 // 推理态用 running 统计; 梯度按标准 BN 反传公式(训练态)
 #include "shared.hpp"
+#include "batch_norm_options.hpp"
 #include "op_dispatcher.hpp"
 #include "backend_slots.hpp"
 #include <cmath>
@@ -13,25 +14,21 @@ static void batch_norm2d_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor
 
 static void batch_norm2d_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
                                 const void* o) {
-    const float* opts = static_cast<const float*>(o);   // {eps, momentum, training}
+    // options = BatchNormOptions(此前按 float[3] 强转读 {double,double,bool}
+    // —— 后端同款 UB, CPU 侧靠 denormal!=0 碰巧工作, 一并修正)
+    const BatchNormOptions* opts = static_cast<const BatchNormOptions*>(o);
     // 训练态统计更新走组合路径(ref), 推理统计量走 oneDNN
-    if (opts[2] == 0.f
+    if (!opts->training
         && !onednn::batch_norm(*in[0], *in[1], *in[2], *in[3], *in[4],
-                               *out[0], opts[0])) {
+                               *out[0], (float)opts->eps)) {
         batch_norm2d_ref(c, in, out, o);
         return;
     }
-    if (opts[2] != 0.f) {
+    if (opts->training) {
         batch_norm2d_ref(c, in, out, o);
     }
 }
 
-
-struct BatchNormOptions {
-    double eps;
-    double momentum;
-    bool   training;
-};
 
 static void batch_norm2d_infer(Span<const TensorMeta*> in, const void*,
                                ShapeList& outs) {

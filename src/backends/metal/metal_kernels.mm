@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <string>
 #include "operators/shared.hpp"
+#include "operators/batch_norm_options.hpp"
 #include <cmath>
 #include <random>
 #include <vector>
@@ -1340,14 +1341,16 @@ void layer_norm_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
 
 void batch_norm2d_metal(KernelContext&, Span<const Tensor*> in,
                         Span<Tensor*> out, const void* options) {
-    const float* opts = static_cast<const float*>(options);
+    // options = BatchNormOptions{double eps, double momentum, bool training}
+    // (此前 float[3] 强转读错训练标志 —— 见 CUDA 同款修复)
+    const BatchNormOptions* o = static_cast<const BatchNormOptions*>(options);
     const Tensor& x = *in[0];
     static id<MTLComputePipelineState> p = nil;
     if (!p) p = device::pipeline(kMslNorm, "bnchannel");
     struct { int32_t m, c, h, w; float eps, mom; int32_t tr; } pc{
         (int32_t)(x.size(0) * x.size(2) * x.size(3)), (int32_t)x.size(1),
         (int32_t)x.size(2), (int32_t)x.size(3),
-        opts[0], opts[1], (int32_t)opts[2]};
+        (float)o->eps, (float)o->momentum, o->training ? 1 : 0};
     const device::MBuf bufs[6] = {mbuf(x), mbuf(*in[1]), mbuf(*in[2]),
                                   mbuf(*in[3]), mbuf(*in[4]), mbuf(*out[0])};
     device::dispatch_bufs_tg(p, bufs, 6, &pc, sizeof(pc),

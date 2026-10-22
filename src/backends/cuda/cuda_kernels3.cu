@@ -1,5 +1,6 @@
 #include "operator.hpp"
 #include "backends/cuda/cuda_backend.hpp"
+#include "operators/batch_norm_options.hpp"
 // ============================================================================
 // cuda_kernels3.cu — 第三批 CUDA 内核: attention/LN/BN/embedding/
 // 视图族(reshape/transpose/permute/slice)/cat/stack/arange/randen
@@ -344,17 +345,19 @@ __global__ void batch_norm2d_k(const float* x, const float* w, const float* b,
     }
 }
 
+// options 实体布局(与 operators/batch_norm2d.cpp 的 BatchNormOptions 一致;
+// 此前按 float[3] 强转 {double,double,bool} —— bool 位型读成 0.0f,
+// 训练标志恒为假 → CUDA BN 一直跑 eval 统计)
 void batch_norm2d_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                        const void* options) {
-    // options 布局: {eps, momentum, training}
-    const float* opts = static_cast<const float*>(options);
+    const BatchNormOptions* o = static_cast<const BatchNormOptions*>(options);
     const Tensor& x = *in[0];
     const int C = x.size(1);
     batch_norm2d_k<<<C, kBlk3, kBlk3 * sizeof(float)>>>(
         dptr(x), dptr(*in[1]), dptr(*in[2]),
         dptr(*in[3]), dptr(*in[4]),
         dptr(*out[0]), x.size(0), C, x.size(2), x.size(3),
-        opts[0], opts[1], static_cast<int>(opts[2]));
+        (float)o->eps, (float)o->momentum, o->training ? 1 : 0);
 }
 
 // ---- attention: 快速路径 = 批量 GEMM(QK^T → 行 softmax → PV, 每批一个头);

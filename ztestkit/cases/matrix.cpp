@@ -552,3 +552,22 @@ ZTK_CASE(to_device_grad_flag, false) {
     Tensor d = on(ztk_dev, x);
     check(d.requires_grad(), "to_device keeps requires_grad");
 }
+
+// BatchNorm2d train 态批统计跨设备一致(此前全后端把 {double,double,bool}
+// 选项按 float[3] 强转, 训练标志读成 0 → GPU 一直跑 eval 统计; kit 无
+// BN 覆盖故长期漏网 —— UniFP 消费者实测暴露)
+ZTK_CASE(bn_train_parity, false) {
+    LayerParam p; p.channels = 7; p.eps = 1e-5; p.momentum = 0.1;
+    Layer* l = Layer::create(LayerType::BatchNorm2d, p);
+    l->train(true);
+    Tensor x = Tensor::add(
+        Tensor::mul(Tensor::randn({2, 7, 6, 9}, 82), Tensor::full({}, 2.0)),
+        Tensor::full({}, 3.0));
+    Tensor yc = l->forward(x);                       // CPU 批统计
+    Tensor yd = l->forward(on(ztk_dev, x));          // 同层设备前向(权重迁移)
+    cmp("bn train batch stats", yc, yd, 1e-3f);
+    l->train(false);
+    Tensor ye = l->forward(on(ztk_dev, x));
+    check(max_diff(yc, back(ye)) > 0.2f, "bn train differs from running-stat eval");
+    Layer::destroy(l);
+}
