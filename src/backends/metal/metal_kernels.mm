@@ -566,7 +566,7 @@ kernel void optstep(device float* p [[buffer(0)]],
                     device float* u1 [[buffer(2)]],
                     device float* u2 [[buffer(3)]],
                     constant const int* pc [[buffer(8)]], uint3 tpig [[thread_position_in_grid]]) {
-    // pc[0]=n pc[1]=opt; pc[2..] 存 float 位型(lr,p1..p6)
+    // pc[0]=n pc[1]=opt; pc[2..] 存 float 位型(lr,p1..p7)
     const int i = (int)(tpig.x);
     if (i >= pc[0]) return;
     const constant float* pf = (constant float*)&pc[2];
@@ -584,7 +584,7 @@ kernel void optstep(device float* p [[buffer(0)]],
         u2[i] = pf[2] * u2[i] + (1.0f - pf[2]) * grad * grad;
         const float mh = u1[i] / pf[5];
         const float vh = u2[i] / pf[6];
-        p[i] -= lr * mh / (sqrt(vh) + pf[3]);
+        p[i] = p[i] * (1.0f - lr * pf[7]) - lr * mh / (sqrt(vh) + pf[3]);
     }
 }
 )MSL";
@@ -679,13 +679,13 @@ void sgd_step_metal(const Tensor& p, const Tensor& g, const Tensor& vel,
 
 void adam_step_metal(const Tensor& p, const Tensor& g, const Tensor& m,
                      const Tensor& v, long long n, float lr, float b1,
-                     float b2, float eps, float wd, float bias1, float bias2) {
+                     float b2, float eps, float wd, float decay, float bias1, float bias2) {
     static id<MTLComputePipelineState> pl = nil;
     if (!pl) pl = device::pipeline(kMslOpt, "optstep");
-    int pc[9] = {0};
+    int pc[10] = {0};
     pc[0] = (int)n;
     pc[1] = 1;
-    const float pf[7] = {lr, b1, b2, eps, wd, bias1, bias2};
+    const float pf[8] = {lr, b1, b2, eps, wd, bias1, bias2, decay};
     std::memcpy(&pc[2], pf, sizeof(pf));
     const device::MBuf bufs[4] = {mbuf(p), mbuf(g), mbuf(m), mbuf(v)};
     device::dispatch_bufs(pl, bufs, 4, pc, sizeof(pc),

@@ -18,6 +18,7 @@ layout(push_constant) uniform Pc {
     float p4;   // adam: weight_decay
     float p5;   // adam: bias1
     float p6;   // adam: bias2
+    float p7;   // adamw: decoupled decay
 } pc;
 
 void main() {
@@ -36,6 +37,6 @@ void main() {
         u2[i] = pc.p2 * u2[i] + (1.0 - pc.p2) * grad * grad;
         const float mh = u1[i] / pc.p5;
         const float vh = u2[i] / pc.p6;
-        p[i] -= pc.lr * mh / (sqrt(vh) + pc.p3);
+        p[i] = p[i] * (1.0 - pc.lr * pc.p7) - pc.lr * mh / (sqrt(vh) + pc.p3);
     }
 }

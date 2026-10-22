@@ -116,7 +116,7 @@ __global__ void sgd_k(float* p, const float* g, float* vel,
 
 __global__ void adam_k(float* p, const float* g, float* m, float* v,
                        long long n, float lr, float b1, float b2,
-                       float eps, float wd, float bias1, float bias2) {
+                       float eps, float wd, float decay, float bias1, float bias2) {
     const long long i = blockIdx.x * (long long)blockDim.x + threadIdx.x;
     if (i >= n) return;
     const float grad = g[i] + wd * p[i];
@@ -124,7 +124,7 @@ __global__ void adam_k(float* p, const float* g, float* m, float* v,
     v[i] = b2 * v[i] + (1.f - b2) * grad * grad;
     const float mh = m[i] / bias1;
     const float vh = v[i] / bias2;
-    p[i] -= lr * mh / (sqrtf(vh) + eps);
+    p[i] = p[i] * (1.f - lr * decay) - lr * mh / (sqrtf(vh) + eps);
 }
 
 // ---- 二元逐元素: 广播内核(广播维步长 0; op: 0+ 1- 2* 3/) ----
@@ -250,9 +250,9 @@ void sgd_step_cuda(float* p, const float* g, float* vel, long long n,
 }
 
 void adam_step_cuda(float* p, const float* g, float* m, float* v, long long n,
-                    float lr, float b1, float b2, float eps, float wd,
+                    float lr, float b1, float b2, float eps, float wd, float decay,
                     float bias1, float bias2) {
-    adam_k<<<blocks(n), kBlock>>>(p, g, m, v, n, lr, b1, b2, eps, wd,
+    adam_k<<<blocks(n), kBlock>>>(p, g, m, v, n, lr, b1, b2, eps, wd, decay,
                                   bias1, bias2);
 }
 

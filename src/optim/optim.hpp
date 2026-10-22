@@ -25,13 +25,13 @@ public:
     void clear() override;
 protected:
     int64_t step_count_ = 0;         // 偏差校正用
+    bool decoupled_ = false;         // AdamW: 权重衰减不进入梯度
     // AdamW 复用动量逻辑, 仅 weight_decay 语义不同(解耦衰减)
     struct Moment {
         Tensor m;      // 一阶动量
         Tensor v;      // 二阶动量
     };
     std::vector<Moment>  moments_;
-    friend class AdamWImpl;          // 解耦衰减需访问私有成员
     OptimParam param_;
 };
 

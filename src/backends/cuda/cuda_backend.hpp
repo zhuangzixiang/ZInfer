@@ -99,7 +99,7 @@ bool gemm_batched_cuda(const float* A, int lda, long long sa,
 void sgd_step_cuda(float* p, const float* g, float* vel, long long n,
                    float lr, float momentum, float wd);
 void adam_step_cuda(float* p, const float* g, float* m, float* v, long long n,
-                    float lr, float b1, float b2, float eps, float wd,
+                    float lr, float b1, float b2, float eps, float wd, float decay,
                     float bias1, float bias2);
 void memset0_cuda(void* p, size_t bytes);
 

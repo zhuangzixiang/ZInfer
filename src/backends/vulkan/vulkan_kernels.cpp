@@ -423,11 +423,11 @@ void sgd_step_vulkan(const Tensor& p, const Tensor& g, const Tensor& vel,
 
 void adam_step_vulkan(const Tensor& p, const Tensor& g, const Tensor& m,
                       const Tensor& v, long long n, float lr, float b1,
-                      float b2, float eps, float wd, float bias1, float bias2) {
+                      float b2, float eps, float wd, float decay, float bias1, float bias2) {
     void* pl = bridge::get_pipeline(spirv::opt, spirv::opt_bytes, 1, 0, 4);
     require(pl, "adam pipeline");
-    struct Pc { int32_t n; float lr, p1, p2, p3, p4, p5, p6; } pc{
-        (int32_t)n, lr, b1, b2, eps, wd, bias1, bias2};
+    struct Pc { int32_t n; float lr, p1, p2, p3, p4, p5, p6, p7; } pc{
+        (int32_t)n, lr, b1, b2, eps, wd, bias1, bias2, decay};
     const VBuf bufs[4] = {vhandle(p), vhandle(g), vhandle(m), vhandle(v)};
     bridge::dispatch_bufs(pl, bufs, 4, &pc, sizeof(pc),
                           (unsigned)((n + 255) / 256), 1, 1);

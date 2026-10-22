@@ -222,10 +222,9 @@ __global__ void reduce_part_k(const float* x, float* part, long long seg,
     if (threadIdx.x == 0) part[o * gridDim.y + p] = sh[0];
 }
 
-__global__ void reduce_final_k(const float* part, float* y, long long nseg,
+__global__ void reduce_final_k(const float* part, float* y, long long total, long long nseg,
                                float scale) {
     const long long o = blockIdx.x * (long long)blockDim.x + threadIdx.x;
-    const long long total = gridDim.x * (long long)blockDim.x;
     if (o >= total) return;
     float acc = 0.f;
     for (long long p = 0; p < nseg; ++p) acc += part[o * nseg + p];
@@ -259,7 +258,7 @@ static void reduce_host(Span<const Tensor*> in, Span<Tensor*> out,
     dim3 grid((unsigned)total, (unsigned)nseg);
     reduce_part_k<<<grid, kRedBlk>>>(dptr(x), dptr(part), seg, m);
     reduce_final_k<<<(unsigned)((total + kRedBlk - 1) / kRedBlk), kRedBlk>>>(
-        dptr(part), dptr(*out[0]), nseg, m.scale);
+        dptr(part), dptr(*out[0]), total, nseg, m.scale);
 }
 
 void sum_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,

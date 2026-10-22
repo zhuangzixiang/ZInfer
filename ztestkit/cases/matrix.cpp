@@ -330,6 +330,30 @@ ZTK_CASE(repro_t10_training, false) {
     Optimizer::destroy(opt);
 }
 
+ZTK_CASE(repro_unifp_reduce_adamw, true) {
+    for (int64_t n : {3LL, 257LL, 511LL}) {
+        Tensor x = Tensor::ones({n}, DType::F32, ztk_dev);
+        check(std::fabs(Tensor::sum(x, 0).item<float>() - (float)n) < 1e-4f,
+              "reduce tail sum");
+        check(std::fabs(Tensor::mean(x, 0).item<float>() - 1.f) < 1e-6f,
+              "reduce tail mean");
+    }
+    Tensor p = Tensor::ones({3}, DType::F32, ztk_dev);
+    p.requires_grad(true);
+    OptimParam cfg;
+    cfg.lr = 0.1;
+    cfg.weight_decay = 0.1;
+    Optimizer* opt = Optimizer::create(OptimType::AdamW, std::vector<Tensor>{p}, cfg);
+    for (int step = 0; step < 2; ++step) {
+        opt->clear();
+        Tensor::sum(p, 0).backward();
+        opt->step();
+    }
+    check(std::fabs(back(p).data<float>()[0] - 0.7811f) < 1e-4f,
+          "AdamW decoupled two steps");
+    Optimizer::destroy(opt);
+}
+
 // ============ SB2-SB4: 布局/生成/卷积/池化/嵌入/归一化/损失/注意力 ============
 
 ZTK_CASE(layout_ops, false) {

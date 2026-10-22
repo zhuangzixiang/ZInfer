@@ -63,7 +63,7 @@ void sgd_step_metal(const Tensor& p, const Tensor& g, const Tensor& vel,
                     long long n, float lr, float momentum, float wd);
 void adam_step_metal(const Tensor& p, const Tensor& g, const Tensor& m,
                      const Tensor& v, long long n, float lr, float b1,
-                     float b2, float eps, float wd, float bias1, float bias2);
+                     float b2, float eps, float wd, float decay, float bias1, float bias2);
 
 // ---- SB2-SB4: 布局/生成/归一化/损失/卷积/池化/注意力 ----
 void reshape_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
