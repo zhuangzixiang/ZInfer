@@ -24,7 +24,7 @@ static void add_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, c
 const Operator g_add_operator = {
     "add",
     infer_broadcast,
-    binary_grad,
+    add_grad,
     add_ref,
     {add_cpu, ZNN_CUDA_K(add_cuda), ZNN_METAL_K(add_metal), ZNN_VULKAN_K(add_vulkan)},
 };

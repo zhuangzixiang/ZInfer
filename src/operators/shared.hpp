@@ -36,8 +36,8 @@ extern const Operator g_unary_bwd_operator;
 extern const Operator g_clone_operator;
 
 // ---- 梯度规则帮手(输入连续假设, MNIST 路径成立; 非连续留待 contiguous 处理) ----
-// 二元逐元素: 两输入梯度 = grad_out 规约回各自形状
-void binary_grad(BackwardContext& context);
+// 加法专用: 两输入梯度 = grad_out 规约回各自形状; 减法须对第二输入取负
+void add_grad(BackwardContext& context);
 // 一元逐元素: 梯度 = grad_out * d(前向输入 x, 前向输出 y)
 void unary_grad(BackwardContext& context, UnaryBwd fn);
 

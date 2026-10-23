@@ -595,3 +595,59 @@ ZTK_CASE(bn_train_parity, false) {
     check(max_diff(yc, back(ye)) > 0.2f, "bn train differs from running-stat eval");
     Layer::destroy(l);
 }
+
+// 减法反传符号(用户修复: sub 曾注册加法梯度, db 恒 +g → BCE/Dice/GIoU
+// 全部反向; 广播两态 + 共享叶 + 常量减参数 + 加法不变回归)
+ZTK_CASE(sub_gradient, true) {
+    auto red = [](Tensor x) {
+        while (x.dim_count()) x = Tensor::sum(x, 0);
+        return x;
+    };
+    Tensor g2 = Tensor::full({2, 3}, 2.0, DType::F32, ztk_dev);   // 上游 2 倍
+    for (int mode = 0; mode < 4; ++mode) {
+        Shape as = mode == 1 ? Shape{1, 3} : mode == 2 ? Shape{} : Shape{2, 3};
+        Shape bs = mode == 1 ? Shape{2, 1} : mode == 2 ? Shape{2, 3}
+                                                   : mode == 3 ? Shape{1} : Shape{2, 3};
+        Tensor a = Tensor::full(as, 2.0, DType::F32, ztk_dev);
+        Tensor b = Tensor::full(bs, 3.0, DType::F32, ztk_dev);
+        a.requires_grad(true);
+        b.requires_grad(true);
+        Tensor y = Tensor::sub(a, b);
+        Tensor yh = back(y);                                        // 前向: a-b = -1
+        bool fok = true;
+        for (int64_t i = 0; i < yh.numel(); ++i)
+            fok = fok && std::fabs(yh.data<float>()[i] + 1.f) < 1e-5f;
+        check(fok, "sub forward a-b");
+        red(Tensor::mul(y, g2)).backward();
+        Tensor ga = back(a.grad());                                 // d(Σ2y)/da = 12/|a|
+        Tensor gb = back(b.grad());                                 // d(Σ2y)/db = -12/|b|
+        const float ea = 12.f / float(a.numel());
+        const float eb = -12.f / float(b.numel());
+        bool ok = true;
+        for (int64_t i = 0; i < ga.numel(); ++i)
+            ok = ok && std::fabs(ga.data<float>()[i] - ea) < 1e-4f;
+        for (int64_t i = 0; i < gb.numel(); ++i)
+            ok = ok && std::fabs(gb.data<float>()[i] - eb) < 1e-4f;
+        check(ok, "sub da=+g db=-g (broadcast)");
+    }
+    Tensor x = Tensor::full({2, 3}, 2.0, DType::F32, ztk_dev);
+    x.requires_grad(true);
+    red(Tensor::sub(x, x)).backward();
+    bool zero = true;
+    for (int64_t i = 0; i < back(x.grad()).numel(); ++i)
+        zero = zero && std::fabs(back(x.grad()).data<float>()[i]) < 1e-5f;
+    check(zero, "sub shared-leaf cancellation");
+    Tensor b = Tensor::full({1}, 3.0, DType::F32, ztk_dev);
+    b.requires_grad(true);
+    Tensor::sub(Tensor::full({1}, 1.0, DType::F32, ztk_dev), b).backward();
+    check(std::fabs(back(b.grad()).data<float>()[0] + 1.f) < 1e-5f,
+          "sub constant-minus-param");
+    Tensor a = Tensor::full({1}, 2.0, DType::F32, ztk_dev);
+    Tensor c = Tensor::full({1}, 3.0, DType::F32, ztk_dev);
+    a.requires_grad(true);
+    c.requires_grad(true);
+    Tensor::add(a, c).backward();
+    check(std::fabs(back(a.grad()).data<float>()[0] - 1.f) < 1e-5f
+          && std::fabs(back(c.grad()).data<float>()[0] - 1.f) < 1e-5f,
+          "add grads unchanged");
+}

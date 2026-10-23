@@ -1033,3 +1033,29 @@ strided 视图输入族/大 K dim0 规约/to_device 求导标志) + hello_dll
 | 教训: (a) "DLL 导出 112 符号"的完备性要以 hello_dll 级消费者编译
 为验收线, 不是 dumpbin 数数; (b) 相同代码体函数对(ICF 折叠)不可
 作身份判据; (c) 内核并行度要看"输出数", 输出数少≠负载小。
+
+---
+
+## [34] 减法反传符号修复(用户发现) + BN 选项强转 + 归约越界 + 原生 AdamW 衰减
+
+**用户实测 UniFP BCE/Dice 梯度校验暴露: sub 注册的是加法梯度帮手** ——
+`y=a-b` 的 db 恒为 +g(应 -g), 前向正确反传错号; BCE 背景类 logit 被推
+反、Dice 外层 1-ratio 梯度反向、GIoU 全套受累(CPU/CUDA 复现)。修复:
+sub 专属 `sub_grad`(db = reduce(-g)), `binary_grad` 更名 `add_grad`
+防再误用; 四后端共享同一注册(组合实现无后端分叉)。**这正是 UniFP
+过拟合发散一周悬案的最终根因** —— 损失里每处 sub 的 b 操作数梯度全反。
+
+同轮: (a) BN 选项 {double,double,bool} 被三 GPU 后端按 float[3] 强转,
+bool 位型读成 0.0f → **GPU BN 训练态一直跑 eval 统计**(kit 无 BN 覆盖
+长期漏网, UniFP 手动参考仲裁定位; CPU 侧同款 UB 靠 denormal≠0 碰巧工作);
+(b) reduce_final_k 的 total 从 gridDim 推导, 非整块时越界(用户修正:
+显式传参); (c) 原生 CUDA AdamW 忽略解耦衰减(用户修正: p·(1-lr·decay))。
+
+**验证**: ztestkit 309 checks 全绿(CPU+CUDA+VK, STRICT_NATIVE=1,
+新增 sub_gradient/bn_train_parity 入矩阵; 用户独立版用例按仓库惯例
+并入 ZTK_CASE)。hello_dll 消费者回归过。
+
+**反思**: 工具 9/10(手动参考仲裁连破 BN/sub 两案) | 教训: (a) 选项
+blob 一律按真实结构体读, float[] 强转是 UB 温床; (b) 梯度规则注册
+"复用帮手"要审符号语义, 不是所有二元算子都对称; (c) kit 覆盖缺口
+(BN train 跨设备)让 GPU 专属错跑了两轮全绿。

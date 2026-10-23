@@ -101,7 +101,7 @@ void binary_kernel(Span<const Tensor*> in, Span<Tensor*> out, float (*fn)(float,
     }
 }
 
-void binary_grad(BackwardContext& context) {
+void add_grad(BackwardContext& context) {
     const Tensor& g = *context.grad_outputs[0];
     *context.grad_inputs[0] = BackwardContext::reduce_to(g, context.saved_inputs[0]->shape());
     *context.grad_inputs[1] = BackwardContext::reduce_to(g, context.saved_inputs[1]->shape());

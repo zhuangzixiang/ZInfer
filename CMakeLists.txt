@@ -207,6 +207,7 @@ endif()
 
 option(ZNN_BUILD_TESTKIT "Build ztestkit matrix runner" ON)
 if(ZNN_BUILD_TESTKIT)
+    enable_testing()
     if(ZNN_CUDA)
         find_package(CUDAToolkit REQUIRED)
     endif()

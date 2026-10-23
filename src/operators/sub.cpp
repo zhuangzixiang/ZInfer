@@ -21,10 +21,18 @@ static void sub_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, c
     binary_kernel_fast(in, out, [](float a, float b) { return a - b; });
 }
 
+// Shared by CPU, CUDA, Vulkan and Metal. Negation and broadcast reduction
+// dispatch on the gradient's device; the second operand receives -g.
+static void sub_grad(BackwardContext& c) {
+    const Tensor& g = *c.grad_outputs[0];
+    *c.grad_inputs[0] = BackwardContext::reduce_to(g, c.saved_inputs[0]->shape());
+    *c.grad_inputs[1] = BackwardContext::reduce_to(Tensor::neg(g), c.saved_inputs[1]->shape());
+}
+
 const Operator g_sub_operator = {
     "sub",
     infer_broadcast,
-    binary_grad,
+    sub_grad,
     sub_ref,
     {sub_cpu, ZNN_CUDA_K(sub_cuda), ZNN_METAL_K(sub_metal), ZNN_VULKAN_K(sub_vulkan)},
 };
