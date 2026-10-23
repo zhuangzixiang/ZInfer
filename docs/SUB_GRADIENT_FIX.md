@@ -18,12 +18,12 @@ subtraction backward implementations to patch.
 
 Validation:
 
-- `sub_gradient`: CPU, CUDA, Vulkan passed. Equal shapes, row/column/scalar
+- `sub_gradient` matrix case: CPU, CUDA, Vulkan passed. Equal shapes, row/column/scalar
   broadcasting, non-unit upstream gradient, shared-leaf cancellation,
   constant-minus-parameter, and unchanged addition gradients are checked.
 - Metal uses the corrected common implementation, but is not compiled or
   executed on this Windows host. Run this same test target on an Apple host.
-- Existing `ztestkit` matrix: all 276 checks passed on available backends.
+- Existing `ztestkit` matrix: all 309 checks passed on available backends after integrating the subtraction regression (276 before integration).
 - UniFP restored native `Tensor::sub`; no application-side subtraction workaround.
   BCE/Dice finite differences, gated full-size gradients and representative
   full-network parameter finite differences passed.
@@ -31,12 +31,13 @@ Validation:
 Build and run in a configured compiler environment:
 
 ```text
-cmake --build build-dll --target znn sub_gradient ztestkit
-ctest --test-dir build-dll -R subtraction_gradients --output-on-failure
+cmake --build build-dll --target znn ztestkit
 build-dll\ztestkit\ztestkit.exe
 ```
 
-The rebuilt CPU/CUDA/Vulkan DLL is `build-dll/znn.dll`, SHA256:
+The initial diagnostic CPU/CUDA/Vulkan DLL was `build-dll/znn.dll`, SHA256:
 `4962949C705B68A6C7900BC49D784AB70AFCB0EDE957BBDDAB043AD7C63180DF`.
 UniFP experiment evidence is in the sibling project's
 `runs/diagnose_20261023/`, with old failures retained under `baseline/`.
+
+Current rebuild at commit `25ec5a7`: SHA256 `C5BE6091DB55B5A1488B20DE10BBFD647E1F835A88DEC2D4D299ACD7ACA248B2`. Its 309-check matrix and UniFP loss/optimizer regression were rerun; see `UniFP/runs/diagnose_20261023/current_sdk/`. Prior overfit runs retain their original build provenance.
