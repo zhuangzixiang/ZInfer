@@ -1090,3 +1090,18 @@ transpose+clone+LN+transpose+clone —— 全模型 ~60 点位 × 2 次全量拷
 替换抛错。kit +linear_bias 用例(该路径此前零覆盖)。UniFP 全模型在
 Vulkan 首次可端到端运行: 412ms@640 —— 受 VK 每 dispatch 全同步架构
 成本主导(~300 算子 × ~0.6ms, BENCH.md 已记录), 非算子本身慢。
+
+**[36] Vulkan 延迟提交(批量派发)** —— UniFP 推理 VK 413ms 的主因是每算子
+begin+submit+waitIdle(~0.6ms × ~300 算子)。改造 vulkan_device.cpp:
+
+- 单命令缓冲连续录制, 主机-设备边界才 flush(h2d/d2h/mapped_of 四处屏障,
+  提交+等待+释放挂起资源); ZNN_VK_EAGER=1 保留旧逐算子路径(对拍)
+- 描述符集改为每派发新配(录制与执行间复用改绑是规范竞态), 池 64→16384
+- 缓冲释放进隔离区, 队列空闲后归还复用池(挂起命令仍引用)
+- **每派发后插存储屏障(SSBO 写→读)**: Vulkan 同 cb 相邻内核无隐式内存
+  一致性, 旧 waitIdle 恰好掩盖; 缺它时链式 conv→add 确定性读旧值
+  (conv dw+bias 探针二分定位; vkCmdPipelineBarrier 忘加载也静默吞过一轮)
+
+**验证**: ztestkit 321 全绿(STRICT); UniFP VK 413→323ms@640、69.6@320 ——
+同步项已消, 新瓶颈=VK 内核质量本身(naive tiling GEMM vs CUDA 21TF/s),
+下一步方向是 kernel 层而非派发层。EAGER 回退路径同绿。

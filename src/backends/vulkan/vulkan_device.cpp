@@ -91,7 +91,7 @@ namespace {
     F(vkQueueSubmit) F(vkQueueWaitIdle) F(vkGetDeviceQueue)                                    \
     F(vkCreateDescriptorSetLayout) F(vkDestroyDescriptorSetLayout)         \
     F(vkCreateDescriptorPool) F(vkDestroyDescriptorPool)                   \
-    F(vkAllocateDescriptorSets) F(vkUpdateDescriptorSets)
+    F(vkAllocateDescriptorSets) F(vkUpdateDescriptorSets) F(vkFreeDescriptorSets) F(vkCmdPipelineBarrier)
 
 #define VK_DECLARE_FN(name) PFN_##name name;
 VK_FOREACH_INSTANCE_FN(VK_DECLARE_FN)
@@ -333,22 +333,100 @@ void* alloc(size_t bytes) {
     return new VkBuf{buf, mem, mapped, bytes, mem_idx};
 }
 
+void return_to_pool(void* p);               // 前置声明(定义在后; 池归还)
+
+// ---- 延迟提交(批量派发): 算子只录制不等待, 真正的主机-设备边界才同步 ----
+// 动机: 此前每算子 begin+submit+waitIdle(~0.6-1ms 固定成本), 300 算子级
+// 模型在 VK 上被同步开销饿死(UniFP 实测 413ms vs CUDA 16.8ms)。
+// ZNN_VK_EAGER=1 恢复逐算子同步(对拍/调试)。
+namespace {
+VkCommandBuffer g_cb = VK_NULL_HANDLE;
+bool g_dirty = false;                       // cb 中有未提交命令
+std::vector<VkDescriptorSet> g_pending_ds;  // 已录制派发的描述符集(执行完才可释放)
+std::vector<void*> g_quarantine;            // 录制期间释放的缓冲(执行完才可复用)
+bool g_eager = false;                       // ZNN_VK_EAGER 模式
+bool g_defer_ready = false;
+
+void defer_init() {
+    if (!g_defer_ready) {
+        g_defer_ready = true;
+        g_eager = std::getenv("ZNN_VK_EAGER") != nullptr;
+    }
+}
+
+void drain_after_wait() {                   // 队列空闲后: 释放挂起集/隔离缓冲
+    VkState* v = st();
+    if (!g_pending_ds.empty()) {
+        vkFreeDescriptorSets(v->dev, v->dpool,
+                             (uint32_t)g_pending_ds.size(), g_pending_ds.data());
+        g_pending_ds.clear();
+    }
+    for (void* p : g_quarantine) return_to_pool(p);
+    g_quarantine.clear();
+}
+} // namespace
+
+// 同 cb 内相邻内核的存储缓冲写->读依赖(Vulkan 无隐式内存一致性;
+// 旧逐算子 waitIdle 掩盖了此需求, 延迟提交后必须显式屏障)
+static void storage_barrier(VkCommandBuffer cb) {
+    VkMemoryBarrier mb{};
+    mb.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    mb.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT
+                     | VK_ACCESS_TRANSFER_WRITE_BIT;
+    mb.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
+                     | VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+    vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+                              | VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+                              | VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         0, 1, &mb, 0, nullptr, 0, nullptr);
+}
+
+void flush() {                              // 主机-设备同步屏障
+    defer_init();
+    VkState* v = st();
+    if (!g_dirty) return;
+    vkEndCommandBuffer(g_cb);
+    VkSubmitInfo si{};
+    si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    si.commandBufferCount = 1;
+    si.pCommandBuffers = &g_cb;
+    const VkResult rs = vkQueueSubmit(v->queue, 1, &si, VK_NULL_HANDLE);
+    const VkResult rw = vkQueueWaitIdle(v->queue);
+    if (rs != VK_SUCCESS || rw != VK_SUCCESS) {   // [诊断] 设备丢失/提交失败
+        std::fprintf(stderr, "[vk] submit st=%d wait st=%d\n", (int)rs, (int)rw);
+    }
+    vkResetCommandBuffer(g_cb, 0);
+    g_dirty = false;
+    drain_after_wait();
+}
+
+void return_to_pool(void* p) {             // 队列空闲前提下的池归还
+    VkState* v = st();
+    VkBuf* b = static_cast<VkBuf*>(p);
+    std::lock_guard<std::mutex> lk(v->mu);
+    auto& bucket =
+        v->buf_pool[((uint64_t)b->mem_idx << 48) | bucket_of(b->cap)];
+    for (void* q : bucket) {   // [diag] 双重入池 = 双重释放
+        if (q == p) {
+            std::fprintf(stderr, "[vk] POOL DOUBLE-FREE %p!\n", p);
+            break;
+        }
+    }
+    bucket.push_back(p);
+}
+
 void free(void* p) {
     VkState* v = st();
     if (!p) return;
     if (v->ok) {
         VkBuf* b = static_cast<VkBuf*>(p);
+        if (g_dirty && b->cap <= (size_t)256 << 20) {
+            g_quarantine.push_back(p);      // 有未提交命令引用, 延迟归还
+            return;
+        }
         if (b->cap <= (size_t)256 << 20) {  // 池内块归还复用; 超大块真销毁
-            std::lock_guard<std::mutex> lk(v->mu);
-            auto& bucket =
-                v->buf_pool[((uint64_t)b->mem_idx << 48) | bucket_of(b->cap)];
-            for (void* q : bucket) {   // [diag] 双重入池 = 双重释放
-                if (q == p) {
-                    std::fprintf(stderr, "[vk] POOL DOUBLE-FREE %p!\n", p);
-                    break;
-                }
-            }
-            bucket.push_back(p);
+            return_to_pool(p);
             return;
         }
         vkUnmapMemory(v->dev, b->mem);
@@ -362,14 +440,17 @@ void free(void* p) {
 
 // 主机可见内存: 拷贝即 memcpy(常驻映射), 设备一致性由 COHERENT 保证
 void copy_host_to_device(void* dst, const void* src, size_t bytes) {
+    flush();                                // 主机写映射内存前等待队列清空
     memcpy(static_cast<VkBuf*>(dst)->mapped, src, bytes);
 }
 void copy_device_to_host(void* dst, const void* src, size_t bytes) {
+    flush();                                // 主机读映射内存前等待队列清空
     memcpy(dst, static_cast<const VkBuf*>(src)->mapped, bytes);
 }
 
 void copy_device_to_host_off(void* dst, const void* src, size_t soff,
                              size_t bytes) {
+    flush();                                // 同上: 主机读前同步
     // 偏移折算在 mapped 指针上(句柄不可算术)
     memcpy(dst, static_cast<const char*>(static_cast<const VkBuf*>(src)->mapped)
                + soff, bytes);
@@ -382,33 +463,30 @@ VkDevice dev() { return st()->dev; }
 std::mutex& mutex() { return st()->mu; }
 
 VkCommandBuffer begin_cmd() {
+    defer_init();
     VkState* v = st();
-    VkCommandBufferAllocateInfo ai{};
-    ai.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    ai.commandPool = v->pool;
-    ai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    ai.commandBufferCount = 1;
-    VkCommandBuffer cb;
-    vkAllocateCommandBuffers(v->dev, &ai, &cb);
-    VkCommandBufferBeginInfo bi{};
-    bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    vkBeginCommandBuffer(cb, &bi);
-    return cb;
+    if (!g_dirty) {
+        if (g_cb == VK_NULL_HANDLE) {
+            VkCommandBufferAllocateInfo ai{};
+            ai.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            ai.commandPool = v->pool;
+            ai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            ai.commandBufferCount = 1;
+            vkAllocateCommandBuffers(v->dev, &ai, &g_cb);
+        }
+        vkResetCommandBuffer(g_cb, 0);
+        VkCommandBufferBeginInfo bi{};
+        bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        vkBeginCommandBuffer(g_cb, &bi);
+    }
+    g_dirty = true;
+    return g_cb;
 }
 
+// 兼容旧签名: eager 模式逐算子提交等待; 延迟模式仅标记(由 flush 收尾)
 void submit_wait(VkCommandBuffer cb) {
-    VkState* v = st();
-    vkEndCommandBuffer(cb);
-    VkSubmitInfo si{};
-    si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    si.commandBufferCount = 1;
-    si.pCommandBuffers = &cb;
-    const VkResult rs = vkQueueSubmit(v->queue, 1, &si, VK_NULL_HANDLE);
-    const VkResult rw = vkQueueWaitIdle(v->queue);
-    if (rs != VK_SUCCESS || rw != VK_SUCCESS) {   // [诊断] 设备丢失/提交失败
-        std::fprintf(stderr, "[vk] submit st=%d wait st=%d\n", (int)rs, (int)rw);
-    }
-    vkFreeCommandBuffers(v->dev, v->pool, 1, &cb);
+    (void)cb;
+    if (g_eager) flush();
 }
 
 void d2d(VkBuffer dst, VkBuffer src, size_t bytes,
@@ -419,17 +497,22 @@ void d2d(VkBuffer dst, VkBuffer src, size_t bytes,
     c.dstOffset = doff;   // VkBufferCopy 偏移无对齐限制(绑定层才有)
     c.srcOffset = soff;
     vkCmdCopyBuffer(cb, src, dst, 1, &c);
+    storage_barrier(cb);
     submit_wait(cb);
 }
 
 void fill0(VkBuffer buf, size_t bytes) {
     VkCommandBuffer cb = begin_cmd();
     vkCmdFillBuffer(cb, buf, 0, bytes, 0);
+    storage_barrier(cb);
     submit_wait(cb);
 }
 
 void* raw_buf(void* p) { return static_cast<VkBuf*>(p); }   // VkBuf 句柄
-void* mapped_of(void* p) { return static_cast<VkBuf*>(p)->mapped; }
+void* mapped_of(void* p) {
+    flush();                                // 映射指针直读(损失/优化器)前同步
+    return static_cast<VkBuf*>(p)->mapped;
+}
 
 
 bool get_pipeline(PipeKey key, const size_t* push_sizes,   // [storage, push]
@@ -537,13 +620,29 @@ bool dispatch_bufs(const Pipeline& p, const VkBuffer* bufs,
                    const void* push, size_t push_size,
                    uint32_t gx, uint32_t gy, uint32_t gz) {
     VkState* v = st();
+    // 延迟提交: 描述符集每派发新配(录制与执行间复用改绑是竞态);
+    // 池耗尽即 flush 释放挂起集后重试
+    VkDescriptorSetAllocateInfo dsi{};
+    dsi.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    dsi.descriptorPool = v->dpool;
+    dsi.descriptorSetCount = 1;
+    dsi.pSetLayouts = &p.dsl;
+    VkDescriptorSet ds = VK_NULL_HANDLE;
+    if (vkAllocateDescriptorSets(v->dev, &dsi, &ds) != VK_SUCCESS) {
+        flush();
+        if (vkAllocateDescriptorSets(v->dev, &dsi, &ds) != VK_SUCCESS) {
+            std::fprintf(stderr, "[vk] ds alloc failed\n");
+            return false;
+        }
+    }
+    g_pending_ds.push_back(ds);
     VkDescriptorBufferInfo bi[8] = {};
     VkWriteDescriptorSet w[8] = {};   // pNext 未清零曾致驱动崩溃
     for (uint32_t i = 0; i < nbuf; ++i) {
         bi[i] = VkDescriptorBufferInfo{bufs[i], offs ? offs[i] : 0,
                                        VK_WHOLE_SIZE};
         w[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        w[i].dstSet = p.ds;
+        w[i].dstSet = ds;
         w[i].dstBinding = i;
         w[i].descriptorCount = 1;
         w[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -553,12 +652,13 @@ bool dispatch_bufs(const Pipeline& p, const VkBuffer* bufs,
     VkCommandBuffer cb = begin_cmd();
     vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_COMPUTE, p.pipe);
     vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_COMPUTE, p.layout, 0, 1,
-                            &p.ds, 0, nullptr);
+                            &ds, 0, nullptr);
     if (push) {
         vkCmdPushConstants(cb, p.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0,
                            (uint32_t)push_size, push);
     }
     vkCmdDispatch(cb, gx, gy, gz);
+    storage_barrier(cb);
     submit_wait(cb);
     return true;
 }
