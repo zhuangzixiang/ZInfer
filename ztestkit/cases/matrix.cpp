@@ -706,3 +706,14 @@ ZTK_CASE(layer_norm_dim, true) {
     check(eg < 1e-4f, "ln dim=1 grad parity");
     Layer::destroy(lg);
 }
+
+// Linear 带偏置(Vulkan 此前对 bias 直接抛错 —— common.comp 广播本可支持)
+ZTK_CASE(linear_bias, false) {
+    Tensor x = Tensor::randn({3, 7}, 85);
+    Tensor w = Tensor::randn({4, 7}, 86);
+    Tensor b = Tensor::randn({4}, 87);
+    Tensor yc = Tensor::linear(x, w, &b);
+    Tensor xd = on(ztk_dev, x), wd = on(ztk_dev, w), bd = on(ztk_dev, b);
+    Tensor yd = Tensor::linear(xd, wd, &bd);
+    cmp("linear+bias", yc, yd, 1e-3f);
+}

@@ -1084,3 +1084,9 @@ transpose+clone+LN+transpose+clone —— 全模型 ~60 点位 × 2 次全量拷
 (a) 共享内存协作归约与每线程一组是两套模型, barrier 混用必炸;
 (b) 共享盘写延迟让"regen→build"两连发扑空 —— 再遇一次, gen 后必须
 核对 dll mtime > 头文件 mtime。
+
+**[35 续] VK linear 偏置**: common.comp 全维广播本支持 b[N] 对 y[M,N]
+右对齐相加, 原注释的"广播不成立"判断过时 → 直接组合 elementwise add,
+替换抛错。kit +linear_bias 用例(该路径此前零覆盖)。UniFP 全模型在
+Vulkan 首次可端到端运行: 412ms@640 —— 受 VK 每 dispatch 全同步架构
+成本主导(~300 算子 × ~0.6ms, BENCH.md 已记录), 非算子本身慢。

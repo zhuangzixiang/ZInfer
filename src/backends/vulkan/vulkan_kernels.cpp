@@ -215,12 +215,13 @@ void linear_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const uint32_t gx = (uint32_t)((N + tile - 1) / tile);
     const uint32_t gy = (uint32_t)((M + tile - 1) / tile);
     bridge::dispatch(p, vhandle(x), vhandle(w), vhandle(y), &pc, sizeof(pc), gx, gy, 1);
-    // bias: in[2] 存在时逐行广播加(复用 elementwise 广播通道)
+    // bias: 复用 elementwise 全维广播加(b[N] 对 y[M,N] 右对齐广播;
+    // 此前直接抛错 —— common.comp 的 stride-map 广播本就支持行向量)
     if (in.size() > 2 && in[2]) {
-        // 每行加同一向量 —— b[0] 广播不适用, 由 CPU 侧 add 算子组合;
-        // v1: 拷回加再上传? 否 —— 借 mul 广播不成立, 留给组合层。
-        // 简明起见: linear Vulkan 版要求无 bias(组合层会拆分调用)。
-        throw std::runtime_error("znn vulkan: linear bias use add op composition");
+        Tensor ya = *out[0], bb = *in[2];
+        const Tensor* ins[2] = {&ya, &bb};
+        Tensor* outs[1] = {out[0]};
+        elementwise(Span<const Tensor*>(ins, 2), Span<Tensor*>(outs, 1), 0);
     }
 }
 
