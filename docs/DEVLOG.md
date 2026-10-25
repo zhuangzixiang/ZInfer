@@ -1105,3 +1105,13 @@ begin+submit+waitIdle(~0.6ms × ~300 算子)。改造 vulkan_device.cpp:
 **验证**: ztestkit 321 全绿(STRICT); UniFP VK 413→323ms@640、69.6@320 ——
 同步项已消, 新瓶颈=VK 内核质量本身(naive tiling GEMM vs CUDA 21TF/s),
 下一步方向是 kernel 层而非派发层。EAGER 回退路径同绿。
+
+**[37] VK gemm.comp M 持久化(通用)** —— 可达性探针证实小 K 大 M 形状
+吞吐 ∝ K(每 workgroup 计算量 ∝ K 而装载/调度开销恒定)。32×32 内核加
+RT=4 行块持久化: B 块装载复用 4 次, workgroup 数/4, 无形状特化。
+中段形状大幅提升(S4-pw1 117→287, S3-pw2 295→361, S2-pw1 56→74 GF/s);
+大分配探针行受每轮新分配干扰(真实模型走池复用)。
+**真实模型收益有限(323→311@640)** —— 分段画像(vk_profile)找到真凶:
+up2x(cat+reshape 组合, 单次 11.3ms 样例)与高位 LN(dim1)(3.9ms@S1 形状),
+均为访存密集型逐元素内核, 远低于带宽运行。下一步 = 通用上采样算子或
+提速 strided-copy 内核(受益 cat/clone/transpose 全族)。

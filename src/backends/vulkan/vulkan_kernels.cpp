@@ -190,11 +190,12 @@ void matmul_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const int64_t flops = (int64_t)M * N * K * 2;
     const bool big = flops >= (int64_t)50 << 30;
     const int tile = big ? 64 : 32;
+    const int mstep = big ? 64 : 128;    // 32 核 M 持久化: 每组连做 4 行块
     void* p = gemm_pipeline(flops, 0);
     require(p, "gemm pipeline");
     struct { int32_t M, N, K, lda, ldb, ldc; } pc{M, N, K, K, N, N};
     const uint32_t gx = (uint32_t)((N + tile - 1) / tile);
-    const uint32_t gy = (uint32_t)((M + tile - 1) / tile);
+    const uint32_t gy = (uint32_t)((M + mstep - 1) / mstep);
     bridge::dispatch(p, vhandle(a), vhandle(b), vhandle(y), &pc, sizeof(pc), gx, gy, 1);
 }
 
@@ -208,12 +209,14 @@ void linear_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
             "linear needs contiguous");
     const int M = (int)x.size(0), K = (int)x.size(1), N = (int)w.size(0);
     const int64_t flops = (int64_t)M * N * K * 2;
-    const int tile = flops >= (int64_t)50 << 30 ? 64 : 32;
+    const bool big = flops >= (int64_t)50 << 30;
+    const int tile = big ? 64 : 32;
     void* p = gemm_pipeline(flops, 1);
     require(p, "gemm-t pipeline");
     struct { int32_t M, N, K, lda, ldb, ldc; } pc{M, N, K, K, K, N};
+    const int mstep = big ? 64 : 128;   // 32 核 M 持久化(与 matmul 同)
     const uint32_t gx = (uint32_t)((N + tile - 1) / tile);
-    const uint32_t gy = (uint32_t)((M + tile - 1) / tile);
+    const uint32_t gy = (uint32_t)((M + mstep - 1) / mstep);
     bridge::dispatch(p, vhandle(x), vhandle(w), vhandle(y), &pc, sizeof(pc), gx, gy, 1);
     // bias: 复用 elementwise 全维广播加(b[N] 对 y[M,N] 右对齐广播;
     // 此前直接抛错 —— common.comp 的 stride-map 广播本就支持行向量)
