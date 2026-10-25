@@ -275,15 +275,69 @@ __global__ void layer_norm_k(const float* x, const float* w, const float* b,
     }
 }
 
+// 任意 dim 的 LN: 每 warp 一组(组 = 固定其余下标扫 dim, 跨维步进),
+// 与 softmax_dim_k 同构; E[x^2]-mu^2 单遍方差(数值保护同末维内核)。
+struct LnDimIn {
+    long long D;          // 归一化轴长度
+    long long inner;      // dim 之后元素积(组内步进)
+};
+
+__global__ void layer_norm_dim_k(const float* x, const float* w, const float* b,
+                                 float* y, long long groups, LnDimIn m, float eps) {
+    const int64_t gi = blockIdx.x * (int64_t)blockDim.y + threadIdx.y;
+    if (gi >= groups) return;
+    const int lane = threadIdx.x;
+    const int64_t base = gi / m.inner * m.D * m.inner + gi % m.inner;
+    const float* xr = x + base;
+    float* yr = y + base;
+    float ls = 0.f, lq = 0.f;
+    for (int64_t d = lane; d < m.D; d += 32) {
+        const float v = xr[d * m.inner];
+        ls += v; lq += v * v;
+    }
+    for (int off = 16; off > 0; off >>= 1) {
+        ls += __shfl_down_sync(0xffffffff, ls, off);
+        lq += __shfl_down_sync(0xffffffff, lq, off);
+    }
+    const float mu = __shfl_sync(0xffffffff, ls, 0) / m.D;
+    float var = __shfl_sync(0xffffffff, lq, 0) / m.D - mu * mu;
+    var = var > 0.f ? var : 0.f;
+    const float inv = rsqrtf(var + eps);
+    for (int64_t d = lane; d < m.D; d += 32)
+        yr[d * m.inner] = (xr[d * m.inner] - mu) * inv * w[d] + b[d];
+}
+
 void layer_norm_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                      const void* options) {
-    const double eps = *static_cast<const double*>(options);
+    // options = LayerNormOptions{double eps; int64_t dim}(此前仅 double eps,
+    // 末维假设 —— 现 dim 经结构体传入)
+    struct LnOpts { double eps; int64_t dim; };
+    const LnOpts* o = static_cast<const LnOpts*>(options);
     const Tensor& x = *in[0];
-    const int64_t d = x.size(-1);
-    const int64_t n_rows = x.numel() / d;
-    layer_norm_k<<<static_cast<unsigned>(n_rows), kBlk3, 2 * kBlk3 * sizeof(float)>>>(
-        dptr(x), dptr(*in[1]), dptr(*in[2]),
-        dptr(*out[0]), n_rows, d, static_cast<float>(eps));
+    const int64_t rank = x.dim_count();
+    const int64_t dim = o->dim < 0 ? rank - 1 : o->dim;
+    if (dim == rank - 1 && x.is_contiguous()) {          // 末维: 原快路径
+        const int64_t d = x.size(-1);
+        const int64_t n_rows = x.numel() / d;
+        layer_norm_k<<<static_cast<unsigned>(n_rows), kBlk3,
+                       2 * kBlk3 * sizeof(float)>>>(
+            dptr(x), dptr(*in[1]), dptr(*in[2]),
+            dptr(*out[0]), n_rows, d, static_cast<float>(o->eps));
+        return;
+    }
+    LnDimIn m;
+    m.D = x.size(dim);
+    m.inner = 1;
+    int64_t groups = 1;
+    for (int64_t d = 0; d < rank; ++d) {
+        if (d < dim) groups *= x.size(d);
+        else if (d > dim) m.inner *= x.size(d);
+    }
+    groups *= m.inner;              // 组数 = outer × inner(gi = o*inner + i)
+    Tensor xc = x.is_contiguous() ? x : x.clone();       // 异步池流序释放, 局部安全
+    layer_norm_dim_k<<<(unsigned)((groups + 7) / 8), dim3(32, 8)>>>(
+        dptr(xc), dptr(*in[1]), dptr(*in[2]), dptr(*out[0]), groups, m,
+        (float)o->eps);
 }
 
 // ---- batch_norm2d: 每块一通道, 训练态批统计+running 更新, eval 用 running ----

@@ -615,17 +615,39 @@ void embedding_grad_vulkan(const Tensor& g, const Tensor& idx, Tensor& dw) {
 // ---- 归一化族 ----
 void layer_norm_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                        const void* options) {
-    const double eps = *static_cast<const double*>(options);
-    const Tensor& x = *in[0];
-    const int64_t d = x.size(-1);
-    const int64_t rows = x.numel() / d;
-    void* p = bridge::get_pipeline(spirv::norm, spirv::norm_bytes, 0, 0, 6);
-    require(p, "ln pipeline");
+    // options = LayerNormOptions{double eps; int64_t dim}
+    struct LnOpts { double eps; int64_t dim; };
+    const LnOpts* o = static_cast<const LnOpts*>(options);
+    Tensor xc = in[0]->is_contiguous() ? *in[0] : in[0]->clone();
+    const Tensor& x = xc;
+    const int64_t rank = x.dim_count();
+    const int64_t dim = o->dim < 0 ? rank - 1 : o->dim;
+    if (dim == rank - 1) {                               // 末维快路径
+        const int64_t d = x.size(-1);
+        const int64_t rows = x.numel() / d;
+        void* p = bridge::get_pipeline(spirv::norm, spirv::norm_bytes, 0, 0, 6);
+        require(p, "ln pipeline");
+        struct Pc { int32_t rows, d, h, w; float eps, momentum; int32_t training; } pc{
+            (int32_t)rows, (int32_t)d, 0, 0, (float)o->eps, 0.f, 0};
+        const VBuf bufs[6] = {vhandle(x), vhandle(*in[1]), vhandle(*in[2]),
+                              vhandle(x), vhandle(x), vhandle(*out[0])};
+        bridge::dispatch_bufs(p, bufs, 6, &pc, sizeof(pc), 1, (unsigned)rows, 1);
+        return;
+    }
+    int64_t D = x.size(dim), inner = 1, groups = 1;
+    for (int64_t d = 0; d < rank; ++d) {
+        if (d < dim) groups *= x.size(d);
+        else if (d > dim) inner *= x.size(d);
+    }
+    groups *= inner;               // 组数 = outer × inner(gi = o*inner + i)
+    void* p = bridge::get_pipeline(spirv::norm, spirv::norm_bytes, 2, 0, 6);
+    require(p, "ln-dim pipeline");
     struct Pc { int32_t rows, d, h, w; float eps, momentum; int32_t training; } pc{
-        (int32_t)rows, (int32_t)d, 0, 0, (float)eps, 0.f, 0};
+        (int32_t)groups, (int32_t)D, 0, (int32_t)inner, (float)o->eps, 0.f, 0};
     const VBuf bufs[6] = {vhandle(x), vhandle(*in[1]), vhandle(*in[2]),
                           vhandle(x), vhandle(x), vhandle(*out[0])};
-    bridge::dispatch_bufs(p, bufs, 6, &pc, sizeof(pc), 1, (unsigned)rows, 1);
+    bridge::dispatch_bufs(p, bufs, 6, &pc, sizeof(pc),
+                          (unsigned)groups, 1, 1);   // 每 workgroup 一组
 }
 
 void batch_norm2d_vulkan(KernelContext&, Span<const Tensor*> in,

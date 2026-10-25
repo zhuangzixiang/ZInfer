@@ -1,4 +1,6 @@
-// layer_norm: 末维归一化 + 仿射; 梯度按标准 LN 反传公式
+// layer_norm: 沿指定 dim 归一化 + 仿射(默认 -1 末维); 梯度按标准 LN 反传公式
+// (全广播组合, 任意维通用; dim 参数服务 NCHW 通道维归一化 —— ConvNeXt 式用法,
+//  免去消费者 transpose+clone 往返)
 #include "shared.hpp"
 #include "op_dispatcher.hpp"
 #include "backend_slots.hpp"
@@ -13,14 +15,18 @@ static void layer_norm_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*>
 
 struct LayerNormOptions {
     double eps;
+    int64_t dim;                   // -1 = 末维(默认); 否则归一化轴
 };
 
 static void layer_norm_cpu(KernelContext& c, Span<const Tensor*> in,
                            Span<Tensor*> out, const void* o) {
     const LayerNormOptions* a = static_cast<const LayerNormOptions*>(o);
-    if (!onednn::layer_norm(*in[0], *in[1], *in[2], *out[0], a->eps)) {
-        layer_norm_ref(c, in, out, o);
+    const int64_t dim = a->dim < 0 ? in[0]->dim_count() - 1 : a->dim;
+    if (dim == in[0]->dim_count() - 1
+        && onednn::layer_norm(*in[0], *in[1], *in[2], *out[0], a->eps)) {
+        return;
     }
+    layer_norm_ref(c, in, out, o);           // 非末维: oneDNN 不适用, 走 ref
 }
 
 
@@ -30,71 +36,84 @@ static void layer_norm_infer(Span<const TensorMeta*> in, const void*,
     outs.push_back(*in[0]->shape);
 }
 
+// 通用: x 看作 [outer, D, inner](contiguous), 归一化组 = 固定 (o,i) 扫 d
 static void layer_norm_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                            const void* options) {
-    const double eps = static_cast<const LayerNormOptions*>(options)->eps;
+    const LayerNormOptions* a = static_cast<const LayerNormOptions*>(options);
     const Tensor& x = *in[0];
     const Tensor& w = *in[1];
     const Tensor& b = *in[2];
     Tensor& y = *out[0];
-    const int64_t D = x.size(-1);
-    const int64_t rows = x.numel() / D;
+    const int64_t rank = x.dim_count();
+    const int64_t dim = a->dim < 0 ? rank - 1 : a->dim;
+    const int64_t D = x.size(dim);
+    int64_t outer = 1, inner = 1;
+    for (int64_t d = 0; d < rank; ++d) {
+        if (d < dim) outer *= x.size(d);
+        else if (d > dim) inner *= x.size(d);
+    }
     const float* xp = x.data<float>();
     const float* wp = w.data<float>();
     const float* bp = b.data<float>();
     float* yp = y.data<float>();
-    for (int64_t r = 0; r < rows; ++r) {
-        const float* xr = xp + r * D;
-        float* yr = yp + r * D;
-        float mu = 0.f;
-        for (int64_t d = 0; d < D; ++d) mu += xr[d];
-        mu /= static_cast<float>(D);
-        float var = 0.f;
-        for (int64_t d = 0; d < D; ++d) {
-            const float t = xr[d] - mu;
-            var += t * t;
+    const int64_t blk = D * inner;
+    for (int64_t o = 0; o < outer; ++o)
+        for (int64_t i = 0; i < inner; ++i) {
+            const float* xr = xp + o * blk + i;
+            float* yr = yp + o * blk + i;
+            double mu = 0, ex2 = 0;
+            for (int64_t d = 0; d < D; ++d) {
+                const float v = xr[d * inner];
+                mu += v; ex2 += double(v) * v;
+            }
+            mu /= D;
+            const double var = ex2 / D - mu * mu;
+            const float inv = 1.f / std::sqrt(std::max(var, 0.0) + a->eps);
+            const float fmu = float(mu);
+            for (int64_t d = 0; d < D; ++d)
+                yr[d * inner] = (xr[d * inner] - fmu) * inv * wp[d] + bp[d];
         }
-        var /= static_cast<float>(D);
-        const float inv = 1.f / std::sqrt(var + static_cast<float>(eps));
-        for (int64_t d = 0; d < D; ++d) {
-            yr[d] = (xr[d] - mu) * inv * wp[d] + bp[d];
-        }
-    }
 }
 
 static void layer_norm_grad(BackwardContext& c) {
-    // 全算子组合(自动走当前后端)。统一按 2D [rows, D] 推导(任意秩输入),
-    // inv = 1/sqrt(var+eps) 精确公式(经 mean/mul/sqrt/div 组合, 免近似)
-    const double eps = static_cast<const LayerNormOptions*>(c.options)->eps;
+    // 全算子组合(自动走当前后端), 广播语义对任意 dim 通用:
+    //   mu/mean(x,dim), inv=1/sqrt(var+eps), x̂=(x-μ)·inv
+    //   dγ=Σ g·x̂, dβ=Σ g(除 dim 全约), dx=inv·(gγ - mean(gγ) - x̂·mean(gγ·x̂))
+    const LayerNormOptions* a = static_cast<const LayerNormOptions*>(c.options);
     const Tensor& x = *c.saved_inputs[0];
     const Tensor& w = *c.saved_inputs[1];
     const Tensor& g = *c.grad_outputs[0];
-    const int64_t D = x.size(-1);
-    const int64_t rows = x.numel() / D;
+    const int64_t rank = x.dim_count();
+    const int64_t dim = a->dim < 0 ? rank - 1 : a->dim;
     const Device dev = x.device();
-    Tensor x2 = x.reshape(Shape{rows, D});
-    Tensor g2 = g.reshape(Shape{rows, D});
 
-    Tensor mu = Tensor::mean(x2, -1, true);                     // [rows,1]
-    Tensor xc = Tensor::sub(x2, mu);
-    Tensor var = Tensor::mean(Tensor::mul(xc, xc), -1, true);   // [rows,1]
-    Tensor inv = Tensor::div(Tensor::full(Shape{rows, 1}, 1.0, DType::F32, dev),
-                             Tensor::sqrt(Tensor::add(
-                                 var, Tensor::full(Shape{rows, 1}, eps,
-                                                   DType::F32, dev))));
-    Tensor xh = Tensor::mul(xc, inv);                           // x̂ = (x-μ)/σ
+    Tensor mu = Tensor::mean(x, dim, true);                     // [..,1,..]
+    Tensor xc = Tensor::sub(x, mu);
+    Tensor var = Tensor::mean(Tensor::mul(xc, xc), dim, true);
+    Tensor ones = Tensor::full(var.shape(), 1.0, DType::F32, dev);
+    Tensor inv = Tensor::div(ones, Tensor::sqrt(Tensor::add(
+        var, Tensor::full(var.shape(), a->eps, DType::F32, dev))));
+    Tensor xh = Tensor::mul(xc, inv);
 
-    Tensor dgamma = Tensor::sum(Tensor::mul(g2, xh), 0);        // dγ = Σ g·x̂
-    Tensor dbeta = Tensor::sum(g2, 0);                          // dβ = Σ g
-    *c.grad_inputs[1] = dgamma;
-    *c.grad_inputs[2] = dbeta;
+    Tensor dgamma = Tensor::mul(g, xh);                // Σ(除 dim 外全约, keepdim
+    Tensor dbeta = g;                                  // 保形 → 索引不漂移) → [D]
+    for (int64_t d = 0; d < rank; ++d) {
+        if (d == dim) continue;
+        dgamma = Tensor::sum(dgamma, d, true);
+        dbeta = Tensor::sum(dbeta, d, true);
+    }
+    *c.grad_inputs[1] = dgamma.reshape(Shape{w.size(0)});
+    *c.grad_inputs[2] = dbeta.reshape(Shape{w.size(0)});
 
-    // dx = inv·(g·γ - mean(g·γ) - x̂·mean(g·γ·x̂))
-    Tensor gg = Tensor::mul(g2, w);                             // broadcast [D]
-    Tensor m2 = Tensor::mean(gg, -1, true);
-    Tensor m1 = Tensor::mean(Tensor::mul(gg, xh), -1, true);
-    Tensor inner = Tensor::sub(Tensor::sub(gg, m2), Tensor::mul(xh, m1));
-    *c.grad_inputs[0] = Tensor::mul(inner, inv).reshape(x.shape());
+    Shape ws;
+    for (int64_t d = 0; d < rank; ++d) ws.dims[d] = d == dim ? w.size(0) : 1;
+    ws.rank = rank;
+    Tensor wb = w.reshape(ws);
+    Tensor gg = Tensor::mul(g, wb);
+    Tensor m2 = Tensor::mean(gg, dim, true);
+    Tensor m1 = Tensor::mean(Tensor::mul(gg, xh), dim, true);
+    Tensor inner_dx = Tensor::sub(Tensor::sub(gg, m2), Tensor::mul(xh, m1));
+    *c.grad_inputs[0] = Tensor::mul(inner_dx, inv);
 }
 
 const Operator g_layer_norm_operator = {
@@ -106,8 +125,9 @@ const Operator g_layer_norm_operator = {
     sizeof(LayerNormOptions),
 };
 
-Tensor layer_norm_apply(const Tensor& x, const Tensor& w, const Tensor& b, double eps) {
-    const LayerNormOptions o{eps};
+Tensor layer_norm_apply(const Tensor& x, const Tensor& w, const Tensor& b,
+                        double eps, int64_t dim) {
+    const LayerNormOptions o{eps, dim};
     const Tensor* ins[3] = {&x, &w, &b};
     return OpDispatcher::instance().run(&g_layer_norm_operator,
                                         Span<const Tensor*>(ins, 3), &o);

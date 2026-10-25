@@ -120,6 +120,7 @@ struct LayerParam {
     int64_t       out = -1;         // 输出特征数 / 输出通道数
     int64_t       channels = -1;    // BatchNorm2d 通道数
     int64_t       normalized_dim = -1;
+    int64_t       norm_dim = -1;      // LayerNorm 归一化轴(-1=末维; NCHW 通道维填 1)
     int64_t       num_embeddings = -1;
     int64_t       embed_dim = -1;
     Shape         kernel = {0, 0};  // 卷积核 / 池化窗口: {kh, kw}

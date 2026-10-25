@@ -1,6 +1,7 @@
 #version 450
 // 归一化族: OP=0 layer_norm(每工作组一行, 与 CUDA layer_norm_k 同构)
 //           OP=1 batch_norm2d(每工作组一通道, 训练态批统计+running 更新)
+//           OP=2 layer_norm 任意 dim(每工作组一组, 组内跨维步进 inner)
 layout(local_size_x = 256) in;
 
 layout(constant_id = 0) const int OP = 0;
@@ -52,6 +53,31 @@ void ln_row() {
     }
 }
 
+void ln_group() {
+    const int g = int(gl_WorkGroupID.x);                 // 每 workgroup 一组
+    if (g >= pc.rows) return;                            // rows = groups
+    const int lid = int(gl_LocalInvocationID.x);
+    const int base = g / pc.w * pc.d * pc.w + g % pc.w;  // w 复用为 inner
+    float ls = 0.0, lq = 0.0;
+    for (int d = lid; d < pc.d; d += 256) {
+        const float v = x[base + d * pc.w];
+        ls += v; lq += v * v;
+    }
+    sm[lid] = ls; sv[lid] = lq;
+    barrier();
+    if (lid == 0) {
+        float s = 0.0, q = 0.0;
+        for (int i = 0; i < 256; ++i) { s += sm[i]; q += sv[i]; }
+        sm[0] = s / float(pc.d);
+        sv[0] = max(q / float(pc.d) - sm[0] * sm[0], 0.0);
+    }
+    barrier();
+    const float mu = sm[0];
+    const float inv = inversesqrt(sv[0] + pc.eps);
+    for (int d = lid; d < pc.d; d += 256)
+        y[base + d * pc.w] = (x[base + d * pc.w] - mu) * inv * wt[d] + bs[d];
+}
+
 void bn_channel() {
     const int c = int(gl_GlobalInvocationID.y);
     if (c >= pc.d) return;
@@ -101,9 +127,7 @@ void bn_channel() {
 }
 
 void main() {
-    if (OP == 0) {
-        ln_row();
-    } else {
-        bn_channel();
-    }
+    if (OP == 0) { ln_row(); return; }
+    if (OP == 1) { bn_channel(); return; }
+    if (OP == 2) { ln_group(); return; }
 }

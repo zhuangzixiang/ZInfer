@@ -25,7 +25,7 @@ Layer* Layer::create(LayerType type, const LayerParam& p) {
             return new BatchNorm2dLayer(p.channels, p.eps, p.momentum);
         case LayerType::LayerNorm:
             require(p.normalized_dim > 0, "layernorm needs normalized_dim");
-            return new LayerNormLayer(p.normalized_dim, p.eps);
+            return new LayerNormLayer(p.normalized_dim, p.eps, p.norm_dim);
         case LayerType::Embedding:
             require(p.num_embeddings > 0 && p.embed_dim > 0, "embedding needs dims");
             return new EmbeddingLayer(p.num_embeddings, p.embed_dim);

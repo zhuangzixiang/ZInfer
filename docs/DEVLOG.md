@@ -1059,3 +1059,28 @@ bool 位型读成 0.0f → **GPU BN 训练态一直跑 eval 统计**(kit 无 BN 
 blob 一律按真实结构体读, float[] 强转是 UB 温床; (b) 梯度规则注册
 "复用帮手"要审符号语义, 不是所有二元算子都对称; (c) kit 覆盖缺口
 (BN train 跨设备)让 GPU 专属错跑了两轮全绿。
+
+---
+
+## [35] LayerNorm 任意 dim(全后端) — ②' 通道维归一化零拷贝化
+
+UniFP 推理基准定位: 前向 20.6ms@640 为启动开销主导(~300 算子), 其中
+ChannelNorm(NCHW 通道维 LN, ConvNeXt 式)因 znn LN 仅末维, 每个点位
+transpose+clone+LN+transpose+clone —— 全模型 ~60 点位 × 2 次全量拷贝。
+**本轮给 layer_norm 加 dim 参数**(默认 -1 末维不变):
+
+- 选项体 {eps, dim}(三 GPU 后端同款结构体镜像, 吸取 BN float[3] 强转教训)
+- CUDA `layer_norm_dim_k`: 每 warp 一组(gi = o·inner+i 展开寻址, 与
+  softmax_dim_k 同构), E[x²]−μ² 单遍方差 + 数值保护
+- VK norm.comp OP=2 `lngroup`: 每 workgroup 一组(首版误用每线程一组混
+  barrier 模型 —— 探针抓出 102/108 零元素; 且 VK dispatch 的 gx 是组数)
+- Metal `lngroup` 镜像; CPU 非末维回落 ref(oneDNN 仅末维)
+- 梯度重写为全广播组合(mean(x,dim,keepdim) + keepdim 逐轴约 dγ/dβ),
+  任意维通用, 不再假设 [rows,D] reshape
+- LayerParam 增 norm_dim(-1=末维); kit 新增 layer_norm_dim(fwd 手动
+  参考 + 梯度对拍)
+
+**验证**: ztestkit 318 checks 全绿(CPU+CUDA+VK, STRICT)。教训×2:
+(a) 共享内存协作归约与每线程一组是两套模型, barrier 混用必炸;
+(b) 共享盘写延迟让"regen→build"两连发扑空 —— 再遇一次, gen 后必须
+核对 dll mtime > 头文件 mtime。

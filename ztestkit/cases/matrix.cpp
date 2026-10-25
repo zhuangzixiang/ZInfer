@@ -651,3 +651,58 @@ ZTK_CASE(sub_gradient, true) {
           && std::fabs(back(c.grad()).data<float>()[0] - 1.f) < 1e-5f,
           "add grads unchanged");
 }
+
+// LayerNorm 任意 dim(通道维 LN —— ConvNeXt 式 NCHW 用法; 此前仅末维,
+// 消费者需 transpose+clone 往返)。fwd 与梯度对拍(手动 LN 参考)。
+ZTK_CASE(layer_norm_dim, true) {
+    LayerParam p; p.normalized_dim = 6; p.eps = 1e-3; p.norm_dim = 1;
+    Tensor x = Tensor::randn({2, 6, 4, 5}, 83);
+    Layer* lc = Layer::create(LayerType::LayerNorm, p);
+    Tensor yc = lc->forward(x);
+    // 手动参考(逐位置跨通道)
+    Tensor ref = Tensor::zeros(yc.shape());
+    {
+        const float* xp = x.data<float>();
+        float* rp = ref.data<float>();
+        for (int64_t n = 0; n < 2; n++)
+            for (int64_t h = 0; h < 4; h++)
+                for (int64_t w = 0; w < 5; w++) {
+                    double mu = 0, ex2 = 0;
+                    for (int64_t c = 0; c < 6; c++) {
+                        const float v = xp[((n * 6 + c) * 4 + h) * 5 + w];
+                        mu += v; ex2 += double(v) * v;
+                    }
+                    mu /= 6;
+                    const float inv = 1.f / float(std::sqrt(
+                        std::max(ex2 / 6 - mu * mu, 0.0) + 1e-3));
+                    for (int64_t c = 0; c < 6; c++) {
+                        const int64_t i = ((n * 6 + c) * 4 + h) * 5 + w;
+                        rp[i] = (xp[i] - mu) * inv;      // γ=1 β=0
+                    }
+                }
+    }
+    Tensor yd = lc->forward(on(ztk_dev, x));
+    cmp("ln dim=1 fwd", yc, yd, 1e-4f);
+    Tensor rc = ref.clone(), rd = yd;
+    double e = 0;
+    Tensor rh = back(yd);
+    for (int64_t i = 0; i < yc.numel(); i++)
+        e = std::max(e, double(std::fabs(rh.data<float>()[i]
+                                         - ref.data<float>()[i])));
+    check(e < 1e-3f, "ln dim=1 vs manual (fwd values)");
+    Layer::destroy(lc);
+    // 梯度: dim=1 CPU vs 设备(同层双前向)
+    Layer* lg = Layer::create(LayerType::LayerNorm, p);
+    Tensor xa = Tensor::randn({2, 6, 3, 3}, 84);
+    Tensor xg = on(ztk_dev, xa);
+    xa.requires_grad(true); xg.requires_grad(true);
+    Tensor fa = lg->forward(xa), fb = lg->forward(xg);
+    for (int64_t d = fa.dim_count() - 1; d >= 0; --d) { fa = Tensor::sum(fa, d); fb = Tensor::sum(fb, d); }
+    fa.backward(); fb.backward();
+    Tensor ga = back(xa.grad()), gb = back(xg.grad());
+    double eg = 0;
+    for (int64_t i = 0; i < ga.numel(); i++)
+        eg = std::max(eg, double(std::fabs(ga.data<float>()[i] - gb.data<float>()[i])));
+    check(eg < 1e-4f, "ln dim=1 grad parity");
+    Layer::destroy(lg);
+}

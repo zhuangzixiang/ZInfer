@@ -58,13 +58,14 @@ private:
 
 class LayerNormLayer final : public Layer {
 public:
-    LayerNormLayer(int64_t normalized_dim, double eps);
+    LayerNormLayer(int64_t normalized_dim, double eps, int64_t dim = -1);
     Tensor forward(const Tensor& x) override;
     std::vector<Tensor> params() const override;
     void train(bool) override {}
 private:
     Tensor w_, b_;
     double eps_;
+    int64_t dim_;
 };
 
 class EmbeddingLayer final : public Layer {

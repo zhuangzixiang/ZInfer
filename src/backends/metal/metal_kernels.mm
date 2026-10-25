@@ -782,6 +782,40 @@ kernel void lnrow(device const float* x [[buffer(0)]],
     }
 }
 
+kernel void lngroup(device const float* x [[buffer(0)]],
+                     device const float* w [[buffer(1)]],
+                     device const float* b [[buffer(2)]],
+                     device float* y [[buffer(5)]],
+                     constant const int* pc [[buffer(8)]],
+                     threadgroup float* sm [[threadgroup(0)]],
+                     threadgroup float* sv [[threadgroup(1)]],
+                     uint3 tpig [[thread_position_in_grid]],
+                     uint3 tpit [[thread_position_in_threadgroup]]) {
+    // pc: [groups, D, 0, inner, eps, 0, 0] —— 每 threadgroup 一组, 组内跨维步进
+    const int g = (int)(tpig.x);
+    if (g >= pc[0]) return;
+    const int lid = (int)(tpit.x);
+    const int base = g / pc[3] * pc[1] * pc[3] + g % pc[3];
+    float ls = 0.0f, lq = 0.0f;
+    for (int d = lid; d < pc[1]; d += 256) {
+        const float v = x[base + d * pc[3]];
+        ls += v; lq += v * v;
+    }
+    sm[lid] = ls; sv[lid] = lq;
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    if (lid == 0) {
+        float s = 0.0f, q = 0.0f;
+        for (int i = 0; i < 256; ++i) { s += sm[i]; q += sv[i]; }
+        sm[0] = s / (float)pc[1];
+        sv[0] = max(q / (float)pc[1] - sm[0] * sm[0], 0.0f);
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+    const float mu = sm[0];
+    const float inv = rsqrt(sv[0] + pc[4]);
+    for (int d = lid; d < pc[1]; d += 256)
+        y[base + d * pc[3]] = (x[base + d * pc[3]] - mu) * inv * w[d] + b[d];
+}
+
 kernel void bnchannel(device const float* x [[buffer(0)]],
                       device const float* w [[buffer(1)]],
                       device const float* b [[buffer(2)]],
@@ -1323,19 +1357,41 @@ void embedding_grad_metal(const Tensor& g, const Tensor& idx, Tensor& dw) {
 
 void layer_norm_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                       const void* options) {
-    const double eps = *static_cast<const double*>(options);
-    const Tensor& x = *in[0];
-    const int64_t d = x.size(-1);
-    const int64_t rows = x.numel() / d;
-    static id<MTLComputePipelineState> p = nil;
-    if (!p) p = device::pipeline(kMslNorm, "lnrow");
-    // pc: [rows, d, 0, 0, eps, 0, 0](与 MSL 一致)
+    // options = LayerNormOptions{double eps; int64_t dim}
+    struct LnOpts { double eps; int64_t dim; };
+    const LnOpts* o = static_cast<const LnOpts*>(options);
+    Tensor xc = in[0]->is_contiguous() ? *in[0] : in[0]->clone();
+    const Tensor& x = xc;
+    const int64_t rank = x.dim_count();
+    const int64_t dim = o->dim < 0 ? rank - 1 : o->dim;
+    if (dim == rank - 1) {
+        const int64_t d = x.size(-1);
+        const int64_t rows = x.numel() / d;
+        static id<MTLComputePipelineState> p = nil;
+        if (!p) p = device::pipeline(kMslNorm, "lnrow");
+        struct { int32_t r, dm, h, w; float eps, mom; int32_t tr; } pc{
+            (int32_t)rows, (int32_t)d, 0, 0, (float)o->eps, 0.f, 0};
+        const device::MBuf bufs[6] = {mbuf(x), mbuf(*in[1]), mbuf(*in[2]),
+                                      mbuf(x), mbuf(x), mbuf(*out[0])};
+        device::dispatch_bufs_tg(p, bufs, 6, &pc, sizeof(pc),
+                                 MTLSizeMake(1, (uint32_t)rows, 1),
+                                 MTLSizeMake(256, 1, 1), 256 * 4, 256 * 4);
+        return;
+    }
+    int64_t D = x.size(dim), inner = 1, groups = 1;
+    for (int64_t d = 0; d < rank; ++d) {
+        if (d < dim) groups *= x.size(d);
+        else if (d > dim) inner *= x.size(d);
+    }
+    groups *= inner;               // 组数 = outer × inner(gi = o*inner + i)
+    static id<MTLComputePipelineState> pg = nil;
+    if (!pg) pg = device::pipeline(kMslNorm, "lngroup");
     struct { int32_t r, dm, h, w; float eps, mom; int32_t tr; } pc{
-        (int32_t)rows, (int32_t)d, 0, 0, (float)eps, 0.f, 0};
+        (int32_t)groups, (int32_t)D, 0, (int32_t)inner, (float)o->eps, 0.f, 0};
     const device::MBuf bufs[6] = {mbuf(x), mbuf(*in[1]), mbuf(*in[2]),
                                   mbuf(x), mbuf(x), mbuf(*out[0])};
-    device::dispatch_bufs_tg(p, bufs, 6, &pc, sizeof(pc),
-                             MTLSizeMake(1, (uint32_t)rows, 1),
+    device::dispatch_bufs_tg(pg, bufs, 6, &pc, sizeof(pc),
+                             MTLSizeMake((uint32_t)groups, 1, 1),
                              MTLSizeMake(256, 1, 1), 256 * 4, 256 * 4);
 }
 
