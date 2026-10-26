@@ -91,6 +91,7 @@ decltype(&dnnl_memory_desc_create_with_tag) md_tag = nullptr;
 decltype(&dnnl_reorder_primitive_desc_create) reorder_pd = nullptr;
 decltype(&dnnl_memory_set_data_handle) memory_set_handle = nullptr;
 decltype(&dnnl_memory_desc_get_size) md_size = nullptr;
+decltype(&dnnl_memory_desc_equal) md_equal = nullptr;
 decltype(&dnnl_memory_desc_destroy)              md_destroy = nullptr;
 decltype(&dnnl_memory_create)    memory_create  = nullptr;
 decltype(&dnnl_memory_destroy)   memory_destroy = nullptr;
@@ -163,6 +164,7 @@ bool available_onednn() {
             ZNN_DLSYM_DNNL(reorder_pd, "dnnl_reorder_primitive_desc_create");
             ZNN_DLSYM_DNNL(memory_set_handle, "dnnl_memory_set_data_handle");
             ZNN_DLSYM_DNNL(md_size, "dnnl_memory_desc_get_size");
+            ZNN_DLSYM_DNNL(md_equal, "dnnl_memory_desc_equal");
             ZNN_DLSYM_DNNL(md_destroy, "dnnl_memory_desc_destroy");
             ZNN_DLSYM_DNNL(memory_create, "dnnl_memory_create");
             ZNN_DLSYM_DNNL(memory_destroy, "dnnl_memory_destroy");

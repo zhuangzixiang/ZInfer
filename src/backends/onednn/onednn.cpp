@@ -243,6 +243,7 @@ struct ConvPlan {
     Prim primitive,rx,rw,ry;
     Mem xe,we,ye;
     bool scratch=false;
+    bool direct_x=false, direct_w=false, direct_y=false;
     size_t bytes=0;
     bool init(const Tensor& x,const Tensor& w,const Tensor& y,const Conv2dOptions& o,
               const_dnnl_memory_desc_t xs,const_dnnl_memory_desc_t ws,const_dnnl_memory_desc_t ys) {
@@ -258,6 +259,13 @@ struct ConvPlan {
         if(dn::conv_pd(&pd.p,eng.p,dnnl_forward_inference,dnnl_convolution_direct,xa.p,wa.p,nullptr,ya.p,st,di,pad,pad,nullptr)!=dnnl_success)return false;
         auto query=[&](int arg){return dn::pd_query_md(pd.p,dnnl_query_exec_arg_md,arg);};
         auto ix=query(DNNL_ARG_SRC),iw=query(DNNL_ARG_WEIGHTS),iy=query(DNNL_ARG_DST);
+        // Only exact descriptor equality permits aliasing. Missing optional
+        // symbols keep the original reorder path; no shape-based assumptions.
+        if (dn::md_equal && !dn::family_off("conv_direct")) {
+            direct_x = dn::md_equal(xs, ix) != 0;
+            direct_w = dn::md_equal(ws, iw) != 0;
+            direct_y = dn::md_equal(ys, iy) != 0;
+        }
         auto sd=dn::pd_query_md(pd.p,dnnl_query_scratchpad_md,0);scratch=sd!=nullptr;
         bytes=dn::md_size(ix)+dn::md_size(iw)+dn::md_size(iy)+(sd?dn::md_size(sd):0);
         if(!xe.wrap(xs,eng.p,x.data<float>())||!we.wrap(ws,eng.p,w.data<float>())||!ye.wrap(ys,eng.p,y.data<float>()))return false;
@@ -265,7 +273,9 @@ struct ConvPlan {
             Pd rp;return dn::reorder_pd(&rp.p,from,eng.p,to,eng.p,nullptr)==dnnl_success
                         &&dn::primitive_create(&r.p,rp.p)==dnnl_success;
         };
-        return reorder(xs,ix,rx)&&reorder(ws,iw,rw)&&reorder(iy,ys,ry)
+        return (direct_x || reorder(xs,ix,rx))
+            && (direct_w || reorder(ws,iw,rw))
+            && (direct_y || reorder(iy,ys,ry))
             &&dn::primitive_create(&primitive.p,pd.p)==dnnl_success;
     }
     bool run(const Tensor& x,const Tensor& w,Tensor& y) {
@@ -275,9 +285,9 @@ struct ConvPlan {
         Eng eng;Mem xm,wm,ym,sp;
         auto query=[&](int arg){return dn::pd_query_md(pd.p,dnnl_query_exec_arg_md,arg);};
         auto sd=dn::pd_query_md(pd.p,dnnl_query_scratchpad_md,0);
-        if(!xm.wrap(query(DNNL_ARG_SRC),eng.p,DNNL_MEMORY_ALLOCATE)
-           ||!wm.wrap(query(DNNL_ARG_WEIGHTS),eng.p,DNNL_MEMORY_ALLOCATE)
-           ||!ym.wrap(query(DNNL_ARG_DST),eng.p,DNNL_MEMORY_ALLOCATE)
+        if((!direct_x && !xm.wrap(query(DNNL_ARG_SRC),eng.p,DNNL_MEMORY_ALLOCATE))
+           ||(!direct_w && !wm.wrap(query(DNNL_ARG_WEIGHTS),eng.p,DNNL_MEMORY_ALLOCATE))
+           ||(!direct_y && !ym.wrap(query(DNNL_ARG_DST),eng.p,DNNL_MEMORY_ALLOCATE))
            ||(sd&&!sp.wrap(sd,eng.p,DNNL_MEMORY_ALLOCATE)))return false;
         if(dn::memory_set_handle(xe.p,x.data<float>())!=dnnl_success
            ||dn::memory_set_handle(we.p,w.data<float>())!=dnnl_success
@@ -286,10 +296,12 @@ struct ConvPlan {
             dnnl_exec_arg_t args[2]={{DNNL_ARG_FROM,from.p},{DNNL_ARG_TO,to.p}};
             return dn::execute(p.p,stm.p,2,args)==dnnl_success && dn::stream_wait(stm.p)==dnnl_success;
         };
-        if(!reorder(rx,xe,xm)||!reorder(rw,we,wm))return false;
-        dnnl_exec_arg_t args[4]={{DNNL_ARG_SRC,xm.p},{DNNL_ARG_WEIGHTS,wm.p},{DNNL_ARG_DST,ym.p},{DNNL_ARG_SCRATCHPAD,sp.p}};
+        if((!direct_x && !reorder(rx,xe,xm)) || (!direct_w && !reorder(rw,we,wm)))return false;
+        dnnl_exec_arg_t args[4]={{DNNL_ARG_SRC,direct_x ? xe.p : xm.p},
+            {DNNL_ARG_WEIGHTS,direct_w ? we.p : wm.p},
+            {DNNL_ARG_DST,direct_y ? ye.p : ym.p},{DNNL_ARG_SCRATCHPAD,sp.p}};
         if(dn::execute(primitive.p,stm.p,scratch?4:3,args)!=dnnl_success||dn::stream_wait(stm.p)!=dnnl_success)return false;
-        return reorder(ry,ym,ye);
+        return direct_y || reorder(ry,ym,ye);
     }
 };
 bool conv_layout(const Tensor& x,const Tensor& w,Tensor& y,const Conv2dOptions& o,

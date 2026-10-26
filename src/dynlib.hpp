@@ -78,6 +78,7 @@ extern decltype(&dnnl_memory_desc_create_with_tag) md_tag;
 extern decltype(&dnnl_reorder_primitive_desc_create) reorder_pd;
 extern decltype(&dnnl_memory_set_data_handle) memory_set_handle;
 extern decltype(&dnnl_memory_desc_get_size) md_size;
+extern decltype(&dnnl_memory_desc_equal) md_equal;
 extern decltype(&dnnl_memory_desc_destroy)              md_destroy;
 extern decltype(&dnnl_memory_create)    memory_create;
 extern decltype(&dnnl_memory_destroy)   memory_destroy;

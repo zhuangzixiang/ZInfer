@@ -16,6 +16,23 @@ using ztestkit::check;
 using ztestkit::max_diff;
 using ztestkit::on;
 
+// A single-channel 1x1 convolution can use the public plain layout directly.
+// Exercise offset inputs and changed buffers/weights across cached executions.
+ZTK_CASE(conv_plain_binding, false) {
+    auto storage = Tensor::randn({2,1,7,11}, 1301);
+    auto x = storage.slice(0,1,2);
+    auto w = Tensor::ones({1,1,1,1});
+    for (int iteration=0; iteration<3; ++iteration) {
+        w.data<float>()[0] = float(iteration+2);
+        x.data<float>()[iteration] += .25f;
+        auto y = back(Tensor::conv2d(on(ztk_dev,x),on(ztk_dev,w)));
+        bool ok = y.shape() == x.shape();
+        for (int64_t i=0; i<y.numel(); ++i)
+            ok = ok && std::abs(y.data<float>()[i]-x.data<float>()[i]*w.data<float>()[0]) < 1e-5f;
+        check(ok, "plain convolution observes offset and latest input/weight");
+    }
+}
+
 ZTK_CASE(conv_plan_updates, false) {
     for(int groups:{1,2})for(int width:{17,19,17}) {
         auto x=Tensor::randn({2,4,13,width},1201),w=Tensor::randn({6,4/groups,3,3},1202);
