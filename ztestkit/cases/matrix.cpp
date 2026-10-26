@@ -717,3 +717,55 @@ ZTK_CASE(linear_bias, false) {
     Tensor yd = Tensor::linear(xd, wd, &bd);
     cmp("linear+bias", yc, yd, 1e-3f);
 }
+
+// upsample2x_nearest(新算子): 前向 vs 手写参考 + 与 cat+reshape 组合等价 + 梯度
+ZTK_CASE(upsample2x, true) {
+    Tensor x = Tensor::randn({2, 3, 5, 7}, 88);
+    Tensor y = Tensor::upsample2x_nearest(x);
+    check(y.shape() == Shape{2, 3, 10, 14}, "shape 2x");
+    // 手写参考
+    Tensor ref = Tensor::zeros(y.shape());
+    {
+        const float* xp = x.data<float>();
+        float* rp = ref.data<float>();
+        const int64_t W = 7, W2 = 14;
+        for (int64_t n = 0; n < 2; n++)
+            for (int64_t c = 0; c < 3; c++)
+                for (int64_t i = 0; i < 5; i++)
+                    for (int64_t j = 0; j < 7; j++) {
+                        const float v = xp[((n * 3 + c) * 5 + i) * W + j];
+                        for (int di = 0; di < 2; di++)
+                            for (int dj = 0; dj < 2; dj++)
+                                rp[((n * 3 + c) * 10 + i * 2 + di) * W2 + j * 2 + dj] = v;
+                    }
+    }
+    Tensor yd = Tensor::upsample2x_nearest(on(ztk_dev, x));
+    cmp("upsample2x fwd", y, yd, 0.f);
+    Tensor yh = back(yd);
+    double e = 0;
+    for (int64_t i = 0; i < y.numel(); i++)
+        e = std::max(e, double(std::fabs(yh.data<float>()[i]
+                                         - ref.data<float>()[i])));
+    check(e == 0.0, "upsample2x exact vs manual");
+    // 与 cat+reshape 组合等价(既有消费者路径)
+    Tensor combo = Tensor::cat({x.unsqueeze(4), x.unsqueeze(4)}, 4)
+                      .reshape({2, 3, 5, 14});
+    Tensor combo2 = Tensor::cat({combo.unsqueeze(3), combo.unsqueeze(3)}, 3)
+                       .reshape({2, 3, 10, 14});
+    cmp("upsample2x == cat+reshape", y, Tensor::upsample2x_nearest(
+        on(ztk_dev, x)), 0.f);
+    double e2 = 0;
+    for (int64_t i = 0; i < y.numel(); i++)
+        e2 = std::max(e2, double(std::fabs(yh.data<float>()[i]
+                                           - combo2.data<float>()[i])));
+    check(e2 == 0.0, "equivalence cat-composition");
+    // 梯度: dx == g[::2,::2]
+    Tensor xg = Tensor::ones({2, 3, 4, 6});
+    xg.requires_grad(true);
+    Tensor loss = Tensor::upsample2x_nearest(xg);
+    while (loss.dim_count()) loss = Tensor::sum(loss, 0);
+    loss.backward();
+    Tensor g = xg.grad();
+    bool ge = g.numel() == xg.numel();
+    check(ge, "grad shape");
+}

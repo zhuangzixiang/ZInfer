@@ -438,6 +438,41 @@ void mean_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     reduce_run(in, out, static_cast<const RA*>(options)->dim, true);
 }
 
+const char* kMslUpsample = R"MSL(
+#include <metal_stdlib>
+using namespace metal;
+
+kernel void upsample2x(device const float* x [[buffer(0)]],
+                       device float* y [[buffer(2)]],
+                       constant const int* pc [[buffer(3)]],
+                       uint3 tpig [[thread_position_in_grid]]) {
+    // pc[0]=total pc[1]=w_in pc[2]=w_out; 每线程写 2x2 块
+    const int i = (int)(tpig.x);
+    if (i >= pc[0]) return;
+    const int w = i % pc[1];
+    const int r = i / pc[1];
+    const float v = x[i];
+    const int base = r * 2 * pc[2] + w * 2;
+    y[base] = v;
+    y[base + 1] = v;
+    y[base + pc[2]] = v;
+    y[base + pc[2] + 1] = v;
+}
+)MSL";
+
+void upsample2x_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                      const void*) {
+    Tensor xm = in[0]->is_contiguous() ? *in[0] : in[0]->clone();
+    const Tensor& x = xm;
+    static id<MTLComputePipelineState> p = nil;
+    if (!p) p = device::pipeline(kMslUpsample, "upsample2x");
+    const int pc[3] = {(int)x.numel(), (int)x.size(3), (int)(x.size(3) * 2)};
+    const device::MBuf bufs[2] = {mbuf(x), mbuf(*out[0])};
+    device::dispatch_bufs(p, bufs, 2, pc, sizeof(pc),
+                          MTLSizeMake(rup((uint32_t)pc[0], 256), 1, 1),
+                          MTLSizeMake(256, 1, 1));
+}
+
 void softmax_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                    const void* options) {
     Tensor xm = in[0]->is_contiguous() ? *in[0] : in[0]->clone();   // 视图材料化

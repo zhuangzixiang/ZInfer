@@ -46,6 +46,7 @@ void silu_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*)
 void matmul_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void linear_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void softmax_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void upsample2x_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void sum_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void mean_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void unary_bwd_metal(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);

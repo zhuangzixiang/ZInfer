@@ -100,6 +100,7 @@ public:
     static Tensor conv2d    (const Tensor& x, const Tensor& w, const Conv2dOptions& o = {});
     static Tensor max_pool2d(const Tensor& x, Shape k, const Pool2dOptions& o = {});
     static Tensor avg_pool2d(const Tensor& x, Shape k, const Pool2dOptions& o = {});
+    static Tensor upsample2x_nearest(const Tensor& x);   // 最近邻 2×(NCHW)
 
     // ---- 检索 ----
     static Tensor embedding(const Tensor& weight, const Tensor& indices);   // indices: I64

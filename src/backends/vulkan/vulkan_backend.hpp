@@ -40,6 +40,8 @@ void matmul_vulkan(KernelContext&, Span<const Tensor*> in,
                    Span<Tensor*> out, const void*);
 void linear_vulkan(KernelContext&, Span<const Tensor*> in,
                    Span<Tensor*> out, const void*);
+void upsample2x_vulkan(KernelContext&, Span<const Tensor*> in,
+                      Span<Tensor*> out, const void* options);
 void softmax_vulkan(KernelContext&, Span<const Tensor*> in,
                     Span<Tensor*> out, const void*);
 void sum_vulkan(KernelContext&, Span<const Tensor*> in,

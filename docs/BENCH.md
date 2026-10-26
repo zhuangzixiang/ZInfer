@@ -280,3 +280,15 @@ LN 小于 0.1ms 属可接受. Metal 端由用户 Mac 构建后跑同 zbench 补�
 
 **CPU(oneDNN)**: matmul 178-196 GF/s; 逐元素 9.5 GB/s(单线程 Eigen).
 **兜底基线**.
+
+## Vulkan 内存放置开关(ZNN_VK_LOCAL, 2026-10-26)
+
+| 负载 | 默认(sysRAM<64MB) | ZNN_VK_LOCAL=1(全 BAR) |
+|---|---|---|
+| UniFP CNN @320(多小算子) | 71.7 ms | **19.5 ms(3.7×, 51fps)** |
+| UniFP CNN @640 | 336.9 ms | **64.2 ms(5.2×)** |
+| matmul 512³(流式 GEMM) | **1.50 ms** | 33.4 ms(回退 22×) |
+| matmul 1024³ | **11.5 ms** | 13.9 ms |
+
+结论:放置最优解按访问模式分化(CNN 逐算子往返 vs GEMM 流式),默认
+维持原策略;CNN/推理类负载设 ZNN_VK_LOCAL=1。ztestkit 339 两种放置均绿。

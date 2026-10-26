@@ -18,6 +18,7 @@
 #include "backends/vulkan/gen/reduce.h"
 #include "backends/vulkan/gen/softmax.h"
 #include "backends/vulkan/gen/softmaxdim.h"
+#include "backends/vulkan/gen/upsample.h"
 #include "backends/vulkan/gen/unarybwd.h"
 #include "backends/vulkan/gen/copy.h"
 #include "backends/vulkan/gen/bcastgrad.h"
@@ -274,6 +275,19 @@ void mean_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
 }
 
 // ---- softmax(末维快路径 + 任意 dim 通用路径) ----
+void upsample2x_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                       const void*) {
+    Tensor xm = in[0]->is_contiguous() ? *in[0] : in[0]->clone();
+    const Tensor& x = xm;
+    void* p = bridge::get_pipeline(spirv::upsample, spirv::upsample_bytes, 0, 0, 2);
+    require(p, "upsample pipeline");
+    struct Pc { int32_t total, w_in, w_out; } pc{
+        (int32_t)x.numel(), (int32_t)x.size(3), (int32_t)(x.size(3) * 2)};
+    const VBuf bufs[2] = {vhandle(x), vhandle(*out[0])};
+    bridge::dispatch_bufs(p, bufs, 2, &pc, sizeof(pc),
+                          (unsigned)((pc.total + 255) / 256), 1, 1);
+}
+
 void softmax_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                     const void* options) {
     Tensor xm = in[0]->is_contiguous() ? *in[0] : in[0]->clone();   // 视图材料化

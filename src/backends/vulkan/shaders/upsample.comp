@@ -1,0 +1,25 @@
+#version 450
+// upsample2x_nearest: 每线程写 2×2 块(单遍直写, 免 cat+reshape 组合拷贝)
+layout(local_size_x = 256) in;
+
+layout(binding = 0) readonly buffer Xbuf { float x[]; };
+layout(binding = 1) buffer Ybuf { float y[]; };
+
+layout(push_constant) uniform Pc {
+    int total;          // 输入元素数(N*C*H*W)
+    int w_in;           // 输入宽
+    int w_out;          // 输出宽(= 2*w_in)
+} pc;
+
+void main() {
+    const int i = int(gl_GlobalInvocationID.x);
+    if (i >= pc.total) return;
+    const int w = i % pc.w_in;
+    const int r = i / pc.w_in;
+    const float v = x[i];
+    const int base = r * 2 * pc.w_out + w * 2;
+    y[base] = v;
+    y[base + 1] = v;
+    y[base + pc.w_out] = v;
+    y[base + pc.w_out + 1] = v;
+}

@@ -40,6 +40,20 @@ int main() {
         std::printf("Vulkan: not available\n");
     }
 
+    // upsample 梯度探针
+    {
+        try {
+            Tensor x = Tensor::ones({2, 3, 4, 6});
+            x.requires_grad(true);
+            Tensor y = Tensor::upsample2x_nearest(x);
+            Tensor l = y; while (l.dim_count()) l = Tensor::sum(l, 0); l.backward();
+            std::printf("[upgrad] ok grad0=%g numel=%lld\n",
+                        x.grad().data<float>()[0], (long long)x.grad().numel());
+        } catch (const std::exception& e) {
+            std::printf("[upgrad] FAIL: %s\n", e.what());
+        }
+    }
+
     // DLL 消费者回归: 此前缺失的导出(Shape 方法 / data<T> / item<T>)
     {
         Conv2dOptions o;                            // 触发 Shape(initializer_list)

@@ -271,10 +271,12 @@ size_t bucket_of(size_t bytes) {          // 桶 = ≥256 的下一个 2^n
 void* alloc(size_t bytes) {
     VkState* v = st();
     if (!v->ok || bytes == 0) return nullptr;
-    // 内存类型: ≥64MB(4096 级矩阵)走 BAR 显存, 其余系统内存
+    // 内存类型: 默认 ≥64MB(4096 级矩阵)走 BAR 显存, 其余系统内存
     // (实测: ≤2048 工作集系统内存+L2 更快; 8MB 阈值曾把 2048 推上显存反而 2.6× 慢)
-    const uint32_t mem_idx = (bytes >= ((size_t)64 << 20)
-                              && v->local_mem_idx != UINT32_MAX)
+    // ZNN_VK_LOCAL=1: 全部优先 BAR —— 多小算子级 CNN 在独显上避免逐算子 PCIe 往返
+    static const bool prefer_local = std::getenv("ZNN_VK_LOCAL") != nullptr;
+    const uint32_t mem_idx = (v->local_mem_idx != UINT32_MAX
+                              && (prefer_local || bytes >= ((size_t)64 << 20)))
                                  ? v->local_mem_idx : v->host_mem_idx;
     {   // 池命中(key = 类型<<48|桶; 超大块不池化)
         if (bytes <= (size_t)256 << 20) {

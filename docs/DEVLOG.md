@@ -1115,3 +1115,20 @@ RT=4 行块持久化: B 块装载复用 4 次, workgroup 数/4, 无形状特化�
 up2x(cat+reshape 组合, 单次 11.3ms 样例)与高位 LN(dim1)(3.9ms@S1 形状),
 均为访存密集型逐元素内核, 远低于带宽运行。下一步 = 通用上采样算子或
 提速 strided-copy 内核(受益 cat/clone/transpose 全族)。
+
+**[38] upsample2x_nearest 一等算子(全后端) + VK 内存放置开关**
+
+- A: Tensor::upsample2x_nearest(公共 API;此前消费者以 cat+reshape 组合,
+  2 次全量拷贝+中间材料化)。CUDA/VK/Metal 每线程单遍写 2×2 块; 梯度 =
+  reshape{B,C,H,2,W,2}+双 slice 抽取(可微组合)。kit +1 case(手写参考
+  +组合等价+梯度)。**诚实结论: 全模型收益 ~0** —— 我此前的 up2x 热点
+  诊断是画像工具的冷分配假象(单测 11ms 实为 vkAllocateMemory 一次性
+  开销, 稳态链内 3 次 up2x+conv 仅 1.6ms)。教训: 分段画像必须先暖池再计时。
+- 真凶(决定性 A/B): **内存放置** —— 池默认把 <64MB 张量放系统内存,
+  独显上每个算子 PCIe 往返。ZNN_VK_LOCAL=1(全 BAR): CNN **@320
+  71.7→19.5ms(3.7×, 达实时 51fps)、@640 337→64.2ms(5.2×)**; 但流式
+  GEMM 512³ 回退 22× → 按访问模式分化, 保持默认 + 环境开关, BENCH.md
+  记录对照。gemm M 持久化(RT=4)对中段形状 2-3×(S4 117→287 GF/s)。
+- 调试插曲: VK binding 编号(2 缓冲派发是 0/1 非 0/2)、CUDA 边界变量
+  (total vs hw_in)、测试悬空指针 —— 均为 kit 用例逐项暴露后修正;
+  ztestkit 339 ALL GREEN(两种放置均验)。

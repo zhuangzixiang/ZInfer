@@ -137,6 +137,33 @@ __global__ void softmax_dim_k(const float* x, float* y, long long rows,
     for (int64_t i = lane; i < m.n_dim; i += 32) yr[i * m.s_dim] /= s;
 }
 
+// upsample2x_nearest: 每线程写 2×2 块(单遍直写, 免 cat+reshape 组合拷贝)
+__global__ void upsample2x_k(const float* x, float* y, long long total,
+                             long long w_in, long long w_out) {
+    const long long i = blockIdx.x * (long long)blockDim.x + threadIdx.x;
+    if (i >= total) return;
+    const long long w = i % w_in;
+    const long long r = i / w_in;
+    const float v = x[i];
+    float* dst = y + r * 2 * w_out + w * 2;
+    dst[0] = v;
+    dst[1] = v;
+    dst[w_out] = v;
+    dst[w_out + 1] = v;
+}
+
+void upsample2x_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
+                     const void*) {
+    const Tensor& x = *in[0];
+    const long long w_in = x.size(3);
+    const long long hw_in = x.size(2) * w_in;
+    const long long total = x.numel();
+    // 输入连续时按平面索引; 非连续走 ref 级材料化
+    Tensor xc = x.is_contiguous() ? x : x.clone();
+    upsample2x_k<<<(unsigned)((total + kBlock - 1) / kBlock), kBlock>>>(
+        dptr(xc), dptr(*out[0]), total, w_in, w_in * 2);
+}
+
 void softmax_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                   const void* options) {
     Tensor xc = in[0]->is_contiguous() ? *in[0] : in[0]->clone();

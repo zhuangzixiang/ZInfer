@@ -47,6 +47,7 @@ void tanh_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void silu_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 // 第二批(softmax/规约/损失/卷积/池化)
 void softmax_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
+void upsample2x_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void sum_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void mean_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
 void cross_entropy_cuda(KernelContext&, Span<const Tensor*>, Span<Tensor*>, const void*);
