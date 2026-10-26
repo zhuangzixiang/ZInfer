@@ -119,6 +119,15 @@ void avg_grad() {
     }
 }
 
+shared float sums[256];
+void global_avg() {
+    uint lane=gl_LocalInvocationID.x, channel=gl_WorkGroupID.x;
+    int spatial=pc.h*pc.w;float sum=0;
+    for(int i=int(lane);i<spatial;i+=256)sum+=x[int(channel)*spatial+i];
+    sums[lane]=sum;barrier();
+    for(uint s=128;s>0;s>>=1){if(lane<s)sums[lane]+=sums[lane+s];barrier();}
+    if(lane==0)y[channel]=sums[0]/float(spatial);
+}
 void main() {
     if (OP == 0) {
         fwd(true);
@@ -126,6 +135,8 @@ void main() {
         fwd(false);
     } else if (OP == 2) {
         max_grad();
+    } else if(OP==4) {
+        global_avg();
     } else {
         avg_grad();
     }

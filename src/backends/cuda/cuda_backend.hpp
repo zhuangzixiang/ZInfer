@@ -25,6 +25,7 @@ bool   available();                                   // 是否编入且设备�
 void*  alloc(size_t bytes);                           // cudaMalloc
 void   free(void* p);                                 // cudaFree
 void   memset0(void* p, size_t bytes);                // cudaMemset(0)
+void   fill_f32(void* p, size_t count, float value);
 void   copy_host_to_device(void* dst, const void* src, size_t bytes);
 void   copy_device_to_host(void* dst, const void* src, size_t bytes);
 void   copy_device_to_device(void* dst, const void* src, size_t bytes);

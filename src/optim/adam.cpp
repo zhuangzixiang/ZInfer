@@ -6,6 +6,19 @@
 #include <cmath>
 
 namespace znn {
+void AdamImpl::export_state(std::vector<Tensor>& ts,int64_t& step,OptimParam& p,int& kind) const {
+    step=step_count_;p=param_;kind=decoupled_?2:1;
+    for(auto& m:moments_) {ts.push_back(m.m);ts.push_back(m.v);}
+}
+void AdamImpl::import_state(const std::vector<Tensor>& ts,int64_t step,const OptimParam& p,int kind) {
+    if(kind!=(decoupled_?2:1)||ts.size()!=params_.size()*2||step<0) throw std::runtime_error("Adam checkpoint mismatch");
+    std::vector<Moment> next(params_.size());
+    for(size_t i=0;i<params_.size();++i) {
+        if(bool(ts[2*i])!=bool(ts[2*i+1]))throw std::runtime_error("Adam incomplete moments");
+        if(ts[2*i]) {next[i].m=ts[2*i].to_device(params_[i].device());next[i].v=ts[2*i+1].to_device(params_[i].device());}
+    }
+    moments_=std::move(next);param_=p;step_count_=step;
+}
 
 AdamImpl::AdamImpl(std::vector<Tensor> params, const OptimParam& param)
     : param_(param) {

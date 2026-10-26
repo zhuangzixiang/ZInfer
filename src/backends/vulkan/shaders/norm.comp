@@ -78,6 +78,17 @@ void ln_group() {
         y[base + d * pc.w] = (x[base + d * pc.w] - mu) * inv * wt[d] + bs[d];
 }
 
+void ln_spatial() {
+    int lid=int(gl_LocalInvocationID.x), lane=lid%32, part=lid/32;
+    int g=int(gl_WorkGroupID.x)*32+lane;
+    int base=g/pc.w*pc.d*pc.w+g%pc.w;
+    float s=0.0,q=0.0;
+    if(g<pc.rows)for(int d=part;d<pc.d;d+=8){float v=x[base+d*pc.w];s+=v;q+=v*v;}
+    sm[lid]=s;sv[lid]=q;barrier();
+    s=0.0;q=0.0;for(int j=0;j<8;++j){s+=sm[j*32+lane];q+=sv[j*32+lane];}
+    float mu=s/float(pc.d), inv=inversesqrt(max(q/float(pc.d)-mu*mu,0.0)+pc.eps);
+    if(g<pc.rows)for(int d=part;d<pc.d;d+=8)y[base+d*pc.w]=(x[base+d*pc.w]-mu)*inv*wt[d]+bs[d];
+}
 void bn_channel() {
     const int c = int(gl_GlobalInvocationID.y);
     if (c >= pc.d) return;
@@ -130,4 +141,5 @@ void main() {
     if (OP == 0) { ln_row(); return; }
     if (OP == 1) { bn_channel(); return; }
     if (OP == 2) { ln_group(); return; }
+    if (OP == 3) { ln_spatial(); return; }
 }

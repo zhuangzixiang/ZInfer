@@ -76,6 +76,7 @@ float max_diff(const znn::Tensor& a, const znn::Tensor& b) {
     float m = 0.f;
     for (int64_t i = 0; i < a.numel(); ++i) {
         const float d = std::fabs(a.data<float>()[i] - b.data<float>()[i]);
+        if (!std::isfinite(d)) return 1e30f;
         m = m < d ? d : m;
     }
     return m;

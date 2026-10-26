@@ -3,6 +3,7 @@
 #include "op_dispatcher.hpp"
 #include "backend_slots.hpp"
 #include <vector>
+#include <cstring>
 
 namespace znn {
 
@@ -13,7 +14,9 @@ struct CatOptions {
 };
 
 static int64_t resolve_dim(int64_t dim, int64_t rank) {
-    return dim < 0 ? dim + rank : dim;
+    dim = dim < 0 ? dim + rank : dim;
+    if(dim<0 || dim>=rank)throw std::runtime_error("znn: cat dimension out of range");
+    return dim;
 }
 
 static void cat_infer(Span<const TensorMeta*> in, const void* options,
@@ -67,6 +70,25 @@ static void cat_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     }
 }
 
+static void cat_cpu(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
+                    const void* options) {
+    for(size_t i=0;i<in.size();++i)if(!in[i]->is_contiguous()) {
+        cat_ref(ctx,in,out,options);return;
+    }
+    Tensor& y=*out[0];
+    const int64_t dim=resolve_dim(static_cast<const CatOptions*>(options)->dim,y.dim_count());
+    int64_t inner=1,outer=1;
+    for(int64_t d=0;d<y.dim_count();++d){if(d<dim)outer*=y.size(d);if(d>dim)inner*=y.size(d);}
+    const int64_t row=y.size(dim)*inner;
+    int64_t offset=0;
+    for(size_t i=0;i<in.size();++i) {
+        const int64_t block=in[i]->size(dim)*inner;
+        if(block)for(int64_t n=0;n<outer;++n)
+            std::memcpy(y.data<float>()+n*row+offset,in[i]->data<float>()+n*block,size_t(block)*sizeof(float));
+        offset+=block;
+    }
+}
+
 static void cat_grad(BackwardContext& c) {
     const int64_t dim = resolve_dim(static_cast<const CatOptions*>(c.options)->dim,
                                     c.grad_outputs[0]->dim_count());
@@ -85,7 +107,7 @@ const Operator g_cat_operator = {
     cat_infer,
     cat_grad,
     cat_ref,
-    {nullptr, ZNN_CUDA_K(cat_cuda), ZNN_METAL_K(cat_metal), ZNN_VULKAN_K(cat_vulkan)},
+    {cat_cpu, ZNN_CUDA_K(cat_cuda), ZNN_METAL_K(cat_metal), ZNN_VULKAN_K(cat_vulkan)},
     sizeof(CatOptions),
 };
 
@@ -93,7 +115,7 @@ Tensor Tensor::cat(const std::vector<Tensor>& tensors, int64_t dim) {
     if (tensors.empty()) {
         throw std::runtime_error("znn: cat needs inputs");
     }
-    const CatOptions o{dim};
+    const CatOptions o{resolve_dim(dim,tensors.front().dim_count())};
     std::vector<const Tensor*> ins;
     ins.reserve(tensors.size());
     for (const Tensor& t : tensors) {

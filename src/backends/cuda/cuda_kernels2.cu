@@ -386,47 +386,21 @@ __global__ void conv2d_k(const float* x, const float* w, float* y,
     y[i] = acc;
 }
 
-// ---- conv2d 快速路径: im2col + 逐组 GEMM + NCHW 回转 ----
-// 每线程填 (输出位置, 输入通道) 的整条 KH×KW 窗口(越界补零)
+// NCHW im2col: adjacent threads visit adjacent spatial positions. Columns
+// are [N, C*KH*KW, HO*WO], allowing W*col to write NCHW directly.
 __global__ void im2col_k(const float* x, float* col,
-                         int N, int C, int H, int W, int HO, int WO,
-                         int KH, int KW,
-                         int sh, int sw, int ph, int pw, int dh, int dw) {
-    const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
-    const int64_t total = (int64_t)N * HO * WO * C;
-    if (i >= total) return;
-    const int c = i % C;
-    const int64_t t = i / C;
-    const int wo = t % WO;
-    const int64_t t2 = t / WO;
-    const int ho = t2 % HO;
-    const int n = t2 / HO;
-    const int64_t CK = (int64_t)C * KH * KW;
-    float* dst = col + (((int64_t)n * HO + ho) * WO + wo) * CK
-               + (int64_t)c * KH * KW;
-    const float* xn = x + ((int64_t)n * C + c) * H * W;
-    for (int ki = 0; ki < KH; ++ki) {
-        const int ii = ho * sh + ki * dh - ph;
-        for (int kj = 0; kj < KW; ++kj) {
-            const int jj = wo * sw + kj * dw - pw;
-            dst[ki * KW + kj] =
-                (ii < 0 || ii >= H || jj < 0 || jj >= W) ? 0.f : xn[ii * W + jj];
-        }
-    }
-}
-
-// 行主序 y2[M, O] → NCHW y(一次转置写回)
-__global__ void rowmajor_to_nchw_k(const float* y2, float* y,
-                                   int O, int HO, int WO, int64_t total) {
-    const int64_t i = blockIdx.x * (int64_t)blockDim.x + threadIdx.x;
-    if (i >= total) return;
-    const int wo = i % WO;
-    const int64_t t = i / WO;
-    const int ho = t % HO;
-    const int64_t t2 = t / HO;
-    const int o = t2 % O;
-    const int n = t2 / O;
-    y[i] = y2[(((int64_t)n * HO + ho) * WO + wo) * O + o];
+ int N,int C,int H,int W,int HO,int WO,int KH,int KW,
+ int sh,int sw,int ph,int pw,int dh,int dw) {
+ const int64_t i=blockIdx.x*int64_t(blockDim.x)+threadIdx.x;
+ const int64_t spatial=int64_t(HO)*WO;
+ if(i>=int64_t(N)*C*spatial)return;
+ const int64_t pos=i%spatial,nc=i/spatial;
+ const int ho=pos/WO,wo=pos%WO;
+ const float* src=x+nc*H*W;
+ for(int ki=0;ki<KH;++ki)for(int kj=0;kj<KW;++kj) {
+  int h=ho*sh+ki*dh-ph,w=wo*sw+kj*dw-pw;
+  col[(nc*KH*KW+ki*KW+kj)*spatial+pos]=(h<0||h>=H||w<0||w>=W)?0.f:src[h*W+w];
+ }
 }
 
 // ---- 池化反向(每线程一个输出元素, 重算窗口后原子散射) ----
@@ -517,8 +491,18 @@ void conv2d_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
     const int HO = y.size(2), WO = y.size(3);
     const int G = o->groups, Cg = C / G, Og = O / G;
     const int64_t M = (int64_t)N * HO * WO;
-    const int CK = C * KH * KW, CKg = Cg * KH * KW;
+    const int CK = C * KH * KW;
 
+    if (KH == 1 && KW == 1 && o->stride[0] == 1 && o->stride[1] == 1
+        && o->pad[0] == 0 && o->pad[1] == 0) {
+        bool ok = true;
+        for (int n=0;n<N && ok;++n) for(int g=0;g<G && ok;++g)
+            ok = gemm_cuda(dptr(w)+(int64_t)g*Og*Cg,Cg,
+                           dptr(x)+((int64_t)n*C+g*Cg)*H*W,H*W,
+                           dptr(y)+((int64_t)n*O+g*Og)*H*W,H*W,
+                           Og,H*W,Cg,false,ctx.precision);
+        if(ok) return;
+    }
     if (G > 1) {
         // 分组走直接内核: im2col 列切片路径在 kit 矩阵对拍中暴露数值错
         // (ztestkit conv2d groups), 朴素内核与 CPU ref 逐位一致
@@ -530,26 +514,16 @@ void conv2d_cuda(KernelContext& ctx, Span<const Tensor*> in, Span<Tensor*> out,
         return;
     }
 
-    // 快速路径: im2col → 逐组 GEMM(列切片靠 ld 表达, 免拷贝) → NCHW 回转
-    Tensor col = Tensor::empty(Shape{M, CK}, DType::F32, Device::CUDA);
-    im2col_k<<<(unsigned)((M * C + kBlock - 1) / kBlock), kBlock>>>(
-        dptr(x), dptr(col), N, C, H, W, HO, WO, KH, KW,
-        o->stride[0], o->stride[1], o->pad[0], o->pad[1],
-        o->dilation[0], o->dilation[1]);
-    Tensor y2 = Tensor::empty(Shape{M, O}, DType::F32, Device::CUDA);
-    bool ok = true;
-    for (int g = 0; g < G && ok; ++g) {
-        ok = gemm_cuda(dptr(col) + (int64_t)g * CKg, CK,   // A 列切片, ld=CK
-                       dptr(w) + (int64_t)g * Og * CK, CK, // B=w^T 布局
-                       dptr(y2) + (int64_t)g * Og, O,      // C 列切片, ld=O
-                       (int)M, Og, CKg,
-                       /*b_transposed=*/true, ctx.precision);
-    }
-    if (ok) {
-        rowmajor_to_nchw_k<<<(unsigned)((y.numel() + kBlock - 1) / kBlock), kBlock>>>(
-            dptr(y2), dptr(y), O, HO, WO, y.numel());
-        return;
-    }
+    const int spatial=HO*WO;
+    Tensor col=Tensor::empty(Shape{N,CK,spatial},DType::F32,Device::CUDA);
+    im2col_k<<<unsigned((M*C+kBlock-1)/kBlock),kBlock>>>(
+        dptr(x),dptr(col),N,C,H,W,HO,WO,KH,KW,
+        o->stride[0],o->stride[1],o->pad[0],o->pad[1],o->dilation[0],o->dilation[1]);
+    bool ok=true;
+    for(int n=0;n<N && ok;++n)
+        ok=gemm_cuda(dptr(w),CK,dptr(col)+int64_t(n)*CK*spatial,spatial,
+                     dptr(y)+int64_t(n)*O*spatial,spatial,O,spatial,CK,false,ctx.precision);
+    if(ok)return;
 
     // 兜底: 朴素卷积(cuBLAS 缺失或 GEMM 失败)
     conv2d_k<<<static_cast<unsigned>((y.numel() + kBlock - 1) / kBlock), kBlock>>>(
@@ -624,12 +598,25 @@ void max_pool2d_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
         o->pool.pad[0], o->pool.pad[1]);
 }
 
+__global__ void global_avg_pool_k(const float* x,float* y,int spatial) {
+    __shared__ float sums[256];
+    const int lane=threadIdx.x;const int64_t base=int64_t(blockIdx.x)*spatial;
+    float sum=0;for(int i=lane;i<spatial;i+=256)sum+=x[base+i];
+    sums[lane]=sum;__syncthreads();
+    for(int s=128;s;s>>=1){if(lane<s)sums[lane]+=sums[lane+s];__syncthreads();}
+    if(lane==0)y[blockIdx.x]=sums[0]/spatial;
+}
+
 void avg_pool2d_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                      const void* options) {
     require_contiguous1c(*in[0], *out[0]);
     const PoolCallOptions* o = static_cast<const PoolCallOptions*>(options);
     const Tensor& x = *in[0];
     Tensor& y = *out[0];
+    if(y.size(2)==1 && y.size(3)==1 && o->pool.pad[0]==0 && o->pool.pad[1]==0
+       && o->kernel[0]==x.size(2) && o->kernel[1]==x.size(3)) {
+        global_avg_pool_k<<<unsigned(y.numel()),256>>>(dptr(x),dptr(y),int(x.size(2)*x.size(3)));return;
+    }
     avg_pool_k<<<static_cast<unsigned>((y.numel() + kBlock - 1) / kBlock), kBlock>>>(
         dptr(x), dptr(y),
         x.size(0), x.size(1), x.size(2), x.size(3), y.size(2), y.size(3),

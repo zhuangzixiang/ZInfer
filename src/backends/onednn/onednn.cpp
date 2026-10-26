@@ -8,6 +8,9 @@
 #include "backends/onednn/onednn.hpp"
 #include "dynlib.hpp"
 #include <cstring>
+#include <list>
+#include <memory>
+#include <vector>
 
 namespace znn {
 namespace onednn {
@@ -81,7 +84,7 @@ bool exec(dnnl_engine_t eng, dnnl_stream_t stm, dnnl_primitive_desc_t pd,
     }
     const bool binary_op = b != nullptr;
     if (binary_op
-        && dn::pd_query_md(pd, dnnl_query_exec_arg_md, DNNL_ARG_SRC_1) == nullptr) {
+        && dn::pd_query_md(pd, dnnl_query_exec_arg_md, arg1) == nullptr) {
         return false;   // 描述符与参数不符(防御)
     }
     const_dnnl_memory_desc_t sp_md =
@@ -94,10 +97,12 @@ bool exec(dnnl_engine_t eng, dnnl_stream_t stm, dnnl_primitive_desc_t pd,
         || (sp_md && !msp.wrap(sp_md, eng, DNNL_MEMORY_ALLOCATE))) {
         return false;   // RAII 全量析构
     }
-    dnnl_exec_arg_t args[4] = {
-        {DNNL_ARG_SRC_0, ma.p}, {arg1, mb.p},
-        {DNNL_ARG_DST, my.p}, {DNNL_ARG_SCRATCHPAD, msp.p}};
-    const int n = (binary_op ? 2 : 1) + 1 + (sp_md ? 1 : 0);
+    dnnl_exec_arg_t args[4];
+    int n = 0;
+    args[n++] = {DNNL_ARG_SRC_0, ma.p};
+    if (binary_op) args[n++] = {arg1, mb.p};
+    args[n++] = {DNNL_ARG_DST, my.p};
+    if (sp_md) args[n++] = {DNNL_ARG_SCRATCHPAD, msp.p};
     return dn::execute(prim.p, stm, n, args) == dnnl_success
            && dn::stream_wait(stm) == dnnl_success;
 }
@@ -147,8 +152,10 @@ bool binary(Span<const Tensor*> in, Span<Tensor*> out, int alg) {
         const int64_t bdpos = d - (rank - (int64_t)b.dim_count());
         const int64_t bl = bdpos < 0 ? 1 : b.size(bdpos);
         if (bl != y.size(d) && bl != 1) return false;
-        bd[d] = (dnnl_dim_t)y.size(d);
-        bs[d] = bl == 1 ? 0 : acc;
+        // Keep singleton dimensions: expanding them with zero strides forces
+        // oneDNN's slow reference binary implementation on NCHW channel bias.
+        bd[d] = (dnnl_dim_t)bl;
+        bs[d] = acc;
         acc *= bl;
     }
     if (dn::md_create(&mb.p, rank, bd, dnnl_f32, bs) != dnnl_success) {
@@ -228,11 +235,91 @@ bool gemm(const float* A, int lda, const float* B, int ldb,
                      0.f, C, ldc) == dnnl_success;
 }
 
-// ---- 卷积(NCHW × OIHW → NCHW; 分组/非 4D 不支持) ----
+namespace {
+// Plans cache only layouts, primitives and bounded temporary memory. Current
+// weights are always reordered, so data() writes and optimizer updates are safe.
+struct ConvPlan {
+    Pd pd;
+    Prim primitive,rx,rw,ry;
+    Mem xe,we,ye;
+    bool scratch=false;
+    size_t bytes=0;
+    bool init(const Tensor& x,const Tensor& w,const Tensor& y,const Conv2dOptions& o,
+              const_dnnl_memory_desc_t xs,const_dnnl_memory_desc_t ws,const_dnnl_memory_desc_t ys) {
+        Eng eng;Md xa,wa,ya;
+        dnnl_dim_t xd[4],yd[4],wd[5];for(int i=0;i<4;++i){xd[i]=x.size(i);yd[i]=y.size(i);}
+        int rank=4;
+        if(o.groups>1){rank=5;wd[0]=o.groups;wd[1]=w.size(0)/o.groups;for(int i=1;i<4;++i)wd[i+1]=w.size(i);}
+        else for(int i=0;i<4;++i)wd[i]=w.size(i);
+        if(dn::md_tag(&xa.p,4,xd,dnnl_f32,dnnl_format_tag_any)!=dnnl_success
+           ||dn::md_tag(&wa.p,rank,wd,dnnl_f32,dnnl_format_tag_any)!=dnnl_success
+           ||dn::md_tag(&ya.p,4,yd,dnnl_f32,dnnl_format_tag_any)!=dnnl_success)return false;
+        dnnl_dim_t st[2]={o.stride[0],o.stride[1]},di[2]={o.dilation[0]-1,o.dilation[1]-1},pad[2]={o.pad[0],o.pad[1]};
+        if(dn::conv_pd(&pd.p,eng.p,dnnl_forward_inference,dnnl_convolution_direct,xa.p,wa.p,nullptr,ya.p,st,di,pad,pad,nullptr)!=dnnl_success)return false;
+        auto query=[&](int arg){return dn::pd_query_md(pd.p,dnnl_query_exec_arg_md,arg);};
+        auto ix=query(DNNL_ARG_SRC),iw=query(DNNL_ARG_WEIGHTS),iy=query(DNNL_ARG_DST);
+        auto sd=dn::pd_query_md(pd.p,dnnl_query_scratchpad_md,0);scratch=sd!=nullptr;
+        bytes=dn::md_size(ix)+dn::md_size(iw)+dn::md_size(iy)+(sd?dn::md_size(sd):0);
+        if(!xe.wrap(xs,eng.p,x.data<float>())||!we.wrap(ws,eng.p,w.data<float>())||!ye.wrap(ys,eng.p,y.data<float>()))return false;
+        auto reorder=[&](const_dnnl_memory_desc_t from,const_dnnl_memory_desc_t to,Prim& r){
+            Pd rp;return dn::reorder_pd(&rp.p,from,eng.p,to,eng.p,nullptr)==dnnl_success
+                        &&dn::primitive_create(&r.p,rp.p)==dnnl_success;
+        };
+        return reorder(xs,ix,rx)&&reorder(ws,iw,rw)&&reorder(iy,ys,ry)
+            &&dn::primitive_create(&primitive.p,pd.p)==dnnl_success;
+    }
+    bool run(const Tensor& x,const Tensor& w,Tensor& y) {
+        Stm stm;
+        // Retain execution objects, not every layer's full activation buffers.
+        // The latter increased process memory by hundreds of MB for ~1% gain.
+        Eng eng;Mem xm,wm,ym,sp;
+        auto query=[&](int arg){return dn::pd_query_md(pd.p,dnnl_query_exec_arg_md,arg);};
+        auto sd=dn::pd_query_md(pd.p,dnnl_query_scratchpad_md,0);
+        if(!xm.wrap(query(DNNL_ARG_SRC),eng.p,DNNL_MEMORY_ALLOCATE)
+           ||!wm.wrap(query(DNNL_ARG_WEIGHTS),eng.p,DNNL_MEMORY_ALLOCATE)
+           ||!ym.wrap(query(DNNL_ARG_DST),eng.p,DNNL_MEMORY_ALLOCATE)
+           ||(sd&&!sp.wrap(sd,eng.p,DNNL_MEMORY_ALLOCATE)))return false;
+        if(dn::memory_set_handle(xe.p,x.data<float>())!=dnnl_success
+           ||dn::memory_set_handle(we.p,w.data<float>())!=dnnl_success
+           ||dn::memory_set_handle(ye.p,y.data<float>())!=dnnl_success)return false;
+        auto reorder=[&](Prim& p,Mem& from,Mem& to){
+            dnnl_exec_arg_t args[2]={{DNNL_ARG_FROM,from.p},{DNNL_ARG_TO,to.p}};
+            return dn::execute(p.p,stm.p,2,args)==dnnl_success && dn::stream_wait(stm.p)==dnnl_success;
+        };
+        if(!reorder(rx,xe,xm)||!reorder(rw,we,wm))return false;
+        dnnl_exec_arg_t args[4]={{DNNL_ARG_SRC,xm.p},{DNNL_ARG_WEIGHTS,wm.p},{DNNL_ARG_DST,ym.p},{DNNL_ARG_SCRATCHPAD,sp.p}};
+        if(dn::execute(primitive.p,stm.p,scratch?4:3,args)!=dnnl_success||dn::stream_wait(stm.p)!=dnnl_success)return false;
+        return reorder(ry,ym,ye);
+    }
+};
+bool conv_layout(const Tensor& x,const Tensor& w,Tensor& y,const Conv2dOptions& o,
+                 const_dnnl_memory_desc_t xs,const_dnnl_memory_desc_t ws,const_dnnl_memory_desc_t ys) {
+    if(!dn::md_tag || !dn::reorder_pd || !dn::md_size || !dn::memory_set_handle || dn::family_off("conv_layout"))return false;
+    struct Entry {std::vector<int64_t> key;std::unique_ptr<ConvPlan> plan;};
+    struct Cache {std::list<Entry> lru;size_t bytes=0;};
+    thread_local Cache cache;
+    std::vector<int64_t> key;
+    for(int i=0;i<4;++i){key.push_back(x.size(i));key.push_back(w.size(i));key.push_back(y.size(i));}
+    for(int i=0;i<2;++i){key.push_back(o.stride[i]);key.push_back(o.pad[i]);key.push_back(o.dilation[i]);}key.push_back(o.groups);
+    if(!dn::family_off("conv_cache"))for(auto it=cache.lru.begin();it!=cache.lru.end();++it)if(it->key==key){
+        cache.lru.splice(cache.lru.begin(),cache.lru,it);return cache.lru.front().plan->run(x,w,y);
+    }
+    auto plan=std::make_unique<ConvPlan>();if(!plan->init(x,w,y,o,xs,ws,ys))return false;
+    constexpr size_t budget=size_t(256)*1024*1024;
+    if(dn::family_off("conv_cache") || plan->bytes>budget)return plan->run(x,w,y);
+    while(!cache.lru.empty() && (cache.bytes+plan->bytes>budget || cache.lru.size()>=128)){
+        cache.bytes-=cache.lru.back().plan->bytes;cache.lru.pop_back();
+    }
+    cache.bytes+=plan->bytes;cache.lru.push_front({std::move(key),std::move(plan)});
+    return cache.lru.front().plan->run(x,w,y);
+}
+}
+
+// ---- 卷积: 外部 NCHW/OIHW，内部布局由 oneDNN 选择 ----
 bool conv2d(const Tensor& x, const Tensor& w, Tensor& y,
             const Conv2dOptions& o) {
     if (dn::family_off("conv") || !dn::available_onednn()) return false;
-    if (o.groups != 1 || x.dim_count() != 4 || w.dim_count() != 4
+    if (x.dim_count() != 4 || w.dim_count() != 4
         || o.dilation[0] != 1 || o.dilation[1] != 1) {
         return false;
     }
@@ -240,7 +327,15 @@ bool conv2d(const Tensor& x, const Tensor& w, Tensor& y,
     Stm stm;
     if (!eng.ok() || !stm.ok()) return false;
     Md ms, mw, md;
-    if (!ms.from(x) || !mw.from(w) || !md.from(y)) return false;
+    if (!ms.from(x) || !md.from(y)) return false;
+    if (o.groups > 1) {
+        if (!w.is_contiguous()) return false;
+        const dnnl_dim_t dims[5] = {o.groups, w.size(0)/o.groups, w.size(1), w.size(2), w.size(3)};
+        dnnl_dim_t strides[5]; strides[4] = 1;
+        for (int i=3;i>=0;--i) strides[i]=strides[i+1]*dims[i+1];
+        if (dn::md_create(&mw.p,5,dims,dnnl_f32,strides)!=dnnl_success) return false;
+    } else if (!mw.from(w)) return false;
+    if(conv_layout(x,w,y,o,ms.p,mw.p,md.p))return true;
     const dnnl_dim_t st[2] = {(dnnl_dim_t)o.stride[0], (dnnl_dim_t)o.stride[1]};
     const dnnl_dim_t di[2] = {0, 0};
     const dnnl_dim_t pl[2] = {(dnnl_dim_t)o.pad[0], (dnnl_dim_t)o.pad[1]};

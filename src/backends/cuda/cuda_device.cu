@@ -73,8 +73,10 @@ void copy_device_to_device(void* dst, const void* src, size_t bytes) {
 }
 
 void memset0(void* p, size_t bytes) {
-    check(cudaMemset(p, 0, bytes), "memset0");
+    check(cudaMemsetAsync(p, 0, bytes, nullptr), "memset0");
 }
+__global__ void fill_f32_k(float* p,size_t n,float value) {size_t i=blockIdx.x*(size_t)blockDim.x+threadIdx.x;if(i<n)p[i]=value;}
+void fill_f32(void* p,size_t n,float value) {if(n){fill_f32_k<<<(unsigned)((n+255)/256),256>>>((float*)p,n,value);check(cudaGetLastError(),"fill_f32");}}
 
 } // namespace cuda_backend
 } // namespace znn

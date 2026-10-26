@@ -307,6 +307,18 @@ __global__ void layer_norm_dim_k(const float* x, const float* w, const float* b,
         yr[d * m.inner] = (xr[d * m.inner] - mu) * inv * w[d] + b[d];
 }
 
+__global__ void layer_norm_spatial_k(const float* x,const float* w,const float* b,float* y,long long groups,LnDimIn m,float eps) {
+    const int lane=threadIdx.x, part=threadIdx.y;
+    const long long gi=(long long)blockIdx.x*32+lane;
+    const long long base=gi/m.inner*m.D*m.inner+gi%m.inner;
+    __shared__ float sums[8][32], squares[8][32];
+    float s=0,q=0;
+    if(gi<groups)for(long long d=part;d<m.D;d+=8){float v=x[base+d*m.inner];s+=v;q+=v*v;}
+    sums[part][lane]=s;squares[part][lane]=q;__syncthreads();
+    s=0;q=0;for(int j=0;j<8;++j){s+=sums[j][lane];q+=squares[j][lane];}
+    const float mean=s/m.D,inv=rsqrtf(fmaxf(q/m.D-mean*mean,0.f)+eps);
+    if(gi<groups)for(long long d=part;d<m.D;d+=8)y[base+d*m.inner]=(x[base+d*m.inner]-mean)*inv*w[d]+b[d];
+}
 void layer_norm_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                      const void* options) {
     // options = LayerNormOptions{double eps; int64_t dim}(此前仅 double eps,
@@ -335,6 +347,10 @@ void layer_norm_cuda(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     }
     groups *= m.inner;              // 组数 = outer × inner(gi = o*inner + i)
     Tensor xc = x.is_contiguous() ? x : x.clone();       // 异步池流序释放, 局部安全
+    if(m.inner>=1024) {
+        layer_norm_spatial_k<<<(unsigned)((groups+31)/32),dim3(32,8)>>>(dptr(xc),dptr(*in[1]),dptr(*in[2]),dptr(*out[0]),groups,m,float(o->eps));
+        return;
+    }
     layer_norm_dim_k<<<(unsigned)((groups + 7) / 8), dim3(32, 8)>>>(
         dptr(xc), dptr(*in[1]), dptr(*in[2]), dptr(*out[0]), groups, m,
         (float)o->eps);

@@ -6,12 +6,140 @@
 // 新算子接入 = 加一个 ZTK_CASE(与实现同块落地, 测试先行)。
 // ============================================================================
 #include "../ztestkit.hpp"
+#include <filesystem>
+#include <chrono>
+#include <memory>
 
 using namespace znn;
 using ztestkit::back;
 using ztestkit::check;
 using ztestkit::max_diff;
 using ztestkit::on;
+
+ZTK_CASE(conv_plan_updates, false) {
+    for(int groups:{1,2})for(int width:{17,19,17}) {
+        auto x=Tensor::randn({2,4,13,width},1201),w=Tensor::randn({6,4/groups,3,3},1202);
+        Conv2dOptions o;o.groups=groups;o.pad={1,1};o.stride={2,2};
+        for(int iteration=0;iteration<3;++iteration){
+            o.dilation={iteration==2?2:1,1};
+            for(int64_t i=0;i<w.numel();++i)w.data<float>()[i]+=.01f;
+            for(int64_t i=0;i<x.numel();++i)x.data<float>()[i]*=.9f;
+            auto y=back(Tensor::conv2d(on(ztk_dev,x),on(ztk_dev,w),o));bool ok=true;
+            for(int n=0;n<2;++n)for(int oc=0;oc<6;++oc)for(int h=0;h<y.size(2);++h)for(int v=0;v<y.size(3);++v){
+                double sum=0;int g=oc/(6/groups);
+                for(int c=0;c<4/groups;++c)for(int kh=0;kh<3;++kh)for(int kw=0;kw<3;++kw){int hi=h*2+kh*o.dilation[0]-1,wi=v*2+kw-1;if(hi>=0&&hi<13&&wi>=0&&wi<width)sum+=double(x.data<float>()[((n*4+g*(4/groups)+c)*13+hi)*width+wi])*w.data<float>()[((oc*(4/groups)+c)*3+kh)*3+kw];}
+                ok=ok&&std::abs(y.data<float>()[((n*6+oc)*y.size(2)+h)*y.size(3)+v]-sum)<2e-4;
+            }
+            check(ok,"conv plan follows current weights/input, shapes, batches and groups");
+        }
+    }
+}
+
+ZTK_CASE(global_avg_pool_reference, true) {
+    for(int spatial:{1,17,257}) {
+        const int H=spatial,W=19;auto x=Tensor::randn({2,3,H,W},1101);
+        auto xd=on(ztk_dev,x);xd.requires_grad(true);Pool2dOptions o;o.stride={1,1};
+        auto y=Tensor::avg_pool2d(xd,{H,W},o);auto host=back(y);bool ok=true;
+        for(int c=0;c<6;++c){double sum=0;for(int i=0;i<H*W;++i)sum+=x.data<float>()[c*H*W+i];ok=ok&&std::abs(host.data<float>()[c]-sum/(H*W))<2e-6;}
+        check(ok,"global average vs double reference, batch and tail");
+        while(y.dim_count())y=Tensor::sum(y,0);y.backward();auto g=back(xd.grad());
+        ok=true;for(int64_t i=0;i<g.numel();++i)ok=ok&&std::abs(g.data<float>()[i]-1.f/(H*W))<1e-6;
+        check(ok,"global average gradient");
+    }
+}
+
+ZTK_CASE(cat_contiguous_blocks, true) {
+    auto h=Tensor::randn({3,5,7},1102);auto x=on(ztk_dev,h);x.requires_grad(true);
+    for(int dim:{0,1,2,-1}) {
+        int d=dim<0?2:dim;auto y=Tensor::cat({x,x},dim);auto r=back(y);bool ok=true;
+        for(int a=0;a<r.size(0);++a)for(int b=0;b<r.size(1);++b)for(int c=0;c<r.size(2);++c){int ai=d==0?a%3:a,bi=d==1?b%5:b,ci=d==2?c%7:c;ok=ok&&r.data<float>()[(a*r.size(1)+b)*r.size(2)+c]==h.data<float>()[(ai*5+bi)*7+ci];}
+        check(ok,"cat exact contiguous blocks on all axes");
+    }
+    auto s=x.slice(0,1,3);auto y=Tensor::cat({s,s},0);
+    while(y.dim_count())y=Tensor::sum(y,0);y.backward();auto g=back(x.grad());bool ok=true;
+    for(int i=0;i<105;++i)ok=ok&&g.data<float>()[i]==(i<35?0.f:2.f);
+    check(ok,"cat offset blocks and shared input gradient");
+}
+
+ZTK_CASE(native_fill_readback, false) {
+    for(float value:{0.f,.1f,-3.25f}) {
+        auto t=Tensor::full({4099},value,DType::F32,ztk_dev);
+        auto host=t.slice(0,3,4098).to_device(Device::CPU);
+        bool ok=true;for(int64_t i=0;i<host.numel();++i)ok=ok&&host.data<float>()[i]==value;
+        check(ok,"native fill and offset readback");
+    }
+}
+ZTK_CASE(contiguous_offset_arithmetic, true) {
+    auto host=Tensor::randn({1,12,13,11},982),w=Tensor::randn({9,6,3,3},983);
+    auto view=host.slice(1,6,12);auto dv=on(ztk_dev,host).slice(1,6,12);
+    Conv2dOptions o;o.pad={1,1};
+    auto ref=Tensor::conv2d(view,w,o);auto result=back(Tensor::conv2d(dv,on(ztk_dev,w),o));
+    check(max_diff(ref,result)<3e-4f,"contiguous offset convolution");
+    check(max_diff(Activator::silu(view),back(Activator::silu(dv)))<2e-5f,"contiguous offset unary");
+    auto src=Tensor::from_host(host.data<float>(),host.shape(),DType::F32,ztk_dev);src.requires_grad(true);
+    auto sv=src.slice(1,6,12);auto z=Tensor::sum(Tensor::sum(Tensor::sum(Tensor::sum(Tensor::mul(sv,sv),3),2),1),0);z.backward();
+    auto grad=back(src.grad());bool ok=true;
+    for(int i=0;i<12*143;++i)ok=ok&&std::abs(grad.data<float>()[i]-(i<6*143?0:2*host.data<float>()[i]))<1e-5f;
+    check(ok,"contiguous offset gradient");
+}
+
+ZTK_CASE(optimizer_resume, true) {
+    using OptPtr=std::unique_ptr<Optimizer,decltype(&Optimizer::destroy)>;
+    for(auto type:{OptimType::Sgd,OptimType::Adam,OptimType::AdamW}) {
+        auto p=Tensor::full({17},.7,DType::F32,ztk_dev);p.requires_grad(true);
+        OptimParam config;config.lr=.01;config.momentum=.9;config.weight_decay=.03;
+        OptPtr a(Optimizer::create(type,std::vector<Tensor>{p},config),Optimizer::destroy);
+        auto step=[](Tensor& p,Optimizer& o){Tensor::sum(Tensor::mul(p,p),0).backward();o.step();o.clear();};
+        for(int i=0;i<3;++i)step(p,*a);
+        auto host=p.to_device(Device::CPU);auto q=Tensor::from_host(host.data<float>(),host.shape(),DType::F32,ztk_dev);q.requires_grad(true);
+        OptPtr b(Optimizer::create(type,std::vector<Tensor>{q},config),Optimizer::destroy);
+        const auto path=(std::filesystem::temp_directory_path()/("znn_optimizer_"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())+".bin")).string();
+        a->save_state(path);b->load_state(path);std::filesystem::remove(path);
+        for(int i=0;i<4;++i){step(p,*a);step(q,*b);}
+        check(max_diff(back(p),back(q))<1e-6f,"optimizer state reproduces uninterrupted updates");
+    }
+}
+
+ZTK_CASE(sgd_without_momentum, true) {
+    auto p=Tensor::full({17},2.,DType::F32,ztk_dev);p.requires_grad(true);
+    OptimParam cfg;cfg.lr=.1;cfg.momentum=0;cfg.weight_decay=0;
+    std::unique_ptr<Optimizer,decltype(&Optimizer::destroy)> opt(Optimizer::create(OptimType::Sgd,{p},cfg),Optimizer::destroy);
+    Tensor::sum(Tensor::mul(p,p),0).backward();opt->step();
+    auto h=back(p);bool ok=true;for(int i=0;i<17;++i)ok=ok&&std::abs(h.data<float>()[i]-1.6f)<1e-6f;
+    check(ok,"SGD zero momentum device update");
+}
+
+ZTK_CASE(channel_norm_spatial_gradient, true) {
+    LayerParam cfg;cfg.normalized_dim=37;cfg.norm_dim=1;cfg.eps=.001;
+    std::unique_ptr<Layer,decltype(&Layer::destroy)> layer(Layer::create(LayerType::LayerNorm,cfg),Layer::destroy);
+    auto x=Tensor::randn({1,37,33,35},921),weight=Tensor::randn(x.shape(),922);
+    auto dx=on(ztk_dev,x);x.requires_grad(true);dx.requires_grad(true);
+    auto a=Tensor::mul(layer->forward(x),weight),b=Tensor::mul(layer->forward(dx),on(ztk_dev,weight));
+    while(a.dim_count()){a=Tensor::sum(a,0);b=Tensor::sum(b,0);}a.backward();b.backward();
+    check(max_diff(back(x.grad()),back(dx.grad()))<2e-4f,"spatial LN weighted gradient parity");
+}
+
+ZTK_CASE(pointwise_grouped_reference, false) {
+    for(int batch:{1,2})for(int groups:{1,3}) {
+        auto x=Tensor::randn({batch,6,13,11},79),w=Tensor::randn({9,6/groups,1,1},80);
+        Conv2dOptions opt;opt.groups=groups;
+        auto y=back(Tensor::conv2d(on(ztk_dev,x),on(ztk_dev,w),opt));
+        bool ok=true;for(int n=0;n<batch;++n)for(int oc=0;oc<9;++oc)for(int pos=0;pos<143;++pos){float sum=0;int g=oc/(9/groups);for(int c=0;c<6/groups;++c)sum+=x.data<float>()[((n*6+g*(6/groups)+c)*143)+pos]*w.data<float>()[oc*(6/groups)+c];ok=ok&&std::abs(sum-y.data<float>()[(n*9+oc)*143+pos])<2e-4;}
+        check(ok,"pointwise batch/groups manual reference");
+    }
+}
+
+ZTK_CASE(channel_norm_spatial_reference, false) {
+    auto x=Tensor::randn({2,37,33,35},81);
+    LayerParam p;p.normalized_dim=37;p.norm_dim=1;p.eps=1e-3;
+    std::unique_ptr<Layer,decltype(&Layer::destroy)> ln(Layer::create(LayerType::LayerNorm,p),Layer::destroy);
+    auto y=back(ln->forward(on(ztk_dev,x)));bool ok=true;
+    for(int n=0;n<2;++n)for(int i=0;i<1155;i+=7){double s=0,q=0;for(int c=0;c<37;++c){double v=x.data<float>()[(n*37+c)*1155+i];s+=v;q+=v*v;}double mean=s/37,inv=1/std::sqrt(q/37-mean*mean+.001);for(int c=0;c<37;++c){int k=(n*37+c)*1155+i;ok=ok&&std::abs(y.data<float>()[k]-(x.data<float>()[k]-mean)*inv)<2e-4;}}
+    check(ok,"tiled spatial layer norm manual reference");
+    auto view=x.transpose(2,3);
+    auto expected=ln->forward(view.clone());
+    check(max_diff(expected,back(ln->forward(on(ztk_dev,x).transpose(2,3))))<2e-4f,"strided LN view parity");
+}
 
 namespace {
 

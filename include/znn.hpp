@@ -32,6 +32,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <vector>
+#include <string>
 
 namespace znn {
 
@@ -50,6 +51,7 @@ enum class Precision : uint8_t { FP32 = 0, TF32, FP16, BF16, AUTO };
 class ZNN_API Runtime {
 public:
     static bool device_available(Device dev);   // 后端是否编入且可用(编译开关决定)
+    static bool cpu_onednn_available();         // runtime dependency loaded; individual operators may still fall back
     static void set_grad_enabled(bool yes);     // false = 全局暂停建图(验证/推理段)
     static bool grad_enabled();
     static void set_precision(Precision p);     // GEMM 精度(仅 GPU 后端生效)
@@ -226,12 +228,19 @@ public:
 
     virtual void step() = 0;      // 按 .grad() 更新参数
     virtual void clear() = 0;     // 全部参数梯度清零
+    // Portable optimizer checkpoint (parameters themselves are saved separately).
+    void save_state(const std::string& path) const;
+    void load_state(const std::string& path);
 
     const std::vector<Tensor>& params() const { return params_; }  // 只读检视
 
 protected:
     friend class GradScaler;    // unscale 需直接遍历并修改参数梯度
     Optimizer() = default;
+    virtual void export_state(std::vector<Tensor>& tensors, int64_t& step,
+                              OptimParam& param, int& kind) const;
+    virtual void import_state(const std::vector<Tensor>& tensors, int64_t step,
+                              const OptimParam& param, int kind);
     std::vector<Tensor> params_;  // 句柄共享(各实现共用, 见 optim.hpp)
 };
 

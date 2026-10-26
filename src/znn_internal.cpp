@@ -461,7 +461,7 @@ Tensor Tensor::ones(Shape shape, DType dtype, Device device) {
     if (dtype == DType::F16 || dtype == DType::BF16) {
         return Tensor::ones(shape, DType::F32, device).to_dtype(dtype);
     }
-    // 宿主填充后按需上传(设备指针不可宿主直写)
+    if(dtype==DType::F32)return Tensor::full(shape,1.,dtype,device);
     Tensor t = Tensor::empty(shape, dtype, Device::CPU);
     if (dtype == DType::F32) {
         float* p = t.data<float>();
@@ -480,7 +480,17 @@ Tensor Tensor::full(Shape shape, double value, DType dtype, Device device) {
         return Tensor::full(shape, value, DType::F32, device).to_dtype(dtype);
     }
     require(dtype == DType::F32, "full supports floating types");
-    Tensor t = Tensor::empty(shape, dtype, Device::CPU);
+    Tensor t = Tensor::empty(shape, dtype, device);
+    if(t.numel()==0)return t;
+    if(device!=Device::CPU) {
+        switch(device) {
+        case Device::CUDA: ZNN_CUDA_CALL(cuda_backend::fill_f32(gpu_handle(t),size_t(t.numel()),float(value)));break;
+        case Device::Vulkan: ZNN_VULKAN_CALL(vulkan_backend::fill_f32(gpu_handle(t),size_t(t.numel()),float(value)));break;
+        case Device::Metal: ZNN_METAL_CALL(metal_backend::fill_f32(gpu_handle(t),size_t(t.numel()),float(value)));break;
+        default: throw std::runtime_error("Unsupported fill device");
+        }
+        return t;
+    }
     float* p = t.data<float>();
     for (int64_t i = 0; i < t.numel(); ++i) {
         p[i] = static_cast<float>(value);
@@ -881,6 +891,8 @@ Tensor Tensor::detach() const {
 namespace {
 thread_local bool grad_enabled_flag = true;
 }
+
+bool Runtime::cpu_onednn_available() { return dynlib::onednn::available_onednn(); }
 
 bool Runtime::device_available(Device device) {
     if (device == Device::CPU) {

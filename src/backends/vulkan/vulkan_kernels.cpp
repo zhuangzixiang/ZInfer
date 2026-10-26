@@ -658,14 +658,15 @@ void layer_norm_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out
         else if (d > dim) inner *= x.size(d);
     }
     groups *= inner;               // 组数 = outer × inner(gi = o*inner + i)
-    void* p = bridge::get_pipeline(spirv::norm, spirv::norm_bytes, 2, 0, 6);
+    const bool spatial=inner>=1024;
+    void* p = bridge::get_pipeline(spirv::norm, spirv::norm_bytes, spatial?3:2, 0, 6);
     require(p, "ln-dim pipeline");
     struct Pc { int32_t rows, d, h, w; float eps, momentum; int32_t training; } pc{
         (int32_t)groups, (int32_t)D, 0, (int32_t)inner, (float)o->eps, 0.f, 0};
     const VBuf bufs[6] = {vhandle(x), vhandle(*in[1]), vhandle(*in[2]),
                           vhandle(x), vhandle(x), vhandle(*out[0])};
     bridge::dispatch_bufs(p, bufs, 6, &pc, sizeof(pc),
-                          (unsigned)groups, 1, 1);   // 每 workgroup 一组
+                          (unsigned)(spatial?(groups+31)/32:groups), 1, 1);
 }
 
 void batch_norm2d_vulkan(KernelContext&, Span<const Tensor*> in,
@@ -732,6 +733,18 @@ void conv2d_vulkan(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const Tensor& x = *in[0];
     const Tensor& w = *in[1];
     Tensor& y = *out[0];
+    if(x.is_contiguous() && w.is_contiguous() && x.size(0)==1 && o->groups==1
+       && w.size(2)==1 && w.size(3)==1 && o->stride[0]==1 && o->stride[1]==1
+       && o->pad[0]==0 && o->pad[1]==0) {
+        const int M=int(w.size(0)), N=int(x.size(2)*x.size(3)), K=int(x.size(1));
+        const int64_t flops=int64_t(M)*N*K*2;
+        const bool big=flops >= (int64_t(50)<<30);
+        auto p=gemm_pipeline(flops,0); require(p,"pointwise gemm pipeline");
+        struct {int32_t M,N,K,lda,ldb,ldc;} pc{M,N,K,K,N,N};
+        bridge::dispatch(p,vhandle(w),vhandle(x),vhandle(y),&pc,sizeof(pc),
+            (N+(big?63:31))/(big?64:32),(M+(big?63:127))/(big?64:128),1);
+        return;
+    }
     void* p = bridge::get_pipeline(spirv::conv, spirv::conv_bytes, 0, 0, 4);
     require(p, "conv pipeline");
     ConvPc pc = conv_pc(x, w, y, *o);
@@ -785,13 +798,15 @@ void max_pool2d_vulkan(KernelContext&, Span<const Tensor*> in,
 void avg_pool2d_vulkan(KernelContext&, Span<const Tensor*> in,
                        Span<Tensor*> out, const void* options) {
     const PoolCallOptions* o = static_cast<const PoolCallOptions*>(options);
-    void* p = bridge::get_pipeline(spirv::pool, spirv::pool_bytes, 1, 0, 4);
+    const bool global=out[0]->size(2)==1 && out[0]->size(3)==1 && o->pool.pad[0]==0 && o->pool.pad[1]==0
+        && o->kernel[0]==in[0]->size(2) && o->kernel[1]==in[0]->size(3);
+    void* p = bridge::get_pipeline(spirv::pool, spirv::pool_bytes, global?4:1, 0, 4);
     require(p, "pool pipeline");
     PoolPc pc = pool_pc(*in[0], *out[0], *o);
     const VBuf bufs[4] = {vhandle(*in[0]), vhandle(*in[0]),
                           vhandle(*out[0]), vhandle(*out[0])};
     bridge::dispatch_bufs(p, bufs, 4, &pc, sizeof(pc),
-                          (unsigned)grp(out[0]->numel()), 1, 1);
+                          global?unsigned(out[0]->numel()):(unsigned)grp(out[0]->numel()), 1, 1);
 }
 
 void max_pool_grad_vulkan(const Tensor& x, const Tensor& g, Tensor& dx,

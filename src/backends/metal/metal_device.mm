@@ -15,6 +15,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <string>
+#include <cstdlib>
 
 namespace znn {
 namespace metal_backend {
@@ -25,11 +26,32 @@ namespace {
 struct MtlState {
     id<MTLDevice> device = nil;
     id<MTLCommandQueue> queue = nil;
+    id<MTLCommandBuffer> pending = nil;
+    unsigned encoded = 0;
     bool ok = false;
 };
 MtlState* st() {
     static MtlState s;
     return &s;
+}
+
+void flush_pending() {
+    auto* v=st();
+    if(!v->pending) return;
+    auto cb=v->pending;
+    v->pending=nil; v->encoded=0;
+    [cb commit]; [cb waitUntilCompleted];
+    if(cb.status==MTLCommandBufferStatusError)
+        throw std::runtime_error(std::string("znn metal command failed: ")+cb.error.localizedDescription.UTF8String);
+}
+id<MTLCommandBuffer> begin_pending() {
+    auto* v=st();
+    if(!v->pending) v->pending=[v->queue commandBuffer];
+    return v->pending; // retainedReferences keeps encoded buffers alive
+}
+void finish_encoding() {
+    const char* eager=std::getenv("ZNN_METAL_EAGER");
+    if(++st()->encoded>=1024 || (eager && std::strcmp(eager,"0")!=0)) flush_pending();
 }
 
 bool init_metal() {
@@ -70,40 +92,59 @@ void free(void* p) {
 }
 
 void copy_host_to_device(void* dst, const void* src, size_t bytes) {
+    flush_pending();
     memcpy(static_cast<MtlBuf*>(dst)->mapped, src, bytes);   // 共享内存直拷
 }
 void copy_device_to_host(void* dst, const void* src, size_t bytes) {
+    flush_pending();
     memcpy(dst, static_cast<const MtlBuf*>(src)->mapped, bytes);
 }
 
 void copy_device_to_host_off(void* dst, const void* src, size_t soff,
                              size_t bytes) {
+    flush_pending();
     memcpy(dst, static_cast<const char*>(static_cast<const MtlBuf*>(src)->mapped)
                + soff, bytes);
 }
 
 void copy_device_to_device(void* dst, const void* src, size_t bytes) {
     MtlState* v = st();
-    id<MTLCommandBuffer> cb = [v->queue commandBuffer];
+    id<MTLCommandBuffer> cb = begin_pending();
     id<MTLBlitCommandEncoder> enc = [cb blitCommandEncoder];
     MtlBuf* d = static_cast<MtlBuf*>(dst);
     MtlBuf* s = static_cast<MtlBuf*>(const_cast<void*>(src));
     [enc copyFromBuffer:s->buffer sourceOffset:0
                  toBuffer:d->buffer destinationOffset:0 size:bytes];
     [enc endEncoding];
-    [cb commit];
-    [cb waitUntilCompleted];
+    finish_encoding();
 }
 
 void memset0(void* p, size_t bytes) {
+    flush_pending();
     memset(static_cast<MtlBuf*>(p)->mapped, 0, bytes);       // 共享内存
+}
+void fill_f32(void* p,size_t count,float value) {
+    if(!count)return;
+    static id<MTLComputePipelineState> pipe=nil;
+    if(!pipe)pipe=device::pipeline(R"MSL(
+        #include <metal_stdlib>
+        using namespace metal;
+        kernel void fill32(device float* y [[buffer(0)]], constant float& value [[buffer(1)]], constant ulong& n [[buffer(2)]], uint i [[thread_position_in_grid]]) {if(i<n)y[i]=value;}
+    )MSL","fill32");
+    auto cb=begin_pending();auto enc=[cb computeCommandEncoder];
+    [enc setComputePipelineState:pipe];
+    [enc setBuffer:static_cast<MtlBuf*>(p)->buffer offset:0 atIndex:0];
+    [enc setBytes:&value length:sizeof(value) atIndex:1];
+    uint64_t n=count;[enc setBytes:&n length:sizeof(n) atIndex:2];
+    [enc dispatchThreads:MTLSizeMake(count,1,1) threadsPerThreadgroup:MTLSizeMake(256,1,1)];
+    [enc endEncoding];finish_encoding();
 }
 
 // ---- 计算派发入口(内核文件使用; 声明见 metal_device.hpp) ----
 namespace device {
 
 id<MTLBuffer> buf_of(void* p) { return static_cast<MtlBuf*>(p)->buffer; }
-void* mapped_of(void* p) { return static_cast<MtlBuf*>(p)->mapped; }
+void* mapped_of(void* p) { flush_pending(); return static_cast<MtlBuf*>(p)->mapped; }
 
 // MSL 源码 → 管线(驱动运行时编译; Metal 官方路径, 无离线工具)
 id<MTLComputePipelineState> pipeline(const char* msl, const char* name) {
@@ -136,7 +177,7 @@ void dispatch(id<MTLComputePipelineState> p, MBuf a, MBuf b, MBuf y,
               MTLSize grid, MTLSize tg,
               void (^config)(id<MTLComputeCommandEncoder>)) {
     MtlState* v = st();
-    id<MTLCommandBuffer> cb = [v->queue commandBuffer];
+    id<MTLCommandBuffer> cb = begin_pending();
     id<MTLComputeCommandEncoder> enc = [cb computeCommandEncoder];
     [enc setComputePipelineState:p];
     [enc setBuffer:a.buf offset:a.off atIndex:0];   // 视图偏移在绑定折叠
@@ -148,15 +189,14 @@ void dispatch(id<MTLComputePipelineState> p, MBuf a, MBuf b, MBuf y,
     if (config) config(enc);
     [enc dispatchThreads:grid threadsPerThreadgroup:tg];
     [enc endEncoding];
-    [cb commit];
-    [cb waitUntilCompleted];
+    finish_encoding();
 }
 
 void dispatch_bufs(id<MTLComputePipelineState> p, const MBuf* bufs,
                    int nbuf, const void* push, size_t push_size,
                    MTLSize grid, MTLSize tg) {
     MtlState* v = st();
-    id<MTLCommandBuffer> cb = [v->queue commandBuffer];
+    id<MTLCommandBuffer> cb = begin_pending();
     id<MTLComputeCommandEncoder> enc = [cb computeCommandEncoder];
     [enc setComputePipelineState:p];
     for (int i = 0; i < nbuf; ++i) {
@@ -167,8 +207,7 @@ void dispatch_bufs(id<MTLComputePipelineState> p, const MBuf* bufs,
     }
     [enc dispatchThreads:grid threadsPerThreadgroup:tg];
     [enc endEncoding];
-    [cb commit];
-    [cb waitUntilCompleted];
+    finish_encoding();
 }
 
 void dispatch_bufs_tg(id<MTLComputePipelineState> p, const MBuf* bufs,
@@ -176,7 +215,7 @@ void dispatch_bufs_tg(id<MTLComputePipelineState> p, const MBuf* bufs,
                       MTLSize grid, MTLSize tg,
                       NSUInteger tg0_bytes, NSUInteger tg1_bytes) {
     MtlState* v = st();
-    id<MTLCommandBuffer> cb = [v->queue commandBuffer];
+    id<MTLCommandBuffer> cb = begin_pending();
     id<MTLComputeCommandEncoder> enc = [cb computeCommandEncoder];
     [enc setComputePipelineState:p];
     for (int i = 0; i < nbuf; ++i) {
@@ -189,8 +228,7 @@ void dispatch_bufs_tg(id<MTLComputePipelineState> p, const MBuf* bufs,
     if (tg1_bytes > 0) [enc setThreadgroupMemoryLength:tg1_bytes atIndex:1];
     [enc dispatchThreads:grid threadsPerThreadgroup:tg];
     [enc endEncoding];
-    [cb commit];
-    [cb waitUntilCompleted];
+    finish_encoding();
 }
 
 } // namespace device

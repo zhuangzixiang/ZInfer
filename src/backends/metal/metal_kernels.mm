@@ -811,44 +811,25 @@ kernel void lnrow(device const float* x [[buffer(0)]],
         sv[0] = max(q / (float)pc[1] - sm[0] * sm[0], 0.0f);
     }
     threadgroup_barrier(mem_flags::mem_threadgroup);
-    const float inv = rsqrt(sv[0] + pc[4]);
+    const float inv = rsqrt(sv[0] + as_type<float>(pc[4]));
     for (int i = lid; i < pc[1]; i += 256) {
         y[base + i] = (x[base + i] - sm[0]) * inv * w[i] + b[i];
     }
 }
 
 kernel void lngroup(device const float* x [[buffer(0)]],
-                     device const float* w [[buffer(1)]],
-                     device const float* b [[buffer(2)]],
-                     device float* y [[buffer(5)]],
-                     constant const int* pc [[buffer(8)]],
-                     threadgroup float* sm [[threadgroup(0)]],
-                     threadgroup float* sv [[threadgroup(1)]],
-                     uint3 tpig [[thread_position_in_grid]],
-                     uint3 tpit [[thread_position_in_threadgroup]]) {
-    // pc: [groups, D, 0, inner, eps, 0, 0] —— 每 threadgroup 一组, 组内跨维步进
-    const int g = (int)(tpig.x);
-    if (g >= pc[0]) return;
-    const int lid = (int)(tpit.x);
-    const int base = g / pc[3] * pc[1] * pc[3] + g % pc[3];
-    float ls = 0.0f, lq = 0.0f;
-    for (int d = lid; d < pc[1]; d += 256) {
-        const float v = x[base + d * pc[3]];
-        ls += v; lq += v * v;
-    }
-    sm[lid] = ls; sv[lid] = lq;
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-    if (lid == 0) {
-        float s = 0.0f, q = 0.0f;
-        for (int i = 0; i < 256; ++i) { s += sm[i]; q += sv[i]; }
-        sm[0] = s / (float)pc[1];
-        sv[0] = max(q / (float)pc[1] - sm[0] * sm[0], 0.0f);
-    }
-    threadgroup_barrier(mem_flags::mem_threadgroup);
-    const float mu = sm[0];
-    const float inv = rsqrt(sv[0] + pc[4]);
-    for (int d = lid; d < pc[1]; d += 256)
-        y[base + d * pc[3]] = (x[base + d * pc[3]] - mu) * inv * w[d] + b[d];
+ device const float* w [[buffer(1)]], device const float* b [[buffer(2)]],
+ device float* y [[buffer(5)]], constant const int* pc [[buffer(8)]],
+ threadgroup float* sm [[threadgroup(0)]], threadgroup float* sv [[threadgroup(1)]],
+ uint3 group [[threadgroup_position_in_grid]], uint3 tid [[thread_position_in_threadgroup]]) {
+ int lid=int(tid.x), lane=lid%32, part=lid/32, g=int(group.x)*32+lane;
+ int base=g/pc[3]*pc[1]*pc[3]+g%pc[3];
+ float s=0,q=0;
+ if(g<pc[0])for(int d=part;d<pc[1];d+=8){float v=x[base+d*pc[3]];s+=v;q+=v*v;}
+ sm[lid]=s;sv[lid]=q;threadgroup_barrier(mem_flags::mem_threadgroup);
+ s=0;q=0;for(int j=0;j<8;++j){s+=sm[j*32+lane];q+=sv[j*32+lane];}
+ float mu=s/float(pc[1]),inv=rsqrt(max(q/float(pc[1])-mu*mu,0.0f)+as_type<float>(pc[4]));
+ if(g<pc[0])for(int d=part;d<pc[1];d+=8)y[base+d*pc[3]]=(x[base+d*pc[3]]-mu)*inv*w[d]+b[d];
 }
 
 kernel void bnchannel(device const float* x [[buffer(0)]],
@@ -889,8 +870,9 @@ kernel void bnchannel(device const float* x [[buffer(0)]],
             float s = 0.0f;
             for (int i = 0; i < 256; ++i) s += sm[i];
             const float v = s / (float)m;
-            rm[c] = (1.0f - pc[5]) * rm[c] + pc[5] * mu;
-            rv[c] = (1.0f - pc[5]) * rv[c] + pc[5] * v;
+            const float momentum = as_type<float>(pc[5]);
+            rm[c] = (1.0f - momentum) * rm[c] + momentum * mu;
+            rv[c] = (1.0f - momentum) * rv[c] + momentum * v;
             sm[0] = v;
         }
         threadgroup_barrier(mem_flags::mem_threadgroup);
@@ -898,7 +880,7 @@ kernel void bnchannel(device const float* x [[buffer(0)]],
     } else {
         mu = rm[c]; var = rv[c];
     }
-    const float inv = rsqrt(var + pc[4]);
+    const float inv = rsqrt(var + as_type<float>(pc[4]));
     for (int i = lid; i < m; i += 256) {
         const int off = ((i / hw) * pc[1] + c) * hw + i % hw;
         y[off] = (x[off] - mu) * inv * w[c] + b[c];
@@ -1089,6 +1071,16 @@ kernel void poolmax(device const float* x [[buffer(0)]],
         }
     }
     y[i] = m;
+}
+
+kernel void poolglobalavg(device const float* x [[buffer(0)]],
+ device float* y [[buffer(2)]],constant const int* pc [[buffer(8)]],
+ threadgroup float* sums [[threadgroup(0)]],uint3 group [[threadgroup_position_in_grid]],uint3 tid [[thread_position_in_threadgroup]]) {
+ uint lane=tid.x,channel=group.x;int spatial=pc[1]*pc[2];float sum=0;
+ for(int i=int(lane);i<spatial;i+=256)sum+=x[channel*spatial+i];
+ sums[lane]=sum;threadgroup_barrier(mem_flags::mem_threadgroup);
+ for(uint s=128;s>0;s>>=1){if(lane<s)sums[lane]+=sums[lane+s];threadgroup_barrier(mem_flags::mem_threadgroup);}
+ if(lane==0)y[channel]=sums[0]/float(spatial);
 }
 
 kernel void poolavg(device const float* x [[buffer(0)]],
@@ -1409,7 +1401,7 @@ void layer_norm_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
         const device::MBuf bufs[6] = {mbuf(x), mbuf(*in[1]), mbuf(*in[2]),
                                       mbuf(x), mbuf(x), mbuf(*out[0])};
         device::dispatch_bufs_tg(p, bufs, 6, &pc, sizeof(pc),
-                                 MTLSizeMake(1, (uint32_t)rows, 1),
+                                 MTLSizeMake(256, (uint32_t)rows, 1),
                                  MTLSizeMake(256, 1, 1), 256 * 4, 256 * 4);
         return;
     }
@@ -1426,7 +1418,7 @@ void layer_norm_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
     const device::MBuf bufs[6] = {mbuf(x), mbuf(*in[1]), mbuf(*in[2]),
                                   mbuf(x), mbuf(x), mbuf(*out[0])};
     device::dispatch_bufs_tg(pg, bufs, 6, &pc, sizeof(pc),
-                             MTLSizeMake((uint32_t)groups, 1, 1),
+                             MTLSizeMake((uint32_t)((groups+31)/32)*256, 1, 1),
                              MTLSizeMake(256, 1, 1), 256 * 4, 256 * 4);
 }
 
@@ -1445,7 +1437,7 @@ void batch_norm2d_metal(KernelContext&, Span<const Tensor*> in,
     const device::MBuf bufs[6] = {mbuf(x), mbuf(*in[1]), mbuf(*in[2]),
                                   mbuf(*in[3]), mbuf(*in[4]), mbuf(*out[0])};
     device::dispatch_bufs_tg(p, bufs, 6, &pc, sizeof(pc),
-                             MTLSizeMake(1, (uint32_t)x.size(1), 1),
+                             MTLSizeMake(256, (uint32_t)x.size(1), 1),
                              MTLSizeMake(256, 1, 1), 256 * 4, 0);
 }
 
@@ -1494,6 +1486,14 @@ ConvPcM conv_pcm(const Tensor& x, const Tensor& wt, const Tensor& y,
 void conv2d_metal(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out,
                   const void* options) {
     const Conv2dOptions* o = static_cast<const Conv2dOptions*>(options);
+    const Tensor& x=*in[0]; const Tensor& w=*in[1];
+    if(x.is_contiguous() && w.is_contiguous() && x.size(0)==1 && o->groups==1
+       && w.size(2)==1 && w.size(3)==1 && o->stride[0]==1 && o->stride[1]==1
+       && o->pad[0]==0 && o->pad[1]==0) {
+        const int spatial=int(x.size(2)*x.size(3));
+        gemm_run(w,x,*out[0],int(w.size(0)),spatial,int(x.size(1)),int(x.size(1)),spatial,0);
+        return;
+    }
     static id<MTLComputePipelineState> p = nil;
     if (!p) p = device::pipeline(kMslConv, "convfwd");
     ConvPcM pc = conv_pcm(*in[0], *in[1], *out[0], *o);
@@ -1556,6 +1556,11 @@ void avg_pool2d_metal(KernelContext&, Span<const Tensor*> in,
     PoolPcM pc = pool_pcm(*in[0], *out[0], *o);
     const device::MBuf bufs[4] = {mbuf(*in[0]), mbuf(*in[0]),
                                   mbuf(*out[0]), mbuf(*out[0])};
+    if(pc.ho==1 && pc.wo==1 && pc.ph==0 && pc.pw==0 && pc.kh==pc.h && pc.kw==pc.w) {
+        static id<MTLComputePipelineState> pg=nil;
+        if(!pg)pg=device::pipeline(kMslPool,"poolglobalavg");
+        device::dispatch_bufs_tg(pg,bufs,4,&pc,sizeof(pc),MTLSizeMake(uint32_t(pc.total)*256,1,1),MTLSizeMake(256,1,1),256*4,0);return;
+    }
     device::dispatch_bufs(p, bufs, 4, &pc, sizeof(pc),
                           MTLSizeMake(rup((uint32_t)out[0]->numel(), 256), 1, 1),
                           MTLSizeMake(256, 1, 1));

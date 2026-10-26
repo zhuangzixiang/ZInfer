@@ -24,6 +24,7 @@ bool   available();                                   // 是否编入且设备�
 void*  alloc(size_t bytes);                           // VkDeviceMemory+Buffer
 void   free(void* p);
 void   memset0(void* p, size_t bytes);
+void   fill_f32(void* p, size_t count, float value);
 void   copy_host_to_device(void* dst, const void* src, size_t bytes);
 void   copy_device_to_host(void* dst, const void* src, size_t bytes);
 void   copy_device_to_host_off(void* dst, const void* src, size_t soff,

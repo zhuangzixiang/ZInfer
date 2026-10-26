@@ -5,13 +5,19 @@
 #include "operators/shared.hpp"
 
 namespace znn {
+void SgdImpl::export_state(std::vector<Tensor>& ts,int64_t& step,OptimParam& p,int& kind) const {
+    step=0;p=param_;kind=0;ts=velocity_;ts.resize(params_.size());
+}
+void SgdImpl::import_state(const std::vector<Tensor>& ts,int64_t step,const OptimParam& p,int kind) {
+    if(kind!=0||step!=0||ts.size()!=params_.size())throw std::runtime_error("SGD checkpoint mismatch");
+    std::vector<Tensor> next(ts.size());for(size_t i=0;i<ts.size();++i)if(ts[i])next[i]=ts[i].to_device(params_[i].device());
+    velocity_=std::move(next);param_=p;
+}
 
 SgdImpl::SgdImpl(std::vector<Tensor> params, const OptimParam& param)
     : param_(param) {
     params_ = std::move(params);   // 基类成员(GradScaler 共享)
-    if (param_.momentum > 0) {
-        velocity_.resize(params_.size());
-    }
+    velocity_.resize(params_.size());
 }
 
 void SgdImpl::step() {

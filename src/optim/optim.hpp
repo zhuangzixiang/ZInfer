@@ -13,6 +13,8 @@ public:
     SgdImpl(std::vector<Tensor> params, const OptimParam& param);
     void step() override;
     void clear() override;
+    void export_state(std::vector<Tensor>&,int64_t&,OptimParam&,int&) const override;
+    void import_state(const std::vector<Tensor>&,int64_t,const OptimParam&,int) override;
 private:
     std::vector<Tensor> velocity_;   // momentum > 0 时启用
     OptimParam param_;
@@ -23,6 +25,8 @@ public:
     AdamImpl(std::vector<Tensor> params, const OptimParam& param);
     void step() override;
     void clear() override;
+    void export_state(std::vector<Tensor>&,int64_t&,OptimParam&,int&) const override;
+    void import_state(const std::vector<Tensor>&,int64_t,const OptimParam&,int) override;
 protected:
     int64_t step_count_ = 0;         // 偏差校正用
     bool decoupled_ = false;         // AdamW: 权重衰减不进入梯度
@@ -37,7 +41,7 @@ protected:
 
 class AdamWImpl final : public AdamImpl {
 public:
-    using AdamImpl::AdamImpl;
+    AdamWImpl(std::vector<Tensor> params,const OptimParam& p):AdamImpl(std::move(params),p) { decoupled_=true; }
     void step() override;    // 与 Adam 仅解耦衰减语义不同
 };
 

@@ -4,6 +4,7 @@
 #include "backend_slots.hpp"
 #include "znn_internal.hpp"
 #include "operators/shared.hpp"
+#include "op_profile.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <array>
@@ -90,6 +91,7 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
     if (inputs.size() == 0 || !op->infer) {
         throw std::runtime_error("znn: operator needs inputs and infer");
     }
+    profiling::Scope profile(op->name,inputs);
     // 0. 设备一致性校验(混合设备输入此前直达内核 = 越界读崩溃, 存量缺口)
     for (size_t i = 1; i < inputs.size(); ++i) {
         if (inputs[i]->device() != inputs[0]->device()) {
@@ -97,6 +99,24 @@ Tensor OpDispatcher::run(const Operator* op, Span<const Tensor*> inputs, const v
                 std::string("znn: op '") + op->name
                 + "' inputs on different devices (input#0 vs input#"
                 + std::to_string(i) + "); use to_device() to align");
+        }
+    }
+    // Vulkan arithmetic shaders bind allocation bases. A contiguous slice may
+    // still have a nonzero offset (and descriptor offsets require alignment).
+    // Materialize views on-device at the framework boundary; clone itself
+    // handles arbitrary strides and offsets and must not recurse here.
+    const bool vk_views=inputs[0]->device()==Device::Vulkan && std::string(op->name)!="clone";
+    const bool ln_views=std::string(op->name)=="layer_norm";
+    if(vk_views || ln_views) {
+        bool normalize=false;
+        for(size_t i=0;i<inputs.size();++i)
+            normalize=normalize||(vk_views && inputs[i]->storage_offset()!=0)||!inputs[i]->is_contiguous();
+        if(normalize) {
+            std::vector<Tensor> owned(inputs.size());std::vector<const Tensor*> ptrs(inputs.size());
+            for(size_t i=0;i<inputs.size();++i) {
+                owned[i]=((vk_views && inputs[i]->storage_offset()!=0)||!inputs[i]->is_contiguous())?inputs[i]->clone():*inputs[i];ptrs[i]=&owned[i];
+            }
+            return run(op,Span<const Tensor*>(ptrs.data(),ptrs.size()),options);
         }
     }
     // F16/BF16 storage uses the same numerically stable F32 operator kernels.

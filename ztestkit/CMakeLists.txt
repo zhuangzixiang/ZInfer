@@ -16,6 +16,7 @@ target_link_libraries(hello_dll PRIVATE znn)
 target_compile_options(hello_dll PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 if(WIN32 AND ZNN_BUILD_DLL)
     foreach(test_target ztestkit zbench hello_dll)
+        set_property(TARGET ${test_target} APPEND PROPERTY LINK_DEPENDS "$<TARGET_FILE:znn>")
         add_custom_command(TARGET ${test_target} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 $<TARGET_FILE:znn> $<TARGET_FILE_DIR:${test_target}>)

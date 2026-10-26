@@ -11,7 +11,7 @@ static void silu_ref(KernelContext&, Span<const Tensor*> in, Span<Tensor*> out, 
 
 static void silu_cpu(KernelContext& c, Span<const Tensor*> in, Span<Tensor*> out,
                         const void* o) {
-    if (!onednn::eltwise(in, out, (int)dnnl_eltwise_swish, 0.f, 0.f)) {
+    if (!onednn::eltwise(in, out, (int)dnnl_eltwise_swish, 1.f, 0.f)) {
         silu_ref(c, in, out, o);   // 缺 DLL 回落(Eigen 快速路径)
     }
 }

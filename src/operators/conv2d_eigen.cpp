@@ -17,10 +17,7 @@ static void conv2d_eigen(KernelContext&, Span<const Tensor*> in,
     const Tensor& w = *in[1];
     Tensor& y = *out[0];
     const bool fast = x.is_contiguous() && w.is_contiguous() && y.is_contiguous();
-    if (fast && onednn::conv2d(x, w, y,
-                               *static_cast<const Conv2dOptions*>(options))) {
-        return;   // oneDNN 直接卷积(缺失/分组/膨胀回落 im2col+Eigen)
-    }
+    if (fast && onednn::conv2d(x, w, y, *o)) return;
     if (!fast) {
         KernelContext c{Device::CPU, nullptr};
         conv2d_naive(c, in, out, options);
@@ -36,6 +33,29 @@ static void conv2d_eigen(KernelContext&, Span<const Tensor*> in,
     const float* xp = x.data<float>();
     const float* wp = w.data<float>();
     float* yp = y.data<float>();
+    if(KH==1 && KW==1 && o->stride[0]==1 && o->stride[1]==1 && o->pad[0]==0 && o->pad[1]==0) {
+        for(int64_t n=0;n<N;++n) for(int64_t g=0;g<G;++g) {
+            const float* a=wp+g*Og*Cg; const float* b=xp+(n*C+g*Cg)*H*W;
+            float* dst=yp+(n*O+g*Og)*HO*WO;
+            if(!onednn::gemm(a,int(Cg),b,int(H*W),dst,int(HO*WO),int(Og),int(HO*WO),int(Cg),false)) {
+                Eigen::Map<Mat>(dst,Og,HO*WO).noalias()=Eigen::Map<const Mat>(a,Og,Cg)*Eigen::Map<const Mat>(b,Cg,H*W);
+            }
+        }
+        return;
+    }
+    if(Cg==1 && Og==1) {
+        #pragma omp parallel for if(N*C*HO*WO>4096)
+        for(int64_t row=0;row<N*C*HO;++row) {
+            const int64_t ho=row%HO,c=(row/HO)%C,n=row/(HO*C);
+            for(int64_t wo=0;wo<WO;++wo) {
+                float sum=0;
+                for(int64_t ki=0;ki<KH;++ki) {const int64_t h=ho*o->stride[0]+ki*o->dilation[0]-o->pad[0];if(h<0||h>=H)continue;
+                    for(int64_t kj=0;kj<KW;++kj) {const int64_t w=wo*o->stride[1]+kj*o->dilation[1]-o->pad[1];if(w>=0&&w<W)sum+=xp[((n*C+c)*H+h)*W+w]*wp[(c*KH+ki)*KW+kj];}}
+                yp[row*WO+wo]=sum;
+            }
+        }
+        return;
+    }
     std::vector<float> col_buf(static_cast<size_t>(Cg * KH * KW * HO * WO));
     for (int64_t g = 0; g < G; ++g) {
     Eigen::Map<const Mat> w_row(wp + g * Og * Cg * KH * KW, Og, Cg * KH * KW);

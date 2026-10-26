@@ -15,6 +15,9 @@
 #include <vector>
 #include <mutex>
 #include <unordered_map>
+#include <stdexcept>
+#include <chrono>
+#include <fstream>
 #ifdef _WIN32
   #include <windows.h>
 #endif
@@ -110,6 +113,7 @@ struct VkState {
     VkDescriptorPool dpool = VK_NULL_HANDLE;
     uint32_t host_mem_idx = UINT32_MAX;    // 系统内存(小分配: CPU 写缓存 + L2 吸收)
     uint32_t local_mem_idx = UINT32_MAX;  // BAR 显存(大分配: GPU 直读 VRAM)
+    uint32_t read_mem_idx = UINT32_MAX;   // CPU cached coherent readback
     bool ok = false;
     std::mutex mu;                       // 提交串行化(v1 单队列)
     // 缓冲池: 尺寸桶(2^n)空闲链表 —— 每调用 vkCreateBuffer+AllocateMemory
@@ -216,6 +220,7 @@ bool init_vulkan() {
         const VkMemoryPropertyFlags f = mp.memoryTypes[i].propertyFlags;
         if ((f & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) == 0) continue;
         if ((f & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == 0) continue;
+        if (f & VK_MEMORY_PROPERTY_HOST_CACHED_BIT) v->read_mem_idx = i;
         if (f & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
             v->local_mem_idx = i;         // BAR 显存(大矩阵: GPU 直读 VRAM)
         } else if (v->host_mem_idx == UINT32_MAX) {
@@ -224,6 +229,7 @@ bool init_vulkan() {
     }
     if (v->host_mem_idx == UINT32_MAX) v->host_mem_idx = v->local_mem_idx;
     if (v->host_mem_idx == UINT32_MAX) return false;
+    if (v->read_mem_idx == UINT32_MAX) v->read_mem_idx = v->host_mem_idx;
 
     VkCommandPoolCreateInfo pci{};
     pci.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -231,11 +237,12 @@ bool init_vulkan() {
     pci.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     if (vkCreateCommandPool(v->dev, &pci, nullptr, &v->pool) != VK_SUCCESS) return false;
 
-    VkDescriptorPoolSize dpsz[1] = {{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 64}};
+    VkDescriptorPoolSize dpsz[1] = {{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 16384 * 8}};
     VkDescriptorPoolCreateInfo dpi{};
     dpi.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    dpi.maxSets = 64;
+    dpi.maxSets = 16384;
     dpi.poolSizeCount = 1;
+    dpi.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     dpi.pPoolSizes = dpsz;
     if (vkCreateDescriptorPool(v->dev, &dpi, nullptr, &v->dpool) != VK_SUCCESS) {
         return false;
@@ -268,16 +275,10 @@ size_t bucket_of(size_t bytes) {          // 桶 = ≥256 的下一个 2^n
 }
 }
 
-void* alloc(size_t bytes) {
+static void* alloc_type(size_t bytes, uint32_t mem_idx) {
     VkState* v = st();
     if (!v->ok || bytes == 0) return nullptr;
-    // 内存类型: 默认 ≥64MB(4096 级矩阵)走 BAR 显存, 其余系统内存
-    // (实测: ≤2048 工作集系统内存+L2 更快; 8MB 阈值曾把 2048 推上显存反而 2.6× 慢)
-    // ZNN_VK_LOCAL=1: 全部优先 BAR —— 多小算子级 CNN 在独显上避免逐算子 PCIe 往返
-    static const bool prefer_local = std::getenv("ZNN_VK_LOCAL") != nullptr;
-    const uint32_t mem_idx = (v->local_mem_idx != UINT32_MAX
-                              && (prefer_local || bytes >= ((size_t)64 << 20)))
-                                 ? v->local_mem_idx : v->host_mem_idx;
+    // Pools are separated by memory type, so readback and compute never mix.
     {   // 池命中(key = 类型<<48|桶; 超大块不池化)
         if (bytes <= (size_t)256 << 20) {
         const uint64_t key = ((uint64_t)mem_idx << 48) | bucket_of(bytes);
@@ -335,6 +336,17 @@ void* alloc(size_t bytes) {
     return new VkBuf{buf, mem, mapped, bytes, mem_idx};
 }
 
+void* alloc(size_t bytes) {
+    VkState* v = st();
+    // Local computation is the automatic default; 0 is a diagnostic override.
+    const char* setting = std::getenv("ZNN_VK_LOCAL");
+    const bool local = !setting || std::strcmp(setting, "0") != 0;
+    if (local && v->local_mem_idx != UINT32_MAX) {
+        if (void* p = alloc_type(bytes, v->local_mem_idx)) return p;
+    }
+    return alloc_type(bytes, v->host_mem_idx);
+}
+
 void return_to_pool(void* p);               // 前置声明(定义在后; 池归还)
 
 // ---- 延迟提交(批量派发): 算子只录制不等待, 真正的主机-设备边界才同步 ----
@@ -388,19 +400,32 @@ void flush() {                              // 主机-设备同步屏障
     defer_init();
     VkState* v = st();
     if (!g_dirty) return;
+    struct Timing {
+        std::ofstream log;uint64_t sequence=0;
+        Timing(){if(const char* p=std::getenv("ZNN_VK_TIMING_FILE")){log.open(p);log<<"flush,descriptors,submit_ms,wait_ms,cleanup_ms\n";}}
+    };
+    static Timing timing;
+    const bool timed=timing.log.is_open();
+    using Clock=std::chrono::steady_clock;
+    auto stamp=[&](){return timed?Clock::now():Clock::time_point{};};
+    auto t0=stamp();const size_t descriptors=g_pending_ds.size();
     vkEndCommandBuffer(g_cb);
     VkSubmitInfo si{};
     si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     si.commandBufferCount = 1;
     si.pCommandBuffers = &g_cb;
     const VkResult rs = vkQueueSubmit(v->queue, 1, &si, VK_NULL_HANDLE);
+    auto t1=stamp();
     const VkResult rw = vkQueueWaitIdle(v->queue);
+    auto t2=stamp();
     if (rs != VK_SUCCESS || rw != VK_SUCCESS) {   // [诊断] 设备丢失/提交失败
         std::fprintf(stderr, "[vk] submit st=%d wait st=%d\n", (int)rs, (int)rw);
     }
     vkResetCommandBuffer(g_cb, 0);
     g_dirty = false;
     drain_after_wait();
+    if(timed){auto t3=stamp();auto ms=[](auto a,auto b){return std::chrono::duration<double,std::milli>(b-a).count();};
+        timing.log<<++timing.sequence<<','<<descriptors<<','<<ms(t0,t1)<<','<<ms(t1,t2)<<','<<ms(t2,t3)<<'\n';}
 }
 
 void return_to_pool(void* p) {             // 队列空闲前提下的池归还
@@ -440,22 +465,52 @@ void free(void* p) {
     delete static_cast<VkBuf*>(p);
 }
 
-// 主机可见内存: 拷贝即 memcpy(常驻映射), 设备一致性由 COHERENT 保证
+namespace device { VkCommandBuffer begin_cmd(); }
+void fill_f32(void* p,size_t count,float value) {
+    if(!count)return;
+    uint32_t bits;memcpy(&bits,&value,sizeof(bits));
+    auto cb=device::begin_cmd();
+    vkCmdFillBuffer(cb,static_cast<VkBuf*>(p)->buf,0,count*sizeof(float),bits);
+    storage_barrier(cb);
+    if(g_eager)flush();
+}
+// Upload remains a coherent mapped write. Readback uses a GPU transfer to
+// cached host memory: reading uncached BAR memory from the CPU is very slow.
 void copy_host_to_device(void* dst, const void* src, size_t bytes) {
     flush();                                // 主机写映射内存前等待队列清空
     memcpy(static_cast<VkBuf*>(dst)->mapped, src, bytes);
 }
 void copy_device_to_host(void* dst, const void* src, size_t bytes) {
-    flush();                                // 主机读映射内存前等待队列清空
-    memcpy(dst, static_cast<const VkBuf*>(src)->mapped, bytes);
+    copy_device_to_host_off(dst, src, 0, bytes);
 }
 
 void copy_device_to_host_off(void* dst, const void* src, size_t soff,
                              size_t bytes) {
-    flush();                                // 同上: 主机读前同步
-    // 偏移折算在 mapped 指针上(句柄不可算术)
-    memcpy(dst, static_cast<const char*>(static_cast<const VkBuf*>(src)->mapped)
-               + soff, bytes);
+    if (!bytes) return;
+    const auto* source = static_cast<const VkBuf*>(src);
+    if (soff > source->cap || bytes > source->cap - soff)
+        throw std::runtime_error("Vulkan readback outside allocation");
+    VkBuf* staging = nullptr;
+    if (source->mem_idx != st()->read_mem_idx && bytes >= 256)
+        staging = static_cast<VkBuf*>(alloc_type(bytes, st()->read_mem_idx));
+    if (staging) {
+        auto cb = device::begin_cmd();
+        storage_barrier(cb);
+        VkBufferCopy region{soff, 0, bytes};
+        vkCmdCopyBuffer(cb, source->buf, staging->buf, 1, &region);
+        VkMemoryBarrier host{};
+        host.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+        host.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        host.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+        vkCmdPipelineBarrier(cb, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_HOST_BIT, 0, 1, &host, 0, nullptr, 0, nullptr);
+        flush();
+        memcpy(dst, staging->mapped, bytes);
+        free(staging);
+    } else {
+        flush();
+        memcpy(dst, static_cast<const char*>(source->mapped) + soff, bytes);
+    }
 }
 
 // ---- 计算派发入口(内核文件使用) ----

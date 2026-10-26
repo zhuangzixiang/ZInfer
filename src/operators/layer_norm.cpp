@@ -22,6 +22,32 @@ static void layer_norm_cpu(KernelContext& c, Span<const Tensor*> in,
                            Span<Tensor*> out, const void* o) {
     const LayerNormOptions* a = static_cast<const LayerNormOptions*>(o);
     const int64_t dim = a->dim < 0 ? in[0]->dim_count() - 1 : a->dim;
+    const Tensor& x = *in[0];
+    int64_t inner=1, outer=1;
+    for(int64_t d=0;d<x.dim_count();++d) {
+        if(d<dim) outer*=x.size(d);
+        if(d>dim) inner*=x.size(d);
+    }
+    if(inner>1 && x.is_contiguous() && in[1]->is_contiguous() && in[2]->is_contiguous()) {
+        const int64_t D=x.size(dim), tiles=(inner+127)/128;
+        const float* xp=x.data<float>(); const float* wp=in[1]->data<float>();
+        const float* bp=in[2]->data<float>(); float* yp=out[0]->data<float>();
+        // Adjacent spatial locations share cache lines; reduce channels across
+        // a tile instead of striding through the entire tensor per pixel.
+        #pragma omp parallel for if(outer*tiles*D>4096)
+        for(int64_t t=0;t<outer*tiles;++t) {
+            const int64_t base=(t/tiles)*D*inner+(t%tiles)*128;
+            const int n=static_cast<int>(std::min<int64_t>(128,inner-(t%tiles)*128));
+            double sum[128]={}, sq[128]={}; float mean[128],inv[128];
+            for(int64_t d=0;d<D;++d) for(int i=0;i<n;++i) {
+                const double v=xp[base+d*inner+i]; sum[i]+=v; sq[i]+=v*v;
+            }
+            for(int i=0;i<n;++i) {const double m=sum[i]/D;mean[i]=float(m);inv[i]=float(1/std::sqrt(std::max(0.,sq[i]/D-m*m)+a->eps));}
+            for(int64_t d=0;d<D;++d) for(int i=0;i<n;++i)
+                yp[base+d*inner+i]=(xp[base+d*inner+i]-mean[i])*inv[i]*wp[d]+bp[d];
+        }
+        return;
+    }
     if (dim == in[0]->dim_count() - 1
         && onednn::layer_norm(*in[0], *in[1], *in[2], *out[0], a->eps)) {
         return;
